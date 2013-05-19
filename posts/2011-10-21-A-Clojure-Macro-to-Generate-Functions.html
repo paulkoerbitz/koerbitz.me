@@ -28,17 +28,11 @@
 <p class="date">written on October 21, 2011</p>
 
 <p>Prompted by <a href="http://stackoverflow.com/q/7852351/346587">this question</a> on Stackoverflow I thought a little bit about macros that generate functions. Here is what I came up with:</p>
-<p><a href="#">?</a></p>
-<p>1</p>
-<p>2</p>
-<p>3</p>
-<p>4</p>
-<p>5</p>
-<p><code class="sourceCode clojure">(</code><code class="sourceCode clojure"><span class="kw">defmacro</span></code> <code class="sourceCode clojure">make-placeholders </code><code class="sourceCode clojure">[</code><code class="sourceCode clojure">n</code><code class="sourceCode clojure">]</code></p>
-<p><code class="sourceCode clojure">  </code><code class="sourceCode clojure">`</code><code class="sourceCode clojure">(</code><code class="sourceCode clojure"><span class="kw">do</span></code></p>
-<p><code class="sourceCode clojure">     </code><code class="sourceCode clojure">'</code><code class="sourceCode clojure">~</code><code class="sourceCode clojure">(</code><code class="sourceCode clojure"><span class="kw">for</span></code> <code class="sourceCode clojure">[</code><code class="sourceCode clojure">cntr </code><code class="sourceCode clojure">(</code><code class="sourceCode clojure"><span class="kw">range</span></code> <code class="sourceCode clojure"><span class="dv">0</span> n</code><code class="sourceCode clojure">)</code><code class="sourceCode clojure">]</code></p>
-<p><code class="sourceCode clojure">           </code><code class="sourceCode clojure">`</code><code class="sourceCode clojure">(</code><code class="sourceCode clojure"><span class="kw">defn</span></code> <code class="sourceCode clojure">~</code><code class="sourceCode clojure">(</code><code class="sourceCode clojure"><span class="kw">symbol</span></code> <code class="sourceCode clojure">(</code><code class="sourceCode clojure"><span class="kw">str</span></code> <code class="sourceCode clojure"><span class="st">&quot;_&quot;</span></code> <code class="sourceCode clojure">cntr</code><code class="sourceCode clojure">)</code><code class="sourceCode clojure">)</code></p>
-<p><code class="sourceCode clojure">               </code><code class="sourceCode clojure">{</code><code class="sourceCode clojure"><span class="kw">:placeholder</span></code> <code class="sourceCode clojure">true} </code><code class="sourceCode clojure">[</code><code class="sourceCode clojure">&amp;</code> <code class="sourceCode clojure">args</code><code class="sourceCode clojure">]</code> <code class="sourceCode clojure">(</code><code class="sourceCode clojure"><span class="kw">nth</span></code> <code class="sourceCode clojure">args </code><code class="sourceCode clojure">~</code><code class="sourceCode clojure">cntr</code><code class="sourceCode clojure">)</code><code class="sourceCode clojure">)</code><code class="sourceCode clojure">)</code><code class="sourceCode clojure">)</code><code class="sourceCode clojure">)</code></p>
+<pre><code>(defmacro make-placeholders [n]
+  `(map eval
+        '~(for [cntr (range 0 n)]
+           `(defn ~(symbol (str &quot;_&quot; cntr))
+               {:placeholder true} [&amp; args] (nth args ~cntr)))))</code></pre>
 <p>This is macro generates functions _0 .. _n-1 that calls nth on the list of the arguments following it, so (_2 1 2 3 4) returns 3. I have not made up my mind if it is really a good idea to do this, but for now it’s a clever hack - maybe I’ll use it until I discover why it’s a bad idea…</p>
 
       </div>
