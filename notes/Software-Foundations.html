@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Types and Tailcalls - Online Book: Sofware Foundations</title>
+    <link rel="stylesheet" href="../css/default.css" type="text/css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <a href="../">Types and Tailcalls</a>
+      </div>
+      <div class="navigation">
+        <ul>
+          <li><a href="../">blog</a></li>
+          <li><a href="../archive.html">archive</a></li>
+          <li><a href="../notes.html">notes</a></li>
+          <!-- 
+          <li><a href="/projects.html">projects</a></li>
+          -->
+          <li><a href="../about.html">about</a></li>
+        </ul>
+      </div>
+      <div class="body">
+        <h1 class="title">Online Book: Sofware Foundations</h1>
+
+<p class="date">written on August  1, 2013</p>
+
+<h2 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h2>
+<h3 id="polymorphic-lists">Polymorphic Lists</h3>
+<p>Functions and types can be made (parametrically) polymorphic by passing the type as an argument. For example:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">list</span> (<span class="dt">X:Type</span>) : <span class="dt">Type</span> :=
+  | nil : <span class="dt">list</span> <span class="dt">X</span>
+  | cons : <span class="dt">X</span> -&gt; <span class="dt">list</span> <span class="dt">X</span> -&gt; <span class="dt">list</span> X<span class="kw">.</span></code></pre>
+<p>However, it is of course quite cumbersome to do this manually all the time. Arguments can be declared implicit as follows:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Implicit</span> <span class="dt">Arguments</span> nil [[X]]<span class="kw">.</span>
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> cons [[X]]<span class="kw">.</span></code></pre>
+<p>Alternatively one can declare arguments as implicit when defining a function or type by surrounding them with curly braces:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> length {<span class="dt">X:Type</span>} (l:list <span class="dt">X</span>) : nat :=
+  <span class="kw">match</span> l <span class="kw">with</span>
+  | nil =&gt; 0
+  | cons h t =&gt; <span class="dt">S</span> (length t)
+  end.</code></pre>
+<p>When arguments are defined implicitly, sometimes the type needs to be specified when using them</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> emptyList : <span class="dt">list</span> nat := nil.</code></pre>
+<p>Or we can force implicit arguments by prefixing the function name with <code>@</code>:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> emptyList2 := @nil nat.</code></pre>
+<p>With these implicit arguments in place one can define more convenient syntax:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Notation</span> <span class="st">&quot;x :: y&quot;</span> := (cons x y)
+                     (at level 60, right associativity).
+<span class="dt">Notation</span> <span class="st">&quot;[ ]&quot;</span> := nil.
+<span class="dt">Notation</span> <span class="st">&quot;[x , .. , y ]&quot;</span> := (cons x .. (cons y []) ..).</code></pre>
+<p>allowing</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> myList := [1, 2, 3].</code></pre>
+<h3 id="polymorphic-pairs">Polymorphic Pairs</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> prod (<span class="dt">X</span> <span class="dt">Y</span> : <span class="dt">Type</span>) : <span class="dt">Type</span> :=
+  pair : <span class="dt">X</span> -&gt; <span class="dt">Y</span> -&gt; prod <span class="dt">X</span> Y<span class="kw">.</span>
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> pair [[<span class="dt">X]</span> [Y]]<span class="kw">.</span></code></pre>
+<p>Again we can define notation to make this more convenient</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Notation</span> <span class="st">&quot;( x , y )&quot;</span> := (pair x y).
+<span class="dt">Notation</span> <span class="st">&quot;X * Y&quot;</span> := (prod <span class="dt">X</span> <span class="dt">Y</span>) : type_scope.</code></pre>
+<p><code>: type_scope</code> tells Coq that this notation should be applied when parsing types, not code.</p>
+
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+      </div>
+      <div class="footer">
+        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>
+          Contact me via
+          <a href="http://twitter.com/paulkoer">twitter</a> or
+          <a href="http://github.com/paulkoerbitz">github</a>.
+        </p>
+        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
+      </div>
+    </div>
+    <script type="text/javascript">
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-20755947-1']);
+      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+      _gaq.push(['_setAllowLinker', true]);
+      _gaq.push(['_trackPageview']);
+      (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+    </script>
+  </body>
+</html>  
