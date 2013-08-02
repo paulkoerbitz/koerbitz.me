@@ -61,6 +61,21 @@
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Notation</span> <span class="st">&quot;( x , y )&quot;</span> := (pair x y).
 <span class="dt">Notation</span> <span class="st">&quot;X * Y&quot;</span> := (prod <span class="dt">X</span> <span class="dt">Y</span>) : type_scope.</code></pre>
 <p><code>: type_scope</code> tells Coq that this notation should be applied when parsing types, not code.</p>
+<h3 id="polymorphic-options">Polymorphic Options</h3>
+<p>These can be defined much like expected</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">option</span> (<span class="dt">X:Type</span>) : <span class="dt">Type</span> :=
+  | <span class="dt">Some</span> : <span class="dt">X</span> -&gt; <span class="dt">option</span> <span class="dt">X</span>
+  | <span class="dt">None</span> : <span class="dt">option</span> X<span class="kw">.</span>
+
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> <span class="dt">Some</span> [[X]]<span class="kw">.</span>
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> <span class="dt">None</span> [[X]]<span class="kw">.</span></code></pre>
+<h3 id="functions-as-data">Functions as Data</h3>
+<p>Functions can be passed to other functions like so:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> thrice {<span class="dt">X:Type</span>} (f:X-&gt;X) (n:X) : <span class="dt">X</span> :=
+  f (f (f n)).</code></pre>
+<h3 id="partial-application">Partial application</h3>
+<p>Currying seems to work like in Haskell:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> plus3 := plus 3.</code></pre>
 
 <div id="disqus_thread"></div>
 <script type="text/javascript">
