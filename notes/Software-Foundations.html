@@ -25,7 +25,7 @@
       <div class="body">
         <h1 class="title">Online Book: Sofware Foundations</h1>
 
-<p class="date">written on August  1, 2013</p>
+<p class="date">written on August  3, 2013</p>
 
 <h2 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h2>
 <h3 id="polymorphic-lists">Polymorphic Lists</h3>
@@ -76,6 +76,35 @@
 <h3 id="partial-application">Partial application</h3>
 <p>Currying seems to work like in Haskell:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> plus3 := plus 3.</code></pre>
+<h3 id="anonymous-functions">Anonymous functions</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> filter {<span class="dt">X:Type</span>} (f:X-&gt;bool) (l:list <span class="dt">X</span>) : <span class="dt">list</span> <span class="dt">X</span> :=
+  <span class="kw">match</span> l <span class="kw">with</span>
+  | []    =&gt; []
+  | x::xs =&gt; <span class="kw">if</span> (f x) <span class="kw">then</span> x :: (filter f xs)
+                      <span class="kw">else</span> (filter f xs)
+  end.
+
+<span class="dt">Example</span> test_filter :
+  filter (<span class="kw">fun</span> x =&gt; evenb x) [1,2,3,4,5,6] = [2,4,6].
+Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code></pre>
+<p>This excercise gave me a hard time. Not 100% sure why. The key was to define the extra lemma <em>map_snoc</em>, which was actually quite easy in the end.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="co">(** Show that [map] and [rev] commute.  You may need to define an</span>
+<span class="co">    auxiliary lemma. *)</span>
+<span class="dt">Lemma</span> map_snoc : forall (<span class="dt">X</span> <span class="dt">Y</span> : <span class="dt">Type</span>) (f : <span class="dt">X</span> -&gt; <span class="dt">Y</span>) (x : <span class="dt">X</span>) (l : <span class="dt">list</span> <span class="dt">X</span>),
+  map f (snoc l x) = snoc (map f l) (f x).
+Proof<span class="kw">.</span>
+  intros.
+  induction l <span class="kw">as</span> [|h t]. reflexivity.
+  simpl. rewrite -&gt; IHt<span class="kw">.</span> reflexivity.
+Qed<span class="kw">.</span>
+
+<span class="dt">Theorem</span> map_rev : forall (<span class="dt">X</span> <span class="dt">Y</span> : <span class="dt">Type</span>) (f : <span class="dt">X</span> -&gt; <span class="dt">Y</span>) (l : <span class="dt">list</span> <span class="dt">X</span>),
+  map f (rev l) = rev (map f l).
+Proof<span class="kw">.</span>
+  intros.
+  induction l <span class="kw">as</span> [|h t]. reflexivity.
+  simpl. rewrite -&gt; map_snoc. rewrite -&gt; IHt<span class="kw">.</span> reflexivity.
+Qed<span class="kw">.</span></code></pre>
 
 <div id="disqus_thread"></div>
 <script type="text/javascript">
