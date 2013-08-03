@@ -87,7 +87,7 @@
 <span class="dt">Example</span> test_filter :
   filter (<span class="kw">fun</span> x =&gt; evenb x) [1,2,3,4,5,6] = [2,4,6].
 Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code></pre>
-<p>This excercise gave me a hard time. Not 100% sure why. The key was to define the extra lemma <em>map_snoc</em>, which was actually quite easy in the end.</p>
+<p>This excercise gave me a hard time. I think mostly it was because I believed that induction on <em>snoc</em> would be hard and that I went about it the wrong way at first. The key was to define the extra lemma <em>map_snoc</em>, which was actually quite easy in the end.</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="co">(** Show that [map] and [rev] commute.  You may need to define an</span>
 <span class="co">    auxiliary lemma. *)</span>
 <span class="dt">Lemma</span> map_snoc : forall (<span class="dt">X</span> <span class="dt">Y</span> : <span class="dt">Type</span>) (f : <span class="dt">X</span> -&gt; <span class="dt">Y</span>) (x : <span class="dt">X</span>) (l : <span class="dt">list</span> <span class="dt">X</span>),
@@ -105,6 +105,7 @@ Proof<span class="kw">.</span>
   induction l <span class="kw">as</span> [|h t]. reflexivity.
   simpl. rewrite -&gt; map_snoc. rewrite -&gt; IHt<span class="kw">.</span> reflexivity.
 Qed<span class="kw">.</span></code></pre>
+<h3 id="non-uniform-inductive-families-gadts">Non-Uniform Inductive Families (GADTs)</h3>
 
 <div id="disqus_thread"></div>
 <script type="text/javascript">
