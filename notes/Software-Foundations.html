@@ -25,7 +25,7 @@
       <div class="body">
         <h1 class="title">Online Book: Sofware Foundations</h1>
 
-<p class="date">written on August  3, 2013</p>
+<p class="date">written on August  5, 2013</p>
 
 <h2 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h2>
 <h3 id="polymorphic-lists">Polymorphic Lists</h3>
@@ -106,6 +106,45 @@ Proof<span class="kw">.</span>
   simpl. rewrite -&gt; map_snoc. rewrite -&gt; IHt<span class="kw">.</span> reflexivity.
 Qed<span class="kw">.</span></code></pre>
 <h3 id="non-uniform-inductive-families-gadts">Non-Uniform Inductive Families (GADTs)</h3>
+<p>Length-indexed lists.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> llist (<span class="dt">X:Type</span>) : nat -&gt; <span class="dt">Type</span> :=
+  lnil  : llist <span class="dt">X</span> <span class="dt">O</span>
+| lcons : forall n, <span class="dt">X</span> -&gt; llist <span class="dt">X</span> n -&gt; llist <span class="dt">X</span> (<span class="dt">S</span> n).
+
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> lnil [[X]]<span class="kw">.</span>
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> lcons [[<span class="dt">X]</span> [n]].</code></pre>
+<h3 id="more-about-coq">More about Coq</h3>
+<h4 id="the-rewrite-tactic">The rewrite tactic</h4>
+<p>The <code>rewrite</code> tactic uses one side of an equality to replace part of a goal with the other side of the equality. The arrow indicates in which way it operates. So <code>rewrite -&gt; H.</code> uses the lhs of the equality <code>H</code> to replace a part of the goal with the rhs of <code>H</code>.</p>
+<h4 id="the-apply-tactic">The apply tactic</h4>
+<p><code>apply</code> allows applying equations, much like rewriting would. For exmple if we have the following goal</p>
+<pre><code>n : nat
+m : nat
+o : nat
+p : nat
+eq1 : n = m
+eq2 : [n, o] = [n, p]
+============================
+ [n, o] = [n, p]</code></pre>
+<p>we could use <code>rewrite -&gt; eq2. reflexivity.</code>, but we can also just do <code>apply eq2</code>.</p>
+<p><code>apply</code> can also be used with <em>conditional</em> hypothesis, i.e. statements that are themselves implications. For example:</p>
+<pre><code>n : nat
+m : nat
+o : nat
+p : nat
+eq1 : n = m
+eq2 : forall q r : nat, q = r -&gt; [q, o] = [r, p]
+============================
+ [n, o] = [m, p]</code></pre>
+<p>Now we can do <code>apply eq2.</code> and Coq will match <code>q</code> to <code>n</code>, <code>r</code> to <code>m</code> and add <code>n = m</code> to the goals.</p>
+<p>When using <code>apply</code> the fact must match the goal exactly. For example, <code>apply</code> will not work if lhs and rhs are swapped.</p>
+<pre><code>n : nat
+H : true = beq_nat n 5
+============================
+ beq_nat n 5 = true</code></pre>
+<p><code>apply H</code> will not work in the example above. (We can use the <code>symmetry</code> tactic to switch lhs and rhs of a goal.)</p>
+<p>In contrast to <code>rewrite</code> <code>apply</code> works with whole equations (both lhs and rhs) and also works with facts that are implications (like eq2 in the example above). The fact that is <code>apply</code>ied must match the goal exactly. In situations where these two restrictions do not apply both tactics can be used. <code>apply</code> has <code>simpl</code> built in, so can save an additional call to <code>simpl</code> and also to <code>reflexivity</code>.</p>
+<h4 id="the-unfold-tactic">The unfold tactic</h4>
 
 <div id="disqus_thread"></div>
 <script type="text/javascript">
