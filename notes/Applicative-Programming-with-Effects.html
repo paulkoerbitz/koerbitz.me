@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Types and Tailcalls - Applicative Programming with Effects</title>
+    <link rel="stylesheet" href="../css/default.css" type="text/css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <a href="../">Types and Tailcalls</a>
+      </div>
+      <div class="navigation">
+        <ul>
+          <li><a href="../">blog</a></li>
+          <li><a href="../archive.html">archive</a></li>
+          <li><a href="../notes.html">notes</a></li>
+          <!-- 
+          <li><a href="/projects.html">projects</a></li>
+          -->
+          <li><a href="../about.html">about</a></li>
+        </ul>
+      </div>
+      <div class="body">
+        <h1 class="title">Applicative Programming with Effects</h1>
+
+<p class="date">written on August  8, 2013</p>
+
+<h2 id="examples">Examples</h2>
+<h3 id="sequencing-commands">Sequencing commands</h3>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="fu">sequence</span><span class="ot"> ::</span> [<span class="dt">IO</span> a] <span class="ot">-&gt;</span> <span class="dt">IO</span> [a]
+<span class="fu">sequence</span> []     <span class="fu">=</span> <span class="fu">return</span> []
+<span class="fu">sequence</span> (c<span class="fu">:</span>cs) <span class="fu">=</span> <span class="kw">do</span>
+  x <span class="ot">&lt;-</span> c
+  xs <span class="ot">&lt;-</span> <span class="fu">sequence</span> cs
+  <span class="fu">return</span> (x<span class="fu">:</span>xs)</code></pre>
+<p>The results of some effectful computations are collected and the <code>(:)</code> function is then applied to these results. The <strong>Monad</strong> type class provides such an affectful application: <code>ap</code>. With it we can define <code>sequence</code> more succinctly:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">ap ::</span> <span class="kw">Monad</span> m <span class="ot">=&gt;</span> m (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> m a <span class="ot">-&gt;</span> m b
+ap mf mx <span class="fu">=</span> <span class="kw">do</span>
+  f <span class="ot">&lt;-</span> mf
+  x <span class="ot">&lt;-</span> mx
+  <span class="fu">return</span> (f x)
+
+<span class="fu">sequence</span><span class="ot"> ::</span> [<span class="dt">IO</span> a] <span class="ot">-&gt;</span> <span class="dt">IO</span> [a]
+<span class="fu">sequence</span> []     <span class="fu">=</span> <span class="fu">return</span> []
+<span class="fu">sequence</span> (c<span class="fu">:</span>cs) <span class="fu">=</span> <span class="fu">return</span> (<span class="fu">:</span>) <span class="ot">`ap`</span> c <span class="ot">`ap`</span> <span class="fu">sequence</span> cs</code></pre>
+<p>Except for the noise of the <code>return</code> and <code>ap</code> this looks similar to function application (even though effects are present). The authors call this <strong>applicative style</strong>.</p>
+<h3 id="zipwith">zipWith</h3>
+<p>The Haskell prelude <a href="http://hackage.haskell.org/packages/archive/base/latest/doc/html/Prelude.html#v:zipWith">provides the functions zipWith and zipWith3</a>. More generally, this can be defined as follows:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="fu">repeat</span><span class="ot"> ::</span> a <span class="ot">-&gt;</span> [a]
+<span class="fu">repeat</span> x <span class="fu">=</span> x <span class="fu">:</span> <span class="fu">repeat</span> x
+
+<span class="ot">zapp ::</span> [a <span class="ot">-&gt;</span> b] <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [b]
+zapp (f<span class="fu">:</span>fs) (x<span class="fu">:</span>xs) <span class="fu">=</span> f x <span class="fu">:</span> zapp fs xs
+zapp _      _      <span class="fu">=</span> []
+
+<span class="fu">zipWith</span><span class="ot"> ::</span> (a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> c) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [b] <span class="ot">-&gt;</span> [c]
+<span class="fu">zipWith</span> f xs ys <span class="fu">=</span> <span class="fu">repeat</span> f <span class="ot">`zapp`</span> xs <span class="ot">`zapp`</span> ys
+
+<span class="fu">zipWith3</span><span class="ot"> ::</span> (a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> c <span class="ot">-&gt;</span> d) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [b] <span class="ot">-&gt;</span> [c] <span class="ot">-&gt;</span> [d]
+<span class="fu">zipWith3</span> f xs ys zs <span class="fu">=</span> <span class="fu">repeat</span> f <span class="ot">`zapp`</span> xs <span class="ot">`zapp`</span> ys <span class="ot">`zapp`</span> zs</code></pre>
+<p>Again, <code>repeat</code> and <code>zapp</code> add some noise, but otherwise this looks similar to function application, even though one is working with lists.</p>
+<h3 id="evaluating-expressions">Evaluating expressions</h3>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Exp</span> v <span class="fu">=</span> <span class="dt">Var</span> v
+           <span class="fu">|</span> <span class="dt">Val</span> <span class="dt">Int</span>
+           <span class="fu">|</span> <span class="dt">Add</span> (<span class="dt">Exp</span> v) (<span class="dt">Exp</span> v)
+
+<span class="ot">eval ::</span> <span class="dt">Exp</span> v <span class="ot">-&gt;</span> <span class="dt">Env</span> v <span class="ot">-&gt;</span> <span class="dt">Int</span>
+eval (<span class="dt">Var</span> x)   env <span class="fu">=</span> fetch x env
+eval (<span class="dt">Val</span> i)   env <span class="fu">=</span> i
+eval (<span class="dt">Add</span> p q) env <span class="fu">=</span> eval env p <span class="fu">+</span> eval env q</code></pre>
+<p>Using the <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕂</mtext></mrow></math> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕊</mtext></mrow></math> combinators,<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> one can again obtain a form that looks similar to function application:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">k ::</span> a <span class="ot">-&gt;</span> e <span class="ot">-&gt;</span> a
+k x env <span class="fu">=</span> x
+
+<span class="ot">s ::</span> (e <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> (e <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> (e <span class="ot">-&gt;</span> b)
+s ef es env <span class="fu">=</span> (ef env) (es env)
+
+<span class="ot">eval ::</span> <span class="dt">Exp</span> v <span class="ot">-&gt;</span> <span class="dt">Env</span> v <span class="ot">-&gt;</span> <span class="dt">Int</span>
+eval (<span class="dt">Var</span> x)   <span class="fu">=</span> fetch x
+eval (<span class="dt">Val</span> i)   <span class="fu">=</span> k i
+eval (<span class="dt">Add</span> p q) <span class="fu">=</span> k (<span class="fu">+</span>) <span class="ot">`s`</span> eval p <span class="ot">`s`</span> eval q</code></pre>
+<h2 id="the-applicative-class">The <strong>Applicative</strong> class</h2>
+<p>The <strong>Applicative</strong> class abstracts what these examples of <em>pure function applied to funny arguments</em> have in common:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">infixl</span> <span class="dv">4</span> <span class="fu">&lt;*&gt;</span>
+
+<span class="kw">class</span> <span class="kw">Applicative</span> f <span class="kw">where</span>
+<span class="ot">  pure  ::</span> a <span class="ot">-&gt;</span> f a
+<span class="ot">  (&lt;*&gt;) ::</span> f (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> f a <span class="ot">-&gt;</span> f b</code></pre>
+<p>It generalizes the <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕂</mtext></mrow></math> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕊</mtext></mrow></math> combinators from threading an environment to threading an effect.</p>
+<h3 id="applicative-laws">Applicative laws</h3>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">             pure <span class="fu">id</span> <span class="fu">&lt;*&gt;</span> u <span class="fu">=</span> u                       <span class="co">-- identity</span>
+pure (<span class="fu">.</span>) <span class="fu">&lt;*&gt;</span> u <span class="fu">&lt;*&gt;</span> v <span class="fu">&lt;*&gt;</span> w <span class="fu">=</span> u <span class="fu">&lt;*&gt;</span> (v <span class="fu">&lt;*&gt;</span> w)         <span class="co">-- composition</span>
+         pure f <span class="fu">&lt;*&gt;</span> pure x <span class="fu">=</span> pure (f x)              <span class="co">-- homomorphism</span>
+              u <span class="fu">&lt;*&gt;</span> pure x <span class="fu">=</span> pure (\f <span class="ot">-&gt;</span> f x) <span class="fu">&lt;*&gt;</span> u  <span class="co">-- interchange</span></code></pre>
+<h3 id="intuition">Intuition</h3>
+<h2 id="monoids-and-applicatives">Monoids and Applicatives</h2>
+<h2 id="monads-and-applicatives">Monads and Applicatives</h2>
+<h2 id="arrows-and-applicatives">Arrows and Applicatives</h2>
+<h2 id="applicatives-and-category-theory">Applicatives and Category Theory</h2>
+<h2 id="my-own-examples">My Own Examples</h2>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>For monads <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕂</mtext></mrow></math> is <em>return</em> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕊</mtext></mrow></math> is <em>ap</em>.<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+      </div>
+      <div class="footer">
+        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>
+          Contact me via
+          <a href="http://twitter.com/paulkoer">twitter</a> or
+          <a href="http://github.com/paulkoerbitz">github</a>.
+        </p>
+        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
+      </div>
+    </div>
+    <script type="text/javascript">
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-20755947-1']);
+      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+      _gaq.push(['_setAllowLinker', true]);
+      _gaq.push(['_trackPageview']);
+      (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+    </script>
+  </body>
+</html>  

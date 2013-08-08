@@ -34,7 +34,7 @@
            `(<span class="kw">defn</span><span class="fu"> </span><span class="kw">~(symbol</span> (<span class="kw">str</span> <span class="st">&quot;_&quot;</span> cntr))
                {<span class="kw">:placeholder</span> true} [&amp; args] (<span class="kw">nth</span> args <span class="kw">~cntr)))))</span></code></pre>
 <p>This is macro generates functions <code>_0 .. _n-1</code> that calls nth on the list of the arguments following it, so <code>(_2 1 2 3 4)</code> returns 3. I have not made up my mind if it is really a good idea to do this, but for now it’s a clever hack - maybe I’ll use it until I discover why it’s a bad idea…</p>
-
+<hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
   var disqus_shortname = 'paulkoerbitz';

@@ -3,7 +3,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta charset="utf-8">
-    <title>Types and Tailcalls - Online Book: Sofware Foundations</title>
+    <title>Types and Tailcalls - Online Book: Software Foundations</title>
     <link rel="stylesheet" href="../css/default.css" type="text/css">
   </head>
   <body>
@@ -23,9 +23,9 @@
         </ul>
       </div>
       <div class="body">
-        <h1 class="title">Online Book: Sofware Foundations</h1>
+        <h1 class="title">Online Book: Software Foundations</h1>
 
-<p class="date">written on August  5, 2013</p>
+<p class="date">written on August  8, 2013</p>
 
 <h2 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h2>
 <h3 id="polymorphic-lists">Polymorphic Lists</h3>
@@ -113,10 +113,11 @@ Qed<span class="kw">.</span></code></pre>
 
 <span class="dt">Implicit</span> <span class="dt">Arguments</span> lnil [[X]]<span class="kw">.</span>
 <span class="dt">Implicit</span> <span class="dt">Arguments</span> lcons [[<span class="dt">X]</span> [n]].</code></pre>
-<h3 id="more-about-coq">More about Coq</h3>
-<h4 id="the-rewrite-tactic">The rewrite tactic</h4>
+<hr />
+<h2 id="more-about-coq">More about Coq</h2>
+<h3 id="the-rewrite-tactic">The rewrite tactic</h3>
 <p>The <code>rewrite</code> tactic uses one side of an equality to replace part of a goal with the other side of the equality. The arrow indicates in which way it operates. So <code>rewrite -&gt; H.</code> uses the lhs of the equality <code>H</code> to replace a part of the goal with the rhs of <code>H</code>.</p>
-<h4 id="the-apply-tactic">The apply tactic</h4>
+<h3 id="the-apply-tactic">The apply tactic</h3>
 <p><code>apply</code> allows applying equations, much like rewriting would. For exmple if we have the following goal</p>
 <pre><code>n : nat
 m : nat
@@ -144,8 +145,60 @@ H : true = beq_nat n 5
  beq_nat n 5 = true</code></pre>
 <p><code>apply H</code> will not work in the example above. (We can use the <code>symmetry</code> tactic to switch lhs and rhs of a goal.)</p>
 <p>In contrast to <code>rewrite</code> <code>apply</code> works with whole equations (both lhs and rhs) and also works with facts that are implications (like eq2 in the example above). The fact that is <code>apply</code>ied must match the goal exactly. In situations where these two restrictions do not apply both tactics can be used. <code>apply</code> has <code>simpl</code> built in, so can save an additional call to <code>simpl</code> and also to <code>reflexivity</code>.</p>
-<h4 id="the-unfold-tactic">The unfold tactic</h4>
-
+<h3 id="the-unfold-tactic">The unfold tactic</h3>
+<p>Sometimes Coq doesn’t expand a function call into its definition. This is a feature (if it always would, then the goals would become too big and cumbersome. <code>unfold functionname</code> expands the definition of the function in the proof goal.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> override_neq : forall {<span class="dt">X:Type</span>} x1 x2 k1 k2 (f : nat-&gt;X),
+  f k1 = x1 -&gt;
+  beq_nat k2 k1 = <span class="kw">false</span> -&gt;
+  (override f k2 x2) k1 = x1.
+Proof<span class="kw">.</span>
+  intros.
+  unfold override.
+  rewrite -&gt; H0<span class="kw">.</span>
+  rewrite -&gt; H<span class="kw">.</span>
+  reflexivity.
+Qed<span class="kw">.</span></code></pre>
+<p>There is also the inverse, <code>fold</code> which can be used to unexpand a definition.</p>
+<h3 id="inversion">Inversion</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> nat : <span class="dt">Type</span> :=
+  | <span class="dt">O</span> : nat
+  | <span class="dt">S</span> : nat -&gt; nat</code></pre>
+<p>Every number has exactly one of two possible forms, either <code>O</code> or <code>S n</code>. Futhermore, it is implicitly clear that if <code>S n = S m</code> then <code>n = m</code> (this is injectivity) and that <code>S n /= O</code> for all <code>n</code> (disjointness). These principles apply to all inductively defined datatypes: They are injective and things built from distinct constructors are never equal.</p>
+<p>Coq’s <code>inversion</code> tactic allows us to exploit this. Suppose we have a hypothesis <em>H</em> of the form</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml">c a1 a2 ... an = d b1 b2 .. bm</code></pre>
+<p><code>inversion</code> works as follows: When <code>c</code> and <code>d</code> are the same constructor then <code>a1 = b1</code> and so forth and Coq will replace the hypothesis with these and try to rewrite the goal accordingly. If <code>c</code> and <code>d</code> are different constructors then the hypothesis is a contraction and any goal is provable, thus Coq pops the current goal of the goal stack.</p>
+<p>An example of a contradiction:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> silly6 : forall (n : nat),
+     <span class="dt">S</span> n = <span class="dt">O</span> -&gt;
+     2 + 2 = 5.
+Proof<span class="kw">.</span>
+  intros n contra. inversion contra.
+Qed<span class="kw">.</span></code></pre>
+<h3 id="varying-the-induction-hypothesis">Varying the Induction Hypothesis</h3>
+<p>Sometimes it is better not to use <code>intro</code> too much to obtain stronger induction hypothesis. If a variable is free (not intro’ed) when an induction hypothesis is obtained it will have a ‘forall’ quantifier.</p>
+<h3 id="using-tactics-in-hypothesis">Using tactics in Hypothesis</h3>
+<p>A lot of tactics can also be applied to hypothesis (to get them into a form where they can be applied on the goal). This is achieved by apending an <code class="sourceCode ocaml"><span class="kw">in</span></code>. This works for <code>simpl</code>, <code>apply</code>, <code>rewrite</code> <code>symmetry</code>, and <code>unfold</code>.</p>
+<h3 id="using-destruct-on-compound-expressions">Using <strong><em>destruct</em></strong> on compound expressions</h3>
+<p>The <code>destruct</code> tactic can also be used to perform case analysis on compound expressions, not just a single variable. To this end we supply the compound expression as the argument to distruct, for example <code>destruct (beq_nat 3 n).</code></p>
+<h3 id="the-remember-tactic">The <strong><em>remember</em></strong> Tactic</h3>
+<h3 id="the-apply-with-tactic">The <strong><em>apply … with …</em></strong> Tactic</h3>
+<h2 id="review">Review</h2>
+<p>A short overview over the tactics we’ve seen so far. The ones with * have a variante with <em>in</em> which works on hypothesis.</p>
+<dl>
+<dt>intros</dt>
+<dd><p>Moves hypothesis and variables from the goal into the proof context.</p>
+</dd>
+<dt>reflexivity</dt>
+<dd><p>Finish a proof by recognizing equality.</p>
+</dd>
+<dt>rewrite*</dt>
+<dd><p>Uses an equality from a hypothesis or previously proven theorem to replace part of the goal (or hypothesis). <code>rewrite ... -&gt; ...</code> replaces the LHS of a theorem with its RHS, <code>rewrite ... &lt;- ...</code> works the other way around.</p>
+</dd>
+<dt>apply*</dt>
+<dd><p>Prove a goal with an hypothesis, theorem or constructor.</p>
+</dd>
+</dl>
+<hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
   var disqus_shortname = 'paulkoerbitz';

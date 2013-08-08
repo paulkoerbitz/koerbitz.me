@@ -46,7 +46,7 @@ accounting_summary FALSE</code></pre>
 <p>and add the name of your parallel environment (’your_pe_name’ above) to the section parallel environments. To submit a job using this parallel environment do</p>
 <pre><code>$ qsub -pe your_pe_name 4 ./your_job_file.sh</code></pre>
 <p>The newly submitted job will occupy 4 slots. Adjust so that it occupies all cores on the machine (if you have 8 cores use 8 instead of 4) and it should be the only job that gets run on a machine.</p>
-
+<hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
   var disqus_shortname = 'paulkoerbitz';
