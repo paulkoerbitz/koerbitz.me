@@ -25,7 +25,7 @@
       <div class="body">
         <h1 class="title">Online Book: Software Foundations</h1>
 
-<p class="date">written on August  8, 2013</p>
+<p class="date">written on August  9, 2013</p>
 
 <h2 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h2>
 <h3 id="polymorphic-lists">Polymorphic Lists</h3>
@@ -181,7 +181,9 @@ Qed<span class="kw">.</span></code></pre>
 <h3 id="using-destruct-on-compound-expressions">Using <strong><em>destruct</em></strong> on compound expressions</h3>
 <p>The <code>destruct</code> tactic can also be used to perform case analysis on compound expressions, not just a single variable. To this end we supply the compound expression as the argument to distruct, for example <code>destruct (beq_nat 3 n).</code></p>
 <h3 id="the-remember-tactic">The <strong><em>remember</em></strong> Tactic</h3>
+<p>Allows to remember certain expressions in a proof. This can be useful when applying other tacitcs. Coq may be a bit brutal here at times and throw away information that we still need. In that case we can use remember to keep this information around.</p>
 <h3 id="the-apply-with-tactic">The <strong><em>apply … with …</em></strong> Tactic</h3>
+<p>Sometimes Coq may not be able to pattern-match certain variables when we want to apply and implication or equality. This can be achieved for example with <code>apply lemma with (m:=[c,d])</code>.</p>
 <h2 id="review">Review</h2>
 <p>A short overview over the tactics we’ve seen so far. The ones with * have a variante with <em>in</em> which works on hypothesis.</p>
 <dl>
@@ -191,11 +193,41 @@ Qed<span class="kw">.</span></code></pre>
 <dt>reflexivity</dt>
 <dd><p>Finish a proof by recognizing equality.</p>
 </dd>
+<dt>simpl*</dt>
+<dd><p>Apply a function definition in the goal or hypothesis.</p>
+</dd>
+<dt>compute*</dt>
+<dd><p>Similar to simpl, but more powerful (how exactly?)</p>
+</dd>
+<dt>destruct</dt>
+<dd><p>Do case analysis for a simple or compound expression.</p>
+</dd>
+<dt>induction</dt>
+<dd><p>Do induction over an inductive datatype.</p>
+</dd>
 <dt>rewrite*</dt>
 <dd><p>Uses an equality from a hypothesis or previously proven theorem to replace part of the goal (or hypothesis). <code>rewrite ... -&gt; ...</code> replaces the LHS of a theorem with its RHS, <code>rewrite ... &lt;- ...</code> works the other way around.</p>
 </dd>
 <dt>apply*</dt>
 <dd><p>Prove a goal with an hypothesis, theorem or constructor.</p>
+</dd>
+<dt>apply … with …</dt>
+<dd><p>Similar to <em>apply</em> but specifies the variables that cannot be determined by pattern matching explicitly.</p>
+</dd>
+<dt>symmetry*</dt>
+<dd><p>Flip LHS and RHS of an equality in the goal or an hypothesis.</p>
+</dd>
+<dt>remember (e) as x</dt>
+<dd><p>Give a term another name (moves this to the hypothesis).</p>
+</dd>
+<dt>unfold*</dt>
+<dd><p>Replace a defined constant by its right hand side (for example a function definition).</p>
+</dd>
+<dt>inversion</dt>
+<dd><p>Use the injectivity and disjointness of inductive datatypes. For <code>c a1 ... an = d b1 ... bm</code>, if <code>c</code> and <code>d</code> are equal it moves <code>a1 = b1</code>, …, <code>an = bm</code> to the hypothesis. If not then a contradiction is found (=&gt; anything could be proven) and the current goal is popped of the stack.</p>
+</dd>
+<dt>assert (e) as H</dt>
+<dd><p>introduce <em>e</em> as hypothesis <em>H</em> and adds it as additional goal.</p>
 </dd>
 </dl>
 <hr />
