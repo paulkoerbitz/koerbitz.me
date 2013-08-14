@@ -25,9 +25,9 @@
       <div class="body">
         <h1 class="title">Online Book: Software Foundations</h1>
 
-<p class="date">written on August  9, 2013</p>
+<p class="date">written on August 14, 2013</p>
 
-<h2 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h2>
+<h1 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h1>
 <h3 id="polymorphic-lists">Polymorphic Lists</h3>
 <p>Functions and types can be made (parametrically) polymorphic by passing the type as an argument. For example:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">list</span> (<span class="dt">X:Type</span>) : <span class="dt">Type</span> :=
@@ -114,10 +114,10 @@ Qed<span class="kw">.</span></code></pre>
 <span class="dt">Implicit</span> <span class="dt">Arguments</span> lnil [[X]]<span class="kw">.</span>
 <span class="dt">Implicit</span> <span class="dt">Arguments</span> lcons [[<span class="dt">X]</span> [n]].</code></pre>
 <hr />
-<h2 id="more-about-coq">More about Coq</h2>
-<h3 id="the-rewrite-tactic">The rewrite tactic</h3>
+<h1 id="more-about-coq">More about Coq</h1>
+<h2 id="the-rewrite-tactic">The rewrite tactic</h2>
 <p>The <code>rewrite</code> tactic uses one side of an equality to replace part of a goal with the other side of the equality. The arrow indicates in which way it operates. So <code>rewrite -&gt; H.</code> uses the lhs of the equality <code>H</code> to replace a part of the goal with the rhs of <code>H</code>.</p>
-<h3 id="the-apply-tactic">The apply tactic</h3>
+<h2 id="the-apply-tactic">The apply tactic</h2>
 <p><code>apply</code> allows applying equations, much like rewriting would. For exmple if we have the following goal</p>
 <pre><code>n : nat
 m : nat
@@ -145,7 +145,7 @@ H : true = beq_nat n 5
  beq_nat n 5 = true</code></pre>
 <p><code>apply H</code> will not work in the example above. (We can use the <code>symmetry</code> tactic to switch lhs and rhs of a goal.)</p>
 <p>In contrast to <code>rewrite</code> <code>apply</code> works with whole equations (both lhs and rhs) and also works with facts that are implications (like eq2 in the example above). The fact that is <code>apply</code>ied must match the goal exactly. In situations where these two restrictions do not apply both tactics can be used. <code>apply</code> has <code>simpl</code> built in, so can save an additional call to <code>simpl</code> and also to <code>reflexivity</code>.</p>
-<h3 id="the-unfold-tactic">The unfold tactic</h3>
+<h2 id="the-unfold-tactic">The unfold tactic</h2>
 <p>Sometimes Coq doesn’t expand a function call into its definition. This is a feature (if it always would, then the goals would become too big and cumbersome. <code>unfold functionname</code> expands the definition of the function in the proof goal.</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> override_neq : forall {<span class="dt">X:Type</span>} x1 x2 k1 k2 (f : nat-&gt;X),
   f k1 = x1 -&gt;
@@ -159,7 +159,7 @@ Proof<span class="kw">.</span>
   reflexivity.
 Qed<span class="kw">.</span></code></pre>
 <p>There is also the inverse, <code>fold</code> which can be used to unexpand a definition.</p>
-<h3 id="inversion">Inversion</h3>
+<h2 id="inversion">Inversion</h2>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> nat : <span class="dt">Type</span> :=
   | <span class="dt">O</span> : nat
   | <span class="dt">S</span> : nat -&gt; nat</code></pre>
@@ -174,15 +174,15 @@ Qed<span class="kw">.</span></code></pre>
 Proof<span class="kw">.</span>
   intros n contra. inversion contra.
 Qed<span class="kw">.</span></code></pre>
-<h3 id="varying-the-induction-hypothesis">Varying the Induction Hypothesis</h3>
+<h2 id="varying-the-induction-hypothesis">Varying the Induction Hypothesis</h2>
 <p>Sometimes it is better not to use <code>intro</code> too much to obtain stronger induction hypothesis. If a variable is free (not intro’ed) when an induction hypothesis is obtained it will have a ‘forall’ quantifier.</p>
-<h3 id="using-tactics-in-hypothesis">Using tactics in Hypothesis</h3>
+<h2 id="using-tactics-in-hypothesis">Using tactics in Hypothesis</h2>
 <p>A lot of tactics can also be applied to hypothesis (to get them into a form where they can be applied on the goal). This is achieved by apending an <code class="sourceCode ocaml"><span class="kw">in</span></code>. This works for <code>simpl</code>, <code>apply</code>, <code>rewrite</code> <code>symmetry</code>, and <code>unfold</code>.</p>
-<h3 id="using-destruct-on-compound-expressions">Using <strong><em>destruct</em></strong> on compound expressions</h3>
+<h2 id="using-destruct-on-compound-expressions">Using <strong><em>destruct</em></strong> on compound expressions</h2>
 <p>The <code>destruct</code> tactic can also be used to perform case analysis on compound expressions, not just a single variable. To this end we supply the compound expression as the argument to distruct, for example <code>destruct (beq_nat 3 n).</code></p>
-<h3 id="the-remember-tactic">The <strong><em>remember</em></strong> Tactic</h3>
+<h2 id="the-remember-tactic">The <strong><em>remember</em></strong> Tactic</h2>
 <p>Allows to remember certain expressions in a proof. This can be useful when applying other tacitcs. Coq may be a bit brutal here at times and throw away information that we still need. In that case we can use remember to keep this information around.</p>
-<h3 id="the-apply-with-tactic">The <strong><em>apply … with …</em></strong> Tactic</h3>
+<h2 id="the-apply-with-tactic">The <strong><em>apply … with …</em></strong> Tactic</h2>
 <p>Sometimes Coq may not be able to pattern-match certain variables when we want to apply and implication or equality. This can be achieved for example with <code>apply lemma with (m:=[c,d])</code>.</p>
 <h2 id="review">Review</h2>
 <p>A short overview over the tactics we’ve seen so far. The ones with * have a variante with <em>in</em> which works on hypothesis.</p>
@@ -230,6 +230,97 @@ Qed<span class="kw">.</span></code></pre>
 <dd><p>introduce <em>e</em> as hypothesis <em>H</em> and adds it as additional goal.</p>
 </dd>
 </dl>
+<h2 id="exercises">Exercises</h2>
+<ul>
+<li>If the type parameter is not marked as implicit, it must be provided to all constructors.</li>
+</ul>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> forallb {<span class="dt">X:Type</span>} (f:X-&gt;bool) (l:list <span class="dt">X</span>) : <span class="dt">bool</span> :=
+  <span class="kw">match</span> l <span class="kw">with</span>
+    | [] =&gt; <span class="kw">true</span>
+    | h::t =&gt; andb (f h) (forallb f t)
+  end.
+
+<span class="dt">Fixpoint</span> existsb {<span class="dt">X:Type</span>} (f:X-&gt;bool) (l:list <span class="dt">X</span>) : <span class="dt">bool</span> :=
+  <span class="kw">match</span> l <span class="kw">with</span>
+    | [] =&gt; <span class="kw">false</span>
+    | h::t =&gt; orb (f h) (existsb f t)
+  end.
+
+<span class="dt">Definition</span> existsb' {<span class="dt">X:Type</span>} (f:X-&gt;bool) (l:list <span class="dt">X</span>) : <span class="dt">bool</span> :=
+  negb (forallb (<span class="kw">fun</span> x =&gt; negb (f x)) l).
+
+<span class="dt">Example</span> existb_alt_test : existsb' oddb [2,4,5] = <span class="kw">true</span>.
+Proof<span class="kw">.</span> compute. reflexivity. Qed<span class="kw">.</span>
+
+<span class="dt">Example</span> existb_alt_test2 : existsb' oddb [2,4,6] = <span class="kw">false</span>.
+Proof<span class="kw">.</span> compute. reflexivity. Qed<span class="kw">.</span>
+
+<span class="dt">Example</span> existb_alt_test3 : existsb' oddb [] = <span class="kw">false</span>.
+Proof<span class="kw">.</span> compute. reflexivity. Qed<span class="kw">.</span>
+
+<span class="dt">Theorem</span> andb_orb_negb: forall (x y:bool),
+  orb x y = negb (andb (negb x) (negb y)).
+Proof<span class="kw">.</span>
+  destruct x. destruct y. simpl. reflexivity. simpl. reflexivity.
+  destruct y. simpl. reflexivity. simpl. reflexivity.
+Qed<span class="kw">.</span>
+
+<span class="dt">Theorem</span> negb_involutive: forall (x:bool),
+  negb (negb x) = x.
+Proof<span class="kw">.</span>
+  destruct x. simpl. reflexivity. simpl. reflexivity.
+Qed<span class="kw">.</span>
+
+<span class="dt">Theorem</span> existsb_eq: forall (<span class="dt">X:Type</span>) (f:X-&gt;bool) (l:list <span class="dt">X</span>),
+  existsb' f l = existsb f l.
+Proof<span class="kw">.</span>
+  intros <span class="dt">X</span> f l.
+  induction l <span class="kw">as</span> [|h t].
+  <span class="dt">Case</span> <span class="st">&quot;l = []&quot;</span>. compute. reflexivity.
+  <span class="dt">Case</span> <span class="st">&quot;l = h::t&quot;</span>. simpl. unfold existsb'. simpl.
+    replace (forallb (<span class="kw">fun</span> x : <span class="dt">X</span> =&gt; negb (f x)) t) <span class="kw">with</span> (negb (existsb' f t)).
+    rewrite &lt;- andb_orb_negb. rewrite -&gt; IHt<span class="kw">.</span> reflexivity.
+    <span class="co">(* now proof what was 'replaced' *)</span>
+    unfold existsb'. rewrite -&gt; negb_involutive. reflexivity.
+Qed<span class="kw">.</span></code></pre>
+<hr />
+<h1 id="propositions-and-evidence">Propositions and Evidence</h1>
+<h2 id="inductively-defined-propositions">Inductively Defined Propositions</h2>
+<p>Running example: <em>beautiful numbers</em>. A number is <em>beautiful</em> if it is either 0, 3, 5, or the sum of two beautiful numbers.</p>
+<p>This is also described with inference rules. In these the <em>premises</em> are put above a line and the <em>conclusion</em> is put below a line.</p>
+<p>In Coq such properties can be defined as follows:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> beautiful : nat -&gt; <span class="dt">Prop</span> :=
+  b_0   : beautiful 0
+| b_3   : beautiful 3
+| b_5   : beautiful 5
+| b_sum : forall n m, beautiful n -&gt; beautiful m -&gt; beautiful (n+m).</code></pre>
+<p>These rules can be <strong><em>applied</em></strong> to prove properties. The application of these rules is called <strong><em>evidence</em></strong>. For example:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> eight_is_beautiful: beautiful 8.
+Proof<span class="kw">.</span>
+  apply b_sum <span class="kw">with</span> (n:=3) (m:=5).
+  apply b_3.
+  apply b_5.
+Qed<span class="kw">.</span></code></pre>
+<h2 id="induction-over-evidence">Induction Over Evidence</h2>
+<p>Since <strong><em>beautiful</em></strong> is defined inductively, we can also reason about it inductively. In an induction all the possible cases given in an inductive definition must be proven.</p>
+<h2 id="from-boolean-functions-to-propositions">From Boolean Functions to Propositions</h2>
+<p>We can define propositions based on boolean functions like so:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> even (n:nat) : <span class="dt">Prop</span> :=
+  evenb = <span class="kw">true</span>.</code></pre>
+<p>Alternatively the same property could be defined inductively:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> ev : nat -&gt; <span class="dt">Prop</span> :=
+  | ev_0 : ev <span class="dt">O</span>
+  | ev_SS : forall n:nat, ev n -&gt; ev (<span class="dt">S</span> (<span class="dt">S</span> n)).</code></pre>
+<p>In the case of evenness, both definitions don’t differ too much in how hard it is to work with them. However, it is often much easier to work with <code>Inductive</code> definitions. In some cases it might be hard or even impossible to come up with a computational (function based) definition for something that is easily defined inductively. For example for <strong>beautiful</strong> it is much easier to give an inductive definition than one based on a function.</p>
+<h2 id="inversion-on-evidence">Inversion on Evidence</h2>
+<p>One can also use the <code>inversion</code> tactic on evidence. The inversion tactic destructs a hypothesis (say <em>n is even</em>) and matches it against all the constructors of an inductive definition. Each of these constructors then becomes a subgoal which must be proven. Some constructors may lead to contradictory subgoals, these are discarded by inversion. In the following example inversion determines that the first constructor <em>(ev 0)</em> is impossible and discards it immediately.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> <span class="dt">SSev__even</span> : forall n,
+  ev (<span class="dt">S</span> (<span class="dt">S</span> n)) -&gt; ev n.
+Proof<span class="kw">.</span>
+  intros n E<span class="kw">.</span>
+  inversion <span class="dt">E</span> <span class="kw">as</span> [| n' E']<span class="kw">.</span>
+  apply E'<span class="kw">.</span>
+Qed<span class="kw">.</span></code></pre>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">

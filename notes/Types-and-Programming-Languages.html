@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Types and Tailcalls - Types and Programming Languages</title>
+    <link rel="stylesheet" href="../css/default.css" type="text/css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <a href="../">Types and Tailcalls</a>
+      </div>
+      <div class="navigation">
+        <ul>
+          <li><a href="../">blog</a></li>
+          <li><a href="../archive.html">archive</a></li>
+          <li><a href="../notes.html">notes</a></li>
+          <!-- 
+          <li><a href="/projects.html">projects</a></li>
+          -->
+          <li><a href="../about.html">about</a></li>
+        </ul>
+      </div>
+      <div class="body">
+        <h1 class="title">Types and Programming Languages</h1>
+
+<p class="date">written on August  8, 2013</p>
+
+<h2 id="programming-in-the-untyped-lambda-calculus">5.2 Programming in the Untyped Lambda Calculus</h2>
+<h3 id="recursion">Recursion</h3>
+<p>Divergent combinator:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>ω</mi><mo>=</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mo stretchy="false">)</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mo stretchy="false">)</mo></mrow></math></p>
+<p>Evaluating <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>ω</mi></mrow></math> yields again omega.</p>
+<p>Call by value <strong>y-combinator</strong>:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="normal">fix</mtext><mo>=</mo><mi>λ</mi><mi>f</mi><mo>.</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>f</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>f</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow></math></p>
+<p>This <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="normal">fix</mtext></mrow></math> function can be used to define recursive functions. Imagine we want to write a function where in the body of the function we would like to call the function again. This effect can be achieved by first defining <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>g</mi><mo>=</mo><mi>λ</mi><mi>f</mi><mo>.</mo><mtext mathvariant="normal">something with f</mtext></mrow></math> and then <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>h</mi><mo>=</mo><mtext mathvariant="normal">fix</mtext><mi>g</mi></mrow></math>. For example the factorial function can be combined as</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>g</mi><mo>=</mo><mi>λ</mi><mtext mathvariant="normal">fct</mtext><mo>.</mo><mi>λ</mi><mi>n</mi><mo>.</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">fct </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow></math> <math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="normal">factorial</mtext><mo>=</mo><mrow><mtext mathvariant="normal">fix </mtext><mspace width="0.333em"></mspace></mrow><mi>g</mi><mo>.</mo></mrow></math></p>
+<p>Applying factorial:</p>
+
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="normal">factorial</mtext><mspace width="0.167em"></mspace><mi>n</mi><mo>=</mo><mrow><mtext mathvariant="normal">fix </mtext><mspace width="0.333em"></mspace></mrow><mi>g</mi><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><munder><munder><mrow><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow><mo accent="true">︸</mo></munder><mrow><mo>=</mo><mi>h</mi></mrow></munder><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>h</mi><mspace width="0.167em"></mspace><mi>h</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mi>λ</mi><mtext mathvariant="normal">fct</mtext><mo>.</mo><mi>λ</mi><mover><mi>n</mi><mo accent="true">~</mo></mover><mo>.</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">fct </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><munder><munder><mrow><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>h</mi><mspace width="0.167em"></mspace><mi>h</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo></mrow><mo accent="true">︸</mo></munder><mrow><mo>=</mo><mi>f</mi></mrow></munder><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mi>λ</mi><mover><mi>n</mi><mo accent="true">~</mo></mover><mo>.</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">f </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">f </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow></math></p>
+<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><munder><munder><mrow><mo stretchy="false">(</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow><mo accent="true">︸</mo></munder><mrow><mo>=</mo><mrow><mtext mathvariant="normal">factorial </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mi>n</mi><mo>−</mo><mn>1</mn><mo stretchy="false">)</mo></mrow></munder><mo stretchy="false">)</mo></mrow></math></p>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+      </div>
+      <div class="footer">
+        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>
+          Contact me via
+          <a href="http://twitter.com/paulkoer">twitter</a> or
+          <a href="http://github.com/paulkoerbitz">github</a>.
+        </p>
+        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
+      </div>
+    </div>
+    <script type="text/javascript">
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-20755947-1']);
+      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+      _gaq.push(['_setAllowLinker', true]);
+      _gaq.push(['_trackPageview']);
+      (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+    </script>
+  </body>
+</html>  
