@@ -321,6 +321,25 @@ Proof<span class="kw">.</span>
   inversion <span class="dt">E</span> <span class="kw">as</span> [| n' E']<span class="kw">.</span>
   apply E'<span class="kw">.</span>
 Qed<span class="kw">.</span></code></pre>
+<p>I wrote my first inductive property and proved things about it ;)</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> pal {<span class="dt">X:Type</span>} : <span class="dt">list</span> <span class="dt">X</span> -&gt; <span class="dt">Prop</span> :=
+  | pal_nil : pal []
+  | pal_single : forall x:X, pal [x]
+  | pal_cons : forall (x:X) (l:list <span class="dt">X</span>) , pal l -&gt; pal (x :: snoc l x).
+
+<span class="dt">Theorem</span> pal_mirror : forall (<span class="dt">X:Type</span>) (l:list <span class="dt">X</span>),
+  pal (l ++ rev l).
+Proof<span class="kw">.</span>
+  intros <span class="dt">X</span> l. induction l <span class="kw">as</span> [|h t]. simpl. apply pal_nil.
+  simpl. rewrite &lt;- snoc_with_append. apply pal_cons. apply IHt<span class="kw">.</span>
+Qed<span class="kw">.</span>
+
+<span class="dt">Theorem</span> pal_rev : forall (<span class="dt">X:Type</span>) (l:list <span class="dt">X</span>),
+  pal l -&gt; l = rev l.
+Proof<span class="kw">.</span>
+  intros <span class="dt">X</span> l H<span class="kw">.</span> induction H<span class="kw">.</span> simpl. reflexivity. simpl. reflexivity.
+  simpl. rewrite -&gt; rev_snoc. simpl. rewrite &lt;- IHpal<span class="kw">.</span> reflexivity.
+Qed<span class="kw">.</span></code></pre>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
