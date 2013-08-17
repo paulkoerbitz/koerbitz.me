@@ -341,6 +341,56 @@ Proof<span class="kw">.</span>
   simpl. rewrite -&gt; rev_snoc. simpl. rewrite &lt;- IHpal<span class="kw">.</span> reflexivity.
 Qed<span class="kw">.</span></code></pre>
 <hr />
+<h1 id="more-about-propositions-and-evidence">More about Propositions and Evidence</h1>
+<h2 id="relations">Relations</h2>
+<p>One argument propositions on natural numbers can be thought of as a <em>property</em> of certain natural numbers (such as <em>ev</em> or <em>beautiful</em>). A proposition with two arguments can be thought of as a <em>relation</em>: it defines a set of pairs for which the proposition is provable.</p>
+<h3 id="less-than-or-equal">Less than or equal</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> le : nat -&gt; nat -&gt; <span class="dt">Prop</span> :=
+  | le_n : forall n, le n n
+  | le_S : forall n m, (le n m) -&gt; (le n (<span class="dt">S</span> m)).
+
+<span class="dt">Notation</span> <span class="st">&quot;m &lt;= n&quot;</span> := (le m n).</code></pre>
+<p>Proofs about <code>&lt;=</code> follow the same structure as proofs about properties such as <code>ev</code>. Constructors can be <code>apply</code>ed to prove <code>&lt;=</code> goals and tactics like <code>inversion</code> or <code>induction</code> can be used. However, <code>simpl</code> and <code>reflexivity</code> don’t work anymore to prove things with <code>&lt;=</code>.</p>
+<h3 id="less-than">Less than</h3>
+<p>We can define strictly less than in terms of less than or equal:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> lt (n m:nat) := le (<span class="dt">S</span> n) m.
+
+<span class="dt">Notation</span> <span class="st">&quot;m &lt; n&quot;</span> := (lt m n).</code></pre>
+<h2 id="programming-with-propositions">Programming with Propositions</h2>
+<p><em>Propositions</em> are factual claims such as <em>2 + 2 = 4</em>. Propositions don’t necessarily need to be provable: Simply being a proposition is one thing; being provable is something else!</p>
+<p>So far we have seen propositions in theorems, but they can also appear elsewhere, for example in Definitions:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> plus_fact : <span class="dt">Prop</span> := 2 + 2 = 4.</code></pre>
+<p>This proposition can be used later anywhere where a propostion is expected, for example:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> plus_fact_is_true :
+  plus_fact.
+Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code></pre>
+<p>We have seen several ways of constructing propositions:</p>
+<ul>
+<li><p>They can be defined by <code>Inductive</code>.</p></li>
+<li><p>Two expressions can be combined by <code>=</code>. (This is really an application of a constructor defined by <code>Inductive</code>, see Logic chapter).</p></li>
+<li><p>They can be combined using implication and quantification.</p></li>
+</ul>
+<p>Propositions are first class in Coq. They can be defined, partially applied and passed around:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="co">(* Define function from nats to a proposition (nat -&gt; nat -&gt; nat -&gt; Prop) *)</span>
+<span class="dt">Definition</span> between (n m o: nat) : <span class="dt">Prop</span> :=
+  andb (ble_nat n o) (ble_nat o m) = <span class="kw">true</span>.
+
+<span class="co">(* partially apply it *)</span>
+<span class="dt">Definition</span> teen : nat -&gt; <span class="dt">Prop</span> := between 13 19.
+
+<span class="co">(* pass around *)</span>
+<span class="dt">Definition</span> true_for_zero (<span class="dt">P:nat</span>-&gt;Prop) : <span class="dt">Prop</span> :=
+  <span class="dt">P</span> 0.</code></pre>
+<p>Another example are propositions that describe induction on the natural numbers:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> true_for_all_numbers (<span class="dt">P:nat</span> -&gt; <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+  forall n, <span class="dt">P</span> n.
+
+<span class="dt">Definition</span> preserved_by_S (<span class="dt">P:nat</span> -&gt; <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+  forall n', <span class="dt">P</span> n' -&gt; <span class="dt">P</span> (<span class="dt">S</span> n').
+
+<span class="dt">Definition</span> natural_number_induction_valid : <span class="dt">Prop</span> :=
+  forall (<span class="dt">P:nat</span> -&gt; <span class="dt">Prop</span>), true_for_zero <span class="dt">P</span> -&gt; preserved_by_S <span class="dt">P</span> -&gt; true_for_all_numbers P<span class="kw">.</span></code></pre>
+<hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
   var disqus_shortname = 'paulkoerbitz';
