@@ -25,7 +25,7 @@
       <div class="body">
         <h1 class="title">Online Book: Software Foundations</h1>
 
-<p class="date">written on August 26, 2013</p>
+<p class="date">written on September 17, 2013</p>
 
 <h1 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h1>
 <h3 id="polymorphic-lists">Polymorphic Lists</h3>
@@ -392,6 +392,137 @@ Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code><
   forall (<span class="dt">P:nat</span> -&gt; <span class="dt">Prop</span>), true_for_zero <span class="dt">P</span> -&gt; preserved_by_S <span class="dt">P</span> -&gt; true_for_all_numbers P<span class="kw">.</span></code></pre>
 <hr />
 <h1 id="logic-in-coq">Logic in Coq</h1>
+<p>Coq’s built-in logic is small: Its only primitives are <code>Inductive</code> definitions, universal quantification (<code>forall</code>) and implication <code>-&gt;</code>. Everything else can be encoded with these.</p>
+<h3 id="conjunction">Conjunction</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="kw">and</span> (<span class="dt">P</span> <span class="dt">Q</span> : <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+  conj : <span class="dt">P</span> -&gt; <span class="dt">Q</span> -&gt; (<span class="kw">and</span> <span class="dt">P</span> <span class="dt">Q</span>).
+
+<span class="dt">Notation</span> <span class="st">&quot;P /\ Q&quot;</span> := (<span class="kw">and</span> <span class="dt">P</span> <span class="dt">Q</span>) : type_scope.</code></pre>
+<p>Use the <code>split</code> tactic to first prove the lhs and then the rhs of <code>/\</code>.</p>
+<h3 id="iff">Iff</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> iff (<span class="dt">P</span> <span class="dt">Q</span> : <span class="dt">Prop</span>) := (<span class="dt">P</span> -&gt; <span class="dt">Q</span>) /\ (<span class="dt">Q</span> -&gt; <span class="dt">P</span>).
+
+<span class="dt">Notation</span> <span class="st">&quot;P &lt;-&gt; Q&quot;</span> := (iff <span class="dt">P</span> <span class="dt">Q</span>) (at level 95, no associativity) : type_scope.</code></pre>
+<h3 id="disjunction">Disjunction</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="kw">or</span> (<span class="dt">P</span> <span class="dt">Q</span> : <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+  | or_introl : <span class="dt">P</span> -&gt; <span class="kw">or</span> <span class="dt">P</span> <span class="dt">Q</span>
+  | or_intror : <span class="dt">Q</span> -&gt; <span class="kw">or</span> <span class="dt">P</span> Q<span class="kw">.</span>
+
+<span class="dt">Notation</span> <span class="st">&quot;P \/ Q&quot;</span> := (<span class="kw">or</span> <span class="dt">P</span> <span class="dt">Q</span>) : type_scope.</code></pre>
+<h3 id="falsehood">Falsehood</h3>
+<p>Logical falsehood can be represented by an inductively defined proposition without constructors.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">False</span> : <span class="dt">Prop</span> := .</code></pre>
+<p>A convenient theorem is that anything follows from falsehood:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> ex_falso_quodlibet : forall <span class="dt">P:Prop</span>, <span class="dt">False</span> -&gt; P<span class="kw">.</span></code></pre>
+<p>Truth can be defined in a similar way, but is not very useful.</p>
+<h3 id="negation">Negation</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> not (<span class="dt">P:Prop</span>) := <span class="dt">P</span> -&gt; False<span class="kw">.</span>
+
+<span class="dt">Notation</span> <span class="st">&quot;~ x&quot;</span> := (not x) : type_scope.</code></pre>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> contrapositive : forall <span class="dt">P</span> <span class="dt">Q</span> : <span class="dt">Prop</span>, (<span class="dt">P</span> -&gt; <span class="dt">Q</span>) -&gt; (~<span class="dt">Q</span> -&gt; ~<span class="dt">P</span>).</code></pre>
+<p>Some theorems that are provable in classical logic or <em>not</em> provable in Coq’s <em>constructive</em> logic. One can however show the equivalence of the following definitions:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> peirce := forall <span class="dt">P</span> <span class="dt">Q:</span> <span class="dt">Prop</span>,
+  ((<span class="dt">P</span> -&gt; <span class="dt">Q</span>) -&gt; <span class="dt">P</span>) -&gt; P<span class="kw">.</span>
+<span class="dt">Definition</span> classic := forall <span class="dt">P:Prop</span>,
+  ~~<span class="dt">P</span> -&gt; P<span class="kw">.</span>
+<span class="dt">Definition</span> excluded_middle := forall <span class="dt">P:Prop</span>,
+  <span class="dt">P</span> \/ ~P<span class="kw">.</span>
+<span class="dt">Definition</span> de_morgan_not_and_not := forall <span class="dt">P</span> <span class="dt">Q:Prop</span>,
+  ~(~<span class="dt">P</span> /\ ~<span class="dt">Q</span>) -&gt; <span class="dt">P</span> \/ Q<span class="kw">.</span>
+<span class="dt">Definition</span> implies_to_or := forall <span class="dt">P</span> <span class="dt">Q:Prop</span>,
+  (<span class="dt">P</span> -&gt; <span class="dt">Q</span>) -&gt; (~<span class="dt">P</span> \/ <span class="dt">Q</span>).</code></pre>
+<h3 id="inequality">Inequality</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Notation</span> <span class="st">&quot;x &lt;&gt; y&quot;</span> := (~ (x = y)) : type_scope.</code></pre>
+<h3 id="existential-quantification">Existential Quantification</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> ex (<span class="dt">X:Type</span>) (<span class="dt">P</span> : <span class="dt">X</span>-&gt;Prop) : <span class="dt">Prop</span> :=
+  ex_intro : forall (witness:X), <span class="dt">P</span> witness -&gt; ex <span class="dt">X</span> P<span class="kw">.</span></code></pre>
+<h3 id="equality">Equality</h3>
+<p>Has roughly the following definition</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> eq {<span class="dt">X:Type</span>} : <span class="dt">X</span> -&gt; <span class="dt">X</span> -&gt; <span class="dt">Prop</span> :=
+  refl_equal : forall x, eq x x.
+
+<span class="dt">Notation</span> <span class="st">&quot;x = y&quot;</span> := (eq x y) (at level 70, no associativity) : type_scope.</code></pre>
+<h3 id="evidence-carrying-booleans">Evidence-carrying booleans</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> sumbool (<span class="dt">A</span> <span class="dt">B</span> : <span class="dt">Prop</span>) : <span class="dt">Set</span> :=
+  | left : <span class="dt">A</span> -&gt; sumbool <span class="dt">A</span> <span class="dt">B</span>
+  | right : <span class="dt">B</span> -&gt; sumbool <span class="dt">A</span> B<span class="kw">.</span>
+
+<span class="dt">Notation</span> <span class="st">&quot;{ A } + { B }&quot;</span> := (sumbool <span class="dt">A</span> <span class="dt">B</span>) : type_scope.</code></pre>
+<p>These booleans carry evidence of their truth or falsity. When <em>destructed</em> this evidence is available as hypothesis in the proof.</p>
+<h3 id="inversion-again">Inversion, Again</h3>
+<p>In general the <code>inversion</code> tactic</p>
+<ul>
+<li><p>takes a hypothesis <code>H</code> whose type <code>P</code> is inductively defined, and</p></li>
+<li><p>for each constructor <code>C</code> in <code>P</code>’s definition it</p></li>
+<li><p>generates a new subgoal, assuming <code>H</code> was built with <code>C</code></p></li>
+<li><p>adds the arguments (premises) of <code>C</code> as hypothesis to the context</p></li>
+<li><p>matches the conclusion of <code>C</code> against the current goal and calculates the equations that must hold in order for <code>C</code> to be applicable,</p></li>
+<li><p>adds these equalities to the context and rewrites them in the goal,</p></li>
+<li><p>if the equalities involve contradictions, immediately solves the subgoal.</p></li>
+</ul>
+<hr />
+<h1 id="imp---simple-imperative-programs">Imp - Simple Imperative Programs</h1>
+<h3 id="abstract-syntax">Abstract Syntax</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> aexp : <span class="dt">Type</span> :=
+  | <span class="dt">ANum</span> : nat → aexp
+  | <span class="dt">APlus</span> : aexp → aexp → aexp
+  | <span class="dt">AMinus</span> : aexp → aexp → aexp
+  | <span class="dt">AMult</span> : aexp → aexp → aexp.
+
+<span class="dt">Inductive</span> bexp : <span class="dt">Type</span> :=
+  | <span class="dt">BTrue</span> : bexp
+  | <span class="dt">BFalse</span> : bexp
+  | <span class="dt">BEq</span> : aexp → aexp → bexp
+  | <span class="dt">BLe</span> : aexp → aexp → bexp
+  | <span class="dt">BNot</span> : bexp → bexp
+  | <span class="dt">BAnd</span> : bexp → bexp → bexp.</code></pre>
+<h3 id="evaluation">Evaluation</h3>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> aeval (a : aexp) : nat :=
+  <span class="kw">match</span> a <span class="kw">with</span>
+    | <span class="dt">ANum</span> n =&gt; n
+    | <span class="dt">APlus</span> a1 a2 =&gt; (aeval a1) + (aeval a2)
+    | <span class="dt">AMinus</span> a1 a2 =&gt; (aeval a1) - (aeval a2)
+    | <span class="dt">AMult</span> a1 a2 =&gt; (aeval a1) * (aeval a2)
+  end.
+
+<span class="dt">Fixpoint</span> beval (b : bexp) : <span class="dt">bool</span> :=
+  <span class="kw">match</span> b <span class="kw">with</span>
+    | <span class="dt">BTrue</span> =&gt; <span class="kw">true</span>
+    | <span class="dt">BFalse</span> =&gt; <span class="kw">false</span>
+    | <span class="dt">BEq</span> a1 a2 =&gt; beq_nat (aeval a1) (aeval a2)
+    | <span class="dt">BLe</span> a1 a2 =&gt; ble_nat (aeval a1) (aeval a2)
+    | <span class="dt">BNot</span> b =&gt; negb (beval b)
+    | <span class="dt">BAnd</span> b1 b2 =&gt; andb (beval b1) (bevalb2)
+  end.</code></pre>
+<h2 id="coq-automation">Coq Automation</h2>
+<h3 id="tacticals">Tacticals</h3>
+<p>Tacticals are tactics that take other tactics as arguments – higher order tactics.</p>
+<ul>
+<li><p><code>repeat</code>: Keeps applying the passed tactic until it fails.</p></li>
+<li><p><code>try</code>: Tries the passed tactic, if it fails does successfully nothing.</p></li>
+<li><p><code>T1;T2</code>: Takes two tactics <code>T1</code> and <code>T2</code> and applies T1 and then T2 <em>on each subgoal</em> generated by T1.</p></li>
+</ul>
+<p>In the more general form <code>T;[T0|T1|...]</code> <code>T0</code>, <code>T1</code> and so on are applied to the respective subgoals.</p>
+<h3 id="defining-new-tactic-notations">Defining New Tactic Notations</h3>
+<p>There are three ways:</p>
+<ul>
+<li><p><em>Tactic Notation</em>: provides a way to give <em>shorthand tactics</em>. This is the simplest way and illustrated below.</p></li>
+<li><p><em>Ltac</em>: Coq’s programming language for tactics that can examine and modify the proof state. There are many examples in the standard library.</p></li>
+<li><p><em>OCaml API</em>: Exists, but is usually not worth bothering with.</p></li>
+</ul>
+<p>Examples for the tactic notation:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Tactic</span> <span class="dt">Notation</span> <span class="st">&quot;simpl_try&quot;</span> tactic(c) :=
+  simpl; <span class="kw">try</span> c.
+
+<span class="dt">Tactic</span> <span class="dt">Notation</span> <span class="st">&quot;simpl_refl&quot;</span> tactic() :=
+  simpl; reflexivity.</code></pre>
+<h3 id="bulletproofing-case-analysis">Bulletproofing Case Analysis</h3>
+<p>One problem with tactics that act on all cases is that if the cases change, proofs no longer work and this can lead to quite confusing error messages. On trick to get sensible error messages in this case is as follows:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Tactic</span> <span class="dt">Notation</span> <span class="st">&quot;aexp_cases&quot;</span> tactic(first) ident(c) :=
+  first;
+  [ <span class="dt">Case_aux</span> c <span class="st">&quot;ANum&quot;</span> | <span class="dt">Case_aux</span> c <span class="st">&quot;APlus&quot;</span>
+  | <span class="dt">Case_aux</span> c <span class="st">&quot;AMinus&quot;</span> | <span class="dt">Case_aux</span> c <span class="st">&quot;AMult&quot;</span> ].</code></pre>
+<h2 id="the-omega-tactic">The <code>omega</code> tactic</h2>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">

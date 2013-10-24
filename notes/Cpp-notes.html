@@ -25,12 +25,75 @@
       <div class="body">
         <h1 class="title">C++ Notes</h1>
 
-<p class="date">written on August 13, 2013</p>
+<p class="date">written on September 29, 2013</p>
 
+<h3 id="new-and-delete-vs-malloc-and-free"><code>new</code> and <code>delete</code> vs <code>malloc</code> and <code>free</code></h3>
+<h4 id="new-new-delete-delete"><code>new</code>, <code>new[]</code>, <code>delete</code>, <code>delete[]</code></h4>
+<p>Signatures of <code>new</code> (<code>new[]</code> is analogous) defined in header <code>&lt;new&gt;</code>:</p>
+<pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="dt">void</span>* <span class="kw">operator</span> <span class="kw">new</span>  ( std::size_t count );                         <span class="co">// (1)</span>
+<span class="dt">void</span>* <span class="kw">operator</span> <span class="kw">new</span>  ( std::size_t count, <span class="dt">const</span> std::nothrow_t&amp; );  <span class="co">// (2)</span>
+<span class="dt">void</span>* <span class="kw">operator</span> <span class="kw">new</span>  ( std::size_t, <span class="dt">void</span>* ptr );                    <span class="co">// (3)</span></code></pre>
+<ol style="list-style-type: decimal">
+<li><p>Throws <code>std::bad_alloc</code> if the call fails. Allocates <code>count</code> bytes otherwise.</p></li>
+<li><p>Accepts <code>std::nothrow</code> value as second argument. Returns <code>nullptr</code> if allocation fails.</p>
+<p>Example: <code>int* p = new(std::nothrow) int(42);</code></p></li>
+<li><p>Doesn’t allocate but places the newly constructed object in the memory pointed to by <code>ptr</code>.</p></li>
+</ol>
+<p>All of these also have the <code>[]</code> variant, which do the same thing for arrays.</p>
+<p>General points:</p>
+<ul>
+<li><p><code>new</code>, <code>new[]</code>, <code>delete</code> and <code>delete[]</code> are C++ operators (not present in C), they allocate memory from the <em>free store</em> (not the <em>heap</em> as in C).</p></li>
+<li><p>Whether or not they use <code>free</code> and <code>delete</code> underneath (and thus the heap) is an implementation detail. They may well do something different.</p></li>
+<li><p><code>new</code> and <code>new[]</code> can be overloaded.</p></li>
+<li><p><code>new</code> and <code>new[]</code> return fully typed pointers (<code>malloc</code> returns a <code>void*</code>).</p></li>
+<li><p>The new handler can be botained and set via <code>get_new_handler</code> and <code>set_new_handler</code>.</p></li>
+</ul>
+<h4 id="malloc-free"><code>malloc</code>, <code>free</code></h4>
+<ul>
+<li><p>From C. <code>malloc</code> allocates on the heap.</p></li>
+<li><p>No</p></li>
+</ul>
+<hr />
+<h3 id="noexcept"><code>noexcept</code></h3>
+<p>Kind of an imporved <code>throw ()</code> for C++. Doesn’t throw std::unexpected if an exception is thrown. Thus no runtime overhead.</p>
+<p>But does it really effectively give a compile error if the code does throw an exception? I’ll have to find out.</p>
+<hr />
+<h3 id="extern-c"><code>extern &quot;C++&quot;</code></h3>
+<p>Can be used in a block of <code>extern &quot;C&quot;</code> to get C++ linkage:</p>
+<pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">extern</span> <span class="st">&quot;C&quot;</span> {
+  <span class="dt">void</span> f(); <span class="co">// C linkage</span>
+  <span class="kw">extern</span> <span class="st">&quot;C++&quot;</span> {
+    <span class="dt">void</span> g(); <span class="co">// C++ linkage</span>
+  }
+  <span class="co">// ...</span>
+}</code></pre>
+<hr />
+<h3 id="stdunique_ptr-vs.-stdauto_ptr"><code>std::unique_ptr</code> vs. <code>std::auto_ptr</code></h3>
+<p><code>auto_ptr</code> steals the resource on copy construction or assignment, which is non-standard copy behavior (would you expect the resource to be modified on a copy operation?). with <code>unique_ptr</code> the resources must be transfered explicitly:</p>
+<pre class="sourceCode cpp"><code class="sourceCode cpp">std::auto_ptr&lt;<span class="dt">int</span>&gt; ap1(<span class="kw">new</span> <span class="dt">int</span>(<span class="dv">1</span>));
+std::auto_ptr&lt;<span class="dt">int</span>&gt; ap2(ap1); <span class="co">// p1 is now empty</span>
+std::auto_ptr&lt;<span class="dt">int</span>&gt; ap3 = (ap2); <span class="co">// p2 is now empty</span></code></pre>
+<p>vs</p>
+<pre class="sourceCode cpp"><code class="sourceCode cpp">std::unique_ptr&lt;<span class="dt">int</span>&gt; up1(<span class="kw">new</span> <span class="dt">int</span>(<span class="dv">1</span>));
+std::unique_ptr&lt;<span class="dt">int</span>&gt; up2(std::move(up1));
+std::unique_ptr&lt;<span class="dt">int</span>&gt; up3 = std::move(up2);</code></pre>
+<p>Furthermore <code>unique_ptr</code> can handle arrays correctly. <code>auto_ptr</code> would always call <code>delete</code> whereas <code>unique_ptr</code> apparently knows when to call <code>delete []</code> on arrays (how it does that I am not quite clear on).</p>
 <h3 id="stdmake_shared"><code class="sourceCode cpp">std::make_shared</code></h3>
 <p>Defined in <code>&lt;memory&gt;</code></p>
 <pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">template</span>&lt; <span class="kw">class</span> T, <span class="kw">class</span>... Args &gt; shared_ptr&lt;T&gt; make_shared( Args&amp;&amp;... args );</code></pre>
 <p>Creates the object and the smart pointer with a single memory allocation. This improves performance. Furthermore the call <code>f(shared_ptr&lt;int&gt;(new int(42)), g())</code> can leak memory (<code>new int(42)</code>) may be called before <code>g()</code>, which may throw an exception, which in turn may be called before the <code>shared_ptr</code> constructor. This cannot happen with <code>make_shared</code> (because there is only on call which allocates memory).</p>
+<h3 id="using-in-class-definition"><code class="sourceCode cpp"><span class="kw">using</span></code> in class definition</h3>
+<p>Using-declaration introduces a member of a base class into the derived class definition, such as to expose a protected member of base as public member of derived.</p>
+<p>Example:</p>
+<pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">struct</span> B {
+<span class="kw">protected</span>:
+  <span class="dt">int</span> m;
+};
+
+<span class="kw">struct</span> D: <span class="kw">public</span> B {
+<span class="kw">public</span>:
+  <span class="kw">using</span> B::m; <span class="co">// m is now a public member of D</span>
+};</code></pre>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
