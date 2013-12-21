@@ -27,28 +27,482 @@
 
 <p class="date">written on October 29, 2013</p>
 
-<h2 id="parameterized-types">3.4 Parameterized Types</h2>
-<h2 id="mutually-inductive-types">3.5 Mutually Inductive Types</h2>
-<h2 id="reflexive-types">3.6 Reflexive Types</h2>
-<p>An inductive type that has at least one constructor that takes as an</p>
-<h2 id="an-interlude-on-induction-principles">3.7 An Interlude on Induction Principles</h2>
-<h3 id="recursion">Recursion</h3>
-<p>Divergent combinator:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>ω</mi><mo>=</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mo stretchy="false">)</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mo stretchy="false">)</mo></mrow></math></p>
-<p>Evaluating <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>ω</mi></mrow></math> yields again omega.</p>
-<p>Call by value <strong>y-combinator</strong>:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="normal">fix</mtext><mo>=</mo><mi>λ</mi><mi>f</mi><mo>.</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>f</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>f</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow></math></p>
-<p>This <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="normal">fix</mtext></mrow></math> function can be used to define recursive functions. Imagine we want to write a function where in the body of the function we would like to call the function again. This effect can be achieved by first defining <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>g</mi><mo>=</mo><mi>λ</mi><mi>f</mi><mo>.</mo><mtext mathvariant="normal">something with f</mtext></mrow></math> and then <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>h</mi><mo>=</mo><mtext mathvariant="normal">fix</mtext><mi>g</mi></mrow></math>. For example the factorial function can be combined as</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>g</mi><mo>=</mo><mi>λ</mi><mtext mathvariant="normal">fct</mtext><mo>.</mo><mi>λ</mi><mi>n</mi><mo>.</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">fct </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow></math> <math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="normal">factorial</mtext><mo>=</mo><mrow><mtext mathvariant="normal">fix </mtext><mspace width="0.333em"></mspace></mrow><mi>g</mi><mo>.</mo></mrow></math></p>
-<p>Applying factorial:</p>
+<hr />
+<h1 id="introducing-inductive-types">3. Introducing Inductive Types</h1>
+<h2 id="proof-terms">3.1 Proof Terms</h2>
+<dl>
+<dt><em>Curry Howard correspondence</em></dt>
+<dd><p>Relates proofs and programs. Mathematical theorems are represented as types, programs that type-check the corresponding type are proofs of the theorem.</p>
+<p>For example, functions and implications are identical to Curry-Howard.</p>
+</dd>
+<dt><em>true</em> and <em>false</em> vs. <em>True</em> and <em>False</em></dt>
+<dd><p>The former are values, the latter types. Coq’s metatheory guarantees that any term of type <em>bool</em> evalutates to either <em>true</em> or <em>false</em>. However, most propositions do not evaluate to either <em>True</em> or <em>False</em>.</p>
+</dd>
+</dl>
+<h2 id="enumerations">3.2 Enumerations</h2>
+<p>Every <em>Inductive</em> type <em>T</em> also defines an induction principle called <em>T_ind</em>:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">unit</span> : <span class="dt">Set</span> :=
+  | tt.
 
-<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="normal">factorial</mtext><mspace width="0.167em"></mspace><mi>n</mi><mo>=</mo><mrow><mtext mathvariant="normal">fix </mtext><mspace width="0.333em"></mspace></mrow><mi>g</mi><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
-<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><munder><munder><mrow><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow><mo accent="true">︸</mo></munder><mrow><mo>=</mo><mi>h</mi></mrow></munder><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
-<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>h</mi><mspace width="0.167em"></mspace><mi>h</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
-<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mi>λ</mi><mtext mathvariant="normal">fct</mtext><mo>.</mo><mi>λ</mi><mover><mi>n</mi><mo accent="true">~</mo></mover><mo>.</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">fct </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><munder><munder><mrow><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>h</mi><mspace width="0.167em"></mspace><mi>h</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo></mrow><mo accent="true">︸</mo></munder><mrow><mo>=</mo><mi>f</mi></mrow></munder><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
-<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mi>λ</mi><mover><mi>n</mi><mo accent="true">~</mo></mover><mo>.</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">f </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mover><mi>n</mi><mo accent="true">~</mo></mover><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mspace width="0.167em"></mspace><mi>n</mi></mrow></math></p>
-<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">f </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow></math></p>
-<p><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mo>=</mo><mrow><mtext mathvariant="normal">if realeq </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><msub><mi>c</mi><mn>0</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">then </mtext><mspace width="0.333em"></mspace></mrow><msub><mi>c</mi><mn>1</mn></msub><mspace width="0.167em"></mspace><mrow><mtext mathvariant="normal">else </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">times </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mspace width="0.167em"></mspace><munder><munder><mrow><mo stretchy="false">(</mo><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>x</mi><mo>.</mo><mi>g</mi><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mi>λ</mi><mi>y</mi><mo>.</mo><mi>x</mi><mspace width="0.167em"></mspace><mi>x</mi><mspace width="0.167em"></mspace><mi>y</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mspace width="0.167em"></mspace><mo stretchy="false">(</mo><mrow><mtext mathvariant="normal">prd </mtext><mspace width="0.333em"></mspace></mrow><mi>n</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo></mrow><mo accent="true">︸</mo></munder><mrow><mo>=</mo><mrow><mtext mathvariant="normal">factorial </mtext><mspace width="0.333em"></mspace></mrow><mo stretchy="false">(</mo><mi>n</mi><mo>−</mo><mn>1</mn><mo stretchy="false">)</mo></mrow></munder><mo stretchy="false">)</mo></mrow></math></p>
+<span class="dt">Check</span> unit_ind.
+  unit_ind : forall <span class="dt">P</span> : <span class="dt">unit</span> -&gt; <span class="dt">Prop</span>, <span class="dt">P</span> tt -&gt; forall u : <span class="dt">unit</span>, <span class="dt">P</span> u</code></pre>
+<p>The key to telling what is a program and what is a proof lies in the distinction between the type <code>Prop</code> and the type <code>Set</code>. The convention is: <code>Set</code> is the type of normal types and the values of such types are programs. <code>Prop</code> is the type of logical propositions and the values of such types are proofs. Thus an induction principle has a type that shows us that it is a function for building proofs.</p>
+<p>The induction principle <code>unit_ind</code> says that if we provide evidence of <code>P tt</code> it gives us a proof that <code>P u</code> holds for all <code>u</code>.</p>
+<p><code>unit</code> is of type <code>Set</code>. By replacing <code>Set</code> with <code>Prop</code>, unit with <code>True</code> and <code>tt</code> with <code>I</code> we arrive exactly at the definition of <code>True</code> in Coq’s standard library. Thus, the program type <code>unit</code> is the Curry-Howard equivalent of <code>True</code>.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">bool</span> : <span class="dt">Set</span> :=
+  | <span class="kw">true</span>
+  | <span class="kw">false</span>
+
+<span class="dt">Check</span> bool_ind.
+  bool_ind : forall <span class="dt">P</span> : <span class="dt">bool</span> -&gt; <span class="dt">Prop</span>, <span class="dt">P</span> <span class="kw">true</span> -&gt; <span class="dt">P</span> <span class="kw">false</span> -&gt; forall b : <span class="dt">bool</span>, <span class="dt">P</span> b</code></pre>
+<p>The discriminate tactic can be used to prove that two values of inductive type are not equal when the values are formed with different constructors.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> negb : (b:bool) -&gt; <span class="dt">bool</span> :=
+  <span class="kw">match</span> b <span class="kw">with</span>
+    | <span class="kw">true</span> =&gt; <span class="kw">false</span>
+    | <span class="kw">false</span> =&gt; <span class="kw">true</span>
+  end.
+
+<span class="dt">Theorem</span> negb_ineq : forall (b:bool), negb &lt;&gt; b.
+  destruct b; discriminate.
+Qed<span class="kw">.</span></code></pre>
+<h2 id="simple-recursive-types">3.3 Simple Recursive Types</h2>
+<p>Natural numbers are the simplest inductive type worthy of the name:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> nat : <span class="dt">Set</span> :=
+  | <span class="dt">O</span> : nat
+  | <span class="dt">S</span> : nat -&gt; nat.
+
+<span class="dt">Check</span> nat_ind
+  nat_ind : forall <span class="dt">P</span> : nat -&gt; <span class="dt">Prop</span>,
+                   <span class="dt">P</span> <span class="dt">O</span> -&gt; (forall n:nat, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n)) -&gt; forall n:nat, <span class="dt">P</span> n</code></pre>
+<h3 id="some-tactics">Some tactics:</h3>
+<p><code>injection</code></p>
+<p>: Refers to a premise by number (e.g. <code>injection 1</code>).adds new equalities between corresponding arguments of equated terms that are formed by the same constructor.</p>
+<dl>
+<dt><code>trivial</code></dt>
+<dd><p>attempts a number of single proof steps drawn from a user-specified database.</p>
+</dd>
+<dt><code>congruence</code></dt>
+<dd><p>Generalizes <code>discriminate</code> and <code>injection</code>, adds reasoning about general properties of equality, e.g. that functions return equal results on equal arguments. <code>congruence</code> is a <em>complete decision procedure for the theory of equality and uninterpreted functions</em>.</p>
+</dd>
+</dl>
+<h2 id="parameterized-types">3.4 Parameterized Types</h2>
+<p>Polymorphic inductive types:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">list</span> (<span class="dt">T:Set</span>) : <span class="dt">Set</span> :=
+  | <span class="dt">Nil</span> : <span class="dt">list</span> <span class="dt">T</span>
+  | <span class="dt">Cons</span> : <span class="dt">T</span> -&gt; <span class="dt">list</span> <span class="dt">T</span> -&gt; <span class="dt">list</span> T<span class="kw">.</span>
+
+<span class="dt">Check</span> list_ind.
+  list_ind : forall (<span class="dt">T:Set</span>) (<span class="dt">P:list</span> <span class="dt">T</span> -&gt; <span class="dt">Prop</span>),
+             <span class="dt">P</span> (<span class="dt">Nil</span> <span class="dt">T</span>) -&gt; (forall (t:T) (l:list <span class="dt">T</span>), <span class="dt">P</span> l -&gt; <span class="dt">P</span> (<span class="dt">Cons</span> t l)) -&gt; forall (l:list <span class="dt">T</span>), <span class="dt">P</span> l</code></pre>
+<h2 id="mutually-inductive-types">3.5 Mutually Inductive Types</h2>
+<p>Inductive types can refer to each other:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> even_list : <span class="dt">Set</span> :=
+  | <span class="dt">ENil</span> : even_list
+  | <span class="dt">ECons</span> : nat -&gt; odd_list -&gt; even_list
+
+<span class="kw">with</span> odd_list : <span class="dt">Set</span> :=
+  | <span class="dt">OCons</span> : nat -&gt; even_list -&gt; odd_list.</code></pre>
+<p>The problem with such definitions is that the autmoatically generated induction principles are not strong enough:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml">even_list_ind
+  : forall <span class="dt">P</span> : even_list -&gt; <span class="dt">Prop</span>,
+    <span class="dt">P</span> <span class="dt">ENil</span> -&gt;
+    (forall (n:nat) (o:odd_list), <span class="dt">P</span> (<span class="dt">ECons</span> n o)) -&gt;
+    forall e:even_list, <span class="dt">P</span> e.</code></pre>
+<p>There are no inductive hypothesis included in the type, making these principles too weak. Apropriate induction schemes can be generated with the <code>Scheme</code> command:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Scheme</span> even_list_mut := <span class="dt">Induction</span> <span class="kw">for</span> even_list <span class="dt">Sort</span> <span class="dt">Prop</span>
+<span class="kw">with</span> odd_list_mut := <span class="dt">Induction</span> <span class="kw">for</span> odd_list <span class="dt">Sort</span> Prop<span class="kw">.</span>
+
+<span class="dt">Check</span> even_list_mut.
+  even_list_mut
+    : forall (<span class="dt">P</span> : even_list -&gt; <span class="dt">Prop</span>) (<span class="dt">P0</span> : odd_list -&gt; <span class="dt">Prop</span>),
+      <span class="dt">P</span> <span class="dt">ENil</span> -&gt;
+      (forall (n : nat) (o : odd_list), <span class="dt">P0</span> o -&gt; <span class="dt">P</span> (<span class="dt">ECons</span> n o)) -&gt;
+      (forall (n : nat) (e : even_list), <span class="dt">P</span> e -&gt; <span class="dt">P0</span> (<span class="dt">OCons</span> n e)) -&gt;
+      forall e : even_list, <span class="dt">P</span> e</code></pre>
+<p>These ‘manually’ generated schemes are not considered by the <code>induction</code> technique. Therefore it is a good idea to know how induction works without that tactic:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> n_plus_O : forall n : nat, plus n <span class="dt">O</span> = n.
+  <span class="co">(* the (fun =&gt; ...) part is not really needed here but useful</span>
+<span class="co">     in more elaborate examples. *)</span>
+  apply (nat_ind (<span class="kw">fun</span> n =&gt; plus n <span class="dt">O</span> = n));
+  crush.
+Qed<span class="kw">.</span></code></pre>
+<p>Now on to more elaborate examples:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> elength_eapp : forall el1 el2 : even_list
+  elength (eapp el1 el2) = plus (elength el1) (elength el2).
+Proof<span class="kw">.</span>
+  apply (even_list_mut
+    (<span class="kw">fun</span> el1 : even_list =&gt; forall el2 : even_list,
+      elength (eapp el1 el2) = plus (elength el1) (elength el2))
+    (<span class="kw">fun</span> ol : odd_list =&gt; forall el : even_list,
+      olength (oapp ol el) = plus (olength ol) (elength el))); crush.
+Qed<span class="kw">.</span></code></pre>
+<p>In general Coq is not necessarily able to figure out more than one predicate, so explicitly specifying the predicates as above is a good idea.</p>
+<h2 id="reflexive-types">3.6 Reflexive Types</h2>
+<p>An inductive type that has at least one constructor that takes as an argument a function <em>returning the type that is currently being defined</em> is called a <em>reflexive type</em>.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> formula : <span class="dt">Set</span> :=
+  | <span class="dt">Eq</span> : nat -&gt; nat -&gt; formula
+  | <span class="dt">And</span> : formula -&gt; formula -&gt; formula
+  | <span class="dt">Forall</span> : (nat -&gt; formula) -&gt; formula.</code></pre>
+<p>This type avoids using ‘variables’ by instead using Coq functions to encode the syntax of quantification.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Example</span> forall_refl : formula := <span class="dt">Forall</span>  (<span class="kw">fun</span> x =&gt; <span class="dt">Eq</span> x x).</code></pre>
+<p>These formulas can be translated into native Coq propositions quite naturally:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> formulaDenote (f : formula) : <span class="dt">Prop</span> :=
+  <span class="kw">match</span> f <span class="kw">with</span>
+    | <span class="dt">Eq</span> n1 n2 =&gt; n1 = n2
+    | <span class="dt">And</span> f1 f2 =&gt; formulaDenote f1 /\ formulaDenote f2
+    | <span class="dt">Forall</span> f' =&gt; forall n : nat, formulaDenote (f' n)
+  end.</code></pre>
+<p>formula’s induction principle:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml">formula_ind : forall <span class="dt">P</span> : formula -&gt; <span class="dt">Prop</span>
+              (forall n n0 : nat, <span class="dt">P</span> (<span class="dt">Eq</span> n n0)) -&gt;
+              (forall f0 : formula, <span class="dt">P</span> f0 -&gt; forall f1 : formula, <span class="dt">P</span> f1 -&gt; <span class="dt">P</span> (<span class="dt">And</span> f0 f1)) -&gt;
+              (forall f1 : nat -&gt; formula, (forall n : nat, <span class="dt">P</span> (f1 n)) -&gt; <span class="dt">P</span> (<span class="dt">Forall</span> f1)) -&gt;
+              forall f2 : formula <span class="dt">P</span> f2</code></pre>
+<p>Focusing on the Forall case, which comes third, we see that we are allowed to assume that the theorem holds for any application of the argument function f1. That is, Coq induction principles do not follow a simple rule that the textual representations of induction variables must get shorter in appeals to induction hypotheses. Luckily for us, the people behind the metatheory of Coq have verified that this flexibility does not introduce unsoundness.</p>
+<h3 id="strict-positivity-requirement">Strict Positivity Requirement</h3>
+<p>For reasons of soundness, Coq cannot allow some definitions which are possible in Haskell or ML:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> term : <span class="dt">Set</span> :=
+| <span class="dt">App</span> : term -&gt; term -&gt; term
+| <span class="dt">Abs</span> : (term -&gt; term) -&gt; term
+
+<span class="dt">Error:</span> <span class="dt">Non</span> strictly positive occurrence <span class="kw">of</span> <span class="st">&quot;term&quot;</span> <span class="kw">in</span> <span class="st">&quot;(term -&gt; term) -&gt; term&quot;</span></code></pre>
+<p>The strict positivity requirement states that <em>the type being defined may not occur to the left of an arrow in the type of an constructor argument</em>.</p>
+<p>Why must this condition be enforced? If it weren’t the following function would not terminate:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> uhoh (t : term) : term :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | <span class="dt">Abs</span> f =&gt; f t
+    | _ =&gt; t
+  end.
+
+<span class="co">(* This loops *)</span>
+uhoh (<span class="dt">Abs</span> uhoh)</code></pre>
+<p>The soundness of Coq’s logic depends on the language being total. Thus the positivity condition is critical.</p>
+<h2 id="an-interlude-on-induction-principles">3.7 An Interlude on Induction Principles</h2>
+<p>A closer look at induction principles reveals that they are defined in terms of ‘_rect’, more general recursion principles:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Print</span> nat_ind.
+  nat_ind =
+    <span class="kw">fun</span> <span class="dt">P</span> : nat -&gt; <span class="dt">Prop</span> =&gt; nat_rect <span class="dt">P</span>
+      : forall <span class="dt">P</span> : nat -&gt; <span class="dt">Prop</span>,
+        <span class="dt">P</span> <span class="dt">O</span> -&gt; (forall n : nat, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n)) -&gt; forall n : nat, <span class="dt">P</span> n
+
+<span class="dt">Check</span> nat_rect.
+  nat_rect
+    : forall <span class="dt">P</span> : nat -&gt; <span class="dt">Type</span>,
+      <span class="dt">P</span> <span class="dt">O</span> -&gt; (forall n : nat, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n)) -&gt;
+      forall n : nat, <span class="dt">P</span> n</code></pre>
+<p>This looks just like ‘nat_ind’, except that ‘nat_ind’ takes P’s with type ‘nat -&gt; Prop’ and <code>nat_rect</code> takes P’s with type <code>nat -&gt; Type</code>. <code>Prop</code> and <code>Set</code> are both subtypes of <code>Type</code>.</p>
+<p>For most inductive types, not only an induction principle <code>_ind</code> is defined but also a recursion principle <code>_rec</code>:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Print</span> nat_rec.
+  nat_rec =
+    <span class="kw">fun</span> <span class="dt">P</span> : nat -&gt; <span class="dt">Set</span> =&gt; nat_rect <span class="dt">P</span>
+      : forall <span class="dt">P</span> : nat -&gt; <span class="dt">Set</span>,
+        <span class="dt">P</span> <span class="dt">O</span> -&gt; (forall n : nat, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n)) -&gt;
+        forall n : nat, <span class="dt">P</span> n</code></pre>
+<p>This recursion principle is identical to <code>nat_ind</code>, except that P is of type <code>P : nat -&gt; Set</code> and not <code>P : nat -&gt; Prop</code>. We can write recursive functions using this principle:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> plus_recursive (n : nat) : nat -&gt; nat :=
+  <span class="kw">match</span> n <span class="kw">with</span>
+    | <span class="dt">O</span> =&gt; <span class="kw">fun</span> m =&gt; m
+    | <span class="dt">S</span> n' =&gt; <span class="kw">fun</span> m =&gt; <span class="dt">S</span> (plus_recursive n' m)
+  end.
+
+<span class="dt">Definition</span> plus_rec : nat -&gt; nat -&gt; nat :=
+  nat_rec (<span class="kw">fun</span> _ : nat =&gt; nat -&gt; nat) (<span class="kw">fun</span> m =&gt; m) (<span class="kw">fun</span> _ r m =&gt; <span class="dt">S</span> (r m)).
+
+<span class="dt">Theorem</span> plus_equivalent : plus_recursive = plus_rec.
+  reflexivity.
+Qed<span class="kw">.</span></code></pre>
+<p><code>nat_rect</code> is a functional program that we could write ourselves:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml">nat_rect =
+  <span class="kw">fun</span> (<span class="dt">P</span> : nat -&gt; <span class="dt">Type</span>) (f : <span class="dt">P</span> <span class="dt">O</span>) (f0 : forall n : nat, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n)) =&gt;
+  fix <span class="dt">F</span> (n : nat) : <span class="dt">P</span> n :=
+    <span class="kw">match</span> n <span class="kw">as</span> n0 return (<span class="dt">P</span> n0) <span class="kw">with</span>
+    | <span class="dt">O</span> =&gt; f
+    | <span class="dt">S</span> n0 =&gt; f 0 n0 (<span class="dt">F</span> n0)
+    end
+      : forall <span class="dt">P</span> : nat -&gt; <span class="dt">Type</span>,
+        <span class="dt">P</span> <span class="dt">O</span> -&gt; (forall n : nat, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n)) -&gt; forall n : nat, <span class="dt">P</span> n</code></pre>
+<p>Re-implementation:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> nat_rect' (<span class="dt">P</span> : nat -&gt; <span class="dt">Type</span>)
+  (<span class="dt">HO</span> : <span class="dt">P</span> <span class="dt">O</span>)
+  (<span class="dt">HS</span> : forall n, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n)) (n : nat) :=
+  <span class="kw">match</span> n return <span class="dt">P</span> n <span class="kw">with</span>
+    | <span class="dt">O</span> =&gt; <span class="dt">HO</span>
+    | <span class="dt">S</span> n' =&gt; <span class="dt">HS</span> n' (nat_rect' <span class="dt">P</span> <span class="dt">HO</span> <span class="dt">HS</span> n')
+  end.</code></pre>
+<p><code>nat_rect</code> can be better understood by reimplementing nat_ind using sections</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span> nat_ind'.
+  <span class="co">(* the property of natural numbers that we aim to prove *)</span>
+  <span class="dt">Variable</span> <span class="dt">P</span> : nat -&gt; Prop<span class="kw">.</span>
+  <span class="co">(* 'Hypothesis' is a synonym for 'Variable' but is used for variables of Prop type by convention *)</span>
+  <span class="dt">Hypothesis</span> <span class="dt">O_case</span> : <span class="dt">P</span> O<span class="kw">.</span>
+  <span class="dt">Hypothesis</span> <span class="dt">S_case</span> : forall n : nat, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n).
+  <span class="co">(* We define a recursive function to tie the pieces together *)</span>
+  <span class="dt">Fixpoint</span> nat_ind' (n : nat) : <span class="dt">P</span> n :=
+    <span class="kw">match</span> n <span class="kw">with</span>
+      | <span class="dt">O</span> =&gt; <span class="dt">O_case</span>
+      | <span class="dt">S</span> n' =&gt; <span class="dt">S_case</span> (nat_ind' n')
+    end.
+<span class="dt">End</span> nat_ind'.</code></pre>
+<p>Here the principle is fairly clear. If we have a property <code>P</code> which for any <code>nat</code> gives a proposition along with the proofs of <code>P O</code> and that for any <code>n:nat</code> <code>P n -&gt; P (S n)</code> then the fixpoint <code>nat_ind'</code> gives a rule to show <code>P n</code> for any <code>n:nat</code>. Closing the section adds <code>P</code>, <code>O_case</code> and <code>S_case</code> as arguments to <code>nat_ind'</code> and we end up with the same definition as with <code>nat_ind</code> and, modulo the use of <code>Prop</code> instead of <code>Type</code> also</p>
+<p>Let’s see what we can do for mutually recursive types:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span> even_list_mut'.
+  <span class="dt">Variable</span> <span class="dt">P</span> : even_list -&gt; Prop<span class="kw">.</span>
+  <span class="dt">Variable</span> <span class="dt">PO</span> : odd_list -&gt; Prop<span class="kw">.</span>
+
+  <span class="dt">Hypothesis</span> <span class="dt">E_Case</span> : <span class="dt">P</span> ENil<span class="kw">.</span>
+  <span class="dt">Hypothesis</span> <span class="dt">Even_Case</span> :  forall (n : nat) (o : odd_list), <span class="dt">PO</span> o -&gt; <span class="dt">P</span> (<span class="dt">ECons</span> n o).
+  <span class="dt">Hypothesis</span> <span class="dt">Odd_Case</span> :  forall (n : nat) (e : even_list), <span class="dt">P</span> e -&gt; <span class="dt">PO</span> (<span class="dt">OCons</span> n e).
+
+  <span class="co">(* I think something is still amiss here...*)</span>
+  <span class="dt">Fixpoint</span> even_list_mut' (e : even_list) : <span class="dt">P</span> e :=
+    <span class="kw">match</span> e <span class="kw">with</span>
+      | <span class="dt">ENil</span> =&gt; <span class="dt">E_Case</span>
+      | <span class="dt">ECons</span> n o =&gt; <span class="dt">Odd_Case</span> n (odd_list_mut' o)
+  <span class="kw">with</span> odd_list_mut' (o : odd_list) : <span class="dt">PO</span> o :=
+    <span class="kw">match</span> o <span class="kw">with</span>
+      | <span class="dt">OCons</span> n e =&gt; <span class="dt">Even_Case</span> n (even_list_mut' e)
+    end.
+<span class="dt">End</span> even_list_mut'.</code></pre>
+<p>Even induction principles for reflexive types are easy to implement:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span>  formula_ind'.
+  variable <span class="dt">P</span> : formula -&gt; Prop<span class="kw">.</span>
+  <span class="dt">Hypothesis</span> Eq_Case <span class="kw">.</span>
+  <span class="dt">Hypothesis</span> And_Case <span class="kw">.</span>
+  <span class="dt">Hypothesis</span> Forall_Case <span class="kw">.</span>
+
+  <span class="dt">Fixpoint</span> formula_ind (f : formula) : <span class="dt">P</span> f :=
+    <span class="kw">match</span> f <span class="kw">with</span>
+      | <span class="dt">Eq</span> n1 n2 =&gt; <span class="dt">Eq_Case</span> n1 n2
+      | <span class="dt">And</span> f1 f2 =&gt; <span class="dt">And_Case</span> (formual_ind f1) (formula_ind f2)
+      | <span class="dt">Forall</span> f' =&gt; <span class="dt">Forall_Case</span> f' (<span class="kw">fun</span> n =&gt; formula_ind' (f' n))
+    end.
+<span class="dt">End</span> formula_ind'.</code></pre>
+<h2 id="nested-inductive-types">3.8 Nested Inductive Types</h2>
+<p>Trees with arbitrary branching:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> nat_tree : <span class="dt">Set</span> :=
+| <span class="dt">NNode'</span> : nat -&gt; <span class="dt">list</span> nat_tree -&gt; nat_tree.</code></pre>
+<p>This is a <em>nested</em> inductive type because we’re using <code>nat_tree</code> as an argument to <code>list</code> while we’re still definint <code>nat_tree</code>! Coq does not allow all such definitions, it effectively pretends that we are defining <code>nat_tree</code> mutually with <code>list nat_tree</code>. If one of <code>list</code>s conststructors would use <code>nat_tree</code> as an argument in a function then Coq would complain that this violates the positivity requirement and would reject the definition.</p>
+<p>Just as with mutually recursive and reflexive types, the automatically generated induction principles are too weak so that we have to define our own.</p>
+<p>First we need a little helper function:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span> All<span class="kw">.</span>
+  <span class="dt">Variable</span> <span class="dt">T</span> : Set<span class="kw">.</span>
+  <span class="dt">Variable</span> <span class="dt">P</span> : <span class="dt">T</span> -&gt; Prop<span class="kw">.</span>
+  <span class="dt">Fixpoint</span> <span class="dt">All</span> (ls : <span class="dt">list</span> <span class="dt">T</span>) : <span class="dt">Prop</span> :=
+    <span class="kw">match</span> ls <span class="kw">with</span>
+      | <span class="dt">Nil</span> =&gt; <span class="dt">True</span>
+      | <span class="dt">Cons</span> h t =&gt; <span class="dt">P</span> h /\ <span class="dt">All</span> t
+    end.
+<span class="dt">End</span> All<span class="kw">.</span></code></pre>
+<p>Now for the induction principle on nat_tree:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span> nat_tree_ind'.
+  <span class="dt">Variable</span> <span class="dt">P</span> : nat_tree -&gt; Prop<span class="kw">.</span>
+  <span class="dt">Hypothesis</span> <span class="dt">NNode'_case</span> : forall (n : nat) (ls : <span class="dt">list</span> nat_tree),
+    <span class="dt">All</span> <span class="dt">P</span> ls -&gt; <span class="dt">P</span> (<span class="dt">NNode'</span> n ls).
+  <span class="co">(* Coq uses heuristics to see if the fixpoint uses a recursion that it can</span>
+<span class="co">     be sure it works. For nested types we need to structure the fixpoint in</span>
+<span class="co">     a nested way. *)</span>
+  <span class="dt">Fixpoint</span> nat_tree_ind' (tr : nat_tree) : <span class="dt">Prop</span> :=
+    <span class="kw">match</span> tr <span class="kw">with</span>
+      | <span class="dt">NNode'</span> n ls =&gt; <span class="dt">NNode'_case</span> n ls
+        ((fix list_nat_tree_ind (ls : <span class="dt">list</span> nat_tree) : <span class="dt">All</span> <span class="dt">P</span> ls :=
+          <span class="kw">match</span> ls <span class="kw">with</span>
+            | <span class="dt">Nil</span> =&gt; l
+            | <span class="dt">Cons</span> tr' rest =&gt; conj (nat_tree_ind' tr') (list_nat_tree_ind rest)
+          end) ls)
+    end.
+<span class="dt">End</span> nat_tree_ind'.</code></pre>
+<h2 id="manual-proofs-about-constructors">3.9 Manual Proofs About Constructors</h2>
+<hr />
+<h1 id="inductive-predicates">4. Inductive Predicates</h1>
+<p>Agrument that programs and proofs should be separate: All proofs of a proposition are equivalent (<em>proof irrelevance</em>), but not all programs of the same type are (different run time characteristics, etc.).</p>
+<p>Also Chilpala argues that its most effective to employ different techniques for developing programs and for deriving proofs.</p>
+<h2 id="propositional-logic">4.1 Propositional Logic</h2>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span> Propositional<span class="kw">.</span>
+  <span class="dt">Variables</span> <span class="dt">P</span> <span class="dt">Q</span> <span class="dt">R</span> : Prop<span class="kw">.</span>
+
+  <span class="dt">Print</span> True<span class="kw">.</span>
+  <span class="co">(* Inductive True : Prop :=  I : True *)</span>
+
+  <span class="dt">Theorem</span> obvious : True<span class="kw">.</span>
+    apply I<span class="kw">.</span>
+  Qed<span class="kw">.</span>
+
+  <span class="dt">Print</span> False<span class="kw">.</span>
+  <span class="co">(* Inductive False : Prop :=  *)</span>
+
+  <span class="dt">Print</span> not.
+  <span class="co">(* not = fun A : Prop =&gt; A -&gt; False : Prop -&gt; Prop *)</span>
+
+  <span class="dt">Print</span> <span class="kw">and</span>.
+  <span class="co">(* Inductive and (A B : Prop) : Prop :=  conj : A -&gt; B -&gt; A /\ B *)</span>
+
+  <span class="dt">Print</span> <span class="kw">or</span>.
+  <span class="co">(* Inductive or (A B : Prop) : Prop :=</span>
+<span class="co">       or_introl : A -&gt; A \/ B | or_intror : B -&gt; A \/ B</span>
+<span class="co">  *)</span>
+<span class="dt">End</span> <span class="dt">Propositional</span></code></pre>
+<dl>
+<dt><code>tauto</code></dt>
+<dd><p>The simplest automation tactic for Coq. Complete decision procedure for constructive propositional logic.</p>
+</dd>
+<dt><code>intuition</code></dt>
+<dd><p>Extended tactic that can be used when apart from propositional logic some additional steps are required. Simplifies the propositional logic as far as possible.</p>
+</dd>
+</dl>
+<h2 id="what-does-it-mean-to-be-constructive">4.2 What Does It Mean to Be Constructive?</h2>
+<p>Why the distinction between <code>true : bool</code> and <code>True</code> and <code>false : bool</code> and <code>False</code>. This is because Coq implements <em>constructive</em> logic and not <em>classical</em> logic. In <em>constructive</em> logic things like <code>not not P -&gt; P</code> and <code>P \/ not P</code> only hold when P is <em>decidable</em>. The Coq definition of <code>or</code> allows us to extract a proof of <code>P</code> or <code>not P</code> from any proof of <code>P \/ not P</code>. Since proofs are just functional programs that can run, the decidability of <code>P \/ not P</code> would imply a decision procedure for the halting problem (by choosing <code>P</code> as ‘this particular Turing machine halts’).</p>
+<p>Thus, since evaluation is decidable propositions in Coq cannot be of type <code>bool</code>, since that would imply that all propositions are decidable.</p>
+<h2 id="first-order-logic">4.3 First-Order Logic</h2>
+<p>The <code>forall</code> is built into Coq.</p>
+<p>This can be seen as the dependent function type constructor. In fact, implication and universal quantification are syntactic shorthands for the same Coq mechanism. A formula <code>P -&gt; Q</code> is equivalent to <code>forall x : P, Q</code>, where <code>x</code> does not appear in <code>Q</code>. This means that the real type of implication is <em>“for every proof of P there exists a proof of Q”</em>. <code>(* why? *)</code></p>
+<p>Existential quantification is defined in the standard library:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Print</span> ex.
+
+<span class="dt">Inductive</span> ex (<span class="dt">A</span> : <span class="dt">Type</span>) (<span class="dt">P</span> : <span class="dt">A</span> -&gt; <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+  ex_intro : forall x : <span class="dt">A</span>, <span class="dt">P</span> x -&gt; ex <span class="dt">P</span></code></pre>
+<p>The <code>forall</code> quantifier always has the larges possible scope. The type of <code>ex_intro</code> could also be written as <code>forall x : A, (P x -&gt; ex P).</code></p>
+<dl>
+<dt><code>firstorder</code></dt>
+<dd>is a tactic similar to <code>intuition</code> but for first-order logic. However, since first-order logic is much more complicated (and undecidable in general), <code>firstorder</code> is much more likely to get stuck than <code>intuition</code>.
+</dd>
+</dl>
+<h2 id="predicates-with-implicit-equality">4.4 Predicates with Implicit Equality</h2>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> isZero : nat -&gt; <span class="dt">Prop</span> :=
+| <span class="dt">IsZero</span> : isZero 0.</code></pre>
+<p><code>isZero</code> can be called a <em>judgement</em> in the sense used in the semantics of programming languages. These judgements are often defined in the style of <em>natural deduction</em>, where <em>inference rules</em> are written with a number of <em>premises</em> above the line and <em>conclusion</em> below the line.</p>
+<p>In this sense the sole constructor of <code>isZero</code> is <code>IsZero</code> and it can be thought of as a single inference rule for deducing <code>isZero</code>, which has no premises above the line and the conclusion <code>isZero 0</code> below it.</p>
+<p>There is one important differences between this inductive data type and the ones seen so far. The type of <code>isZero</code> is <code>nat -&gt; Prop</code>, with the <code>nat</code> following after the colon. In parameterized types like <code>list</code> the parameters appeared <em>before</em> the colon. Every constructor of a parameterized type must have a range type that uses the same parameter, but here every constructor allows us to choose different arguments to the type of constructors.</p>
+<p>Another example is equality, which in Coq is also defined as an inductive type:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> eq (<span class="dt">A</span> : <span class="dt">Type</span>) (x : <span class="dt">A</span>) : <span class="dt">A</span> -&gt; <span class="dt">Prop</span> := eq_refl : eq x x.</code></pre>
+<p>We see that <code>eq</code> has both an argument <code>x</code>, which is fixed and another argument of the same type. This argument is implicitly required to be the same as <code>x</code> in the constructor <code>eq_refl</code>. Thus we can only prove equality when the two arguments are syntactically equal.</p>
+<h2 id="recursive-predicates">4.5 Recursive Predicates</h2>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> even : nat -&gt; <span class="dt">Prop</span> :=
+| <span class="dt">Even_O</span> : even 0
+| <span class="dt">Even_SS</span> : forall n : nat, even n -&gt; even (<span class="dt">S</span> (<span class="dt">S</span> n)).</code></pre>
+<p>To prove theorems about these inductive predicates it is often helpful to perform induction <em>on the predicate</em>.</p>
+<p>One other thing that we need to watch out for when performing inductive proofs is that the inductive hypothesis needs to have enough <code>forall</code> quantifiers on the variables that we are not performing induction on. This can usually be achieved by reordering the variables / quantifiers in the hypothesis.</p>
+<p>A few more proving and automation tricks shown when trying to prove that <code>forall n, even (S (n+n)) -&gt; False</code>:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Lemma</span> even_contra' : forall n', even n' -&gt; forall n, n' = <span class="dt">S</span> (n+n) -&gt; <span class="dt">False</span>
+<span class="dt">Hint</span> <span class="dt">Rewrite</span> &lt;- plus_n_Sm.
+induction 1; crush;
+  <span class="kw">match</span> goal <span class="kw">with</span>
+    | [ <span class="dt">H</span> : <span class="dt">S</span> ?N = ?N0 + ?N0 |- _ ] =&gt; destruct <span class="dt">N;</span> destruct <span class="dt">N0</span>
+  end; crush.
+Qed<span class="kw">.</span>
+
+<span class="dt">Theorem</span> even_contra : forall n, even (<span class="dt">S</span> (n + n)) -&gt; False<span class="kw">.</span>
+  intros; eapply even_contra; eauto.
+Qed<span class="kw">.</span></code></pre>
+<p>The <code>Hint</code> command ads the following rewrite rule to a database used by crush et al. The lemma’s proof uses a <code>match</code> statement to avoid using local variables and hypothesis names. It furthermore takes advantages of using <code>?N0</code> twice to force equality of those arguments.</p>
+<hr />
+<h1 id="infinite-data-and-proofs">5. Infinite Data and Proofs</h1>
+<h2 id="computing-with-infinite-data">5.1 Computing with Infinite Data</h2>
+<p>Most things that can be realized with infinite lazy datastructures in Haskell can be realized with <code>CoInductive</code> definitions in Coq. However, some restrictions apply, since Coq must make sure that function calls terminate (otherwise this would result in inconsistency). <code>(* why exactly? *)</code>.</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span> stream.
+  <span class="dt">Variable</span> <span class="dt">A</span> : Type<span class="kw">.</span>
+
+  <span class="dt">CoInductive</span> stream : <span class="dt">Type</span> :=
+  | <span class="dt">Cons</span> : <span class="dt">A</span> -&gt; stream -&gt; stream.
+<span class="dt">End</span> stream.
+
+<span class="dt">CoFixpoint</span> zeroes : stream nat := <span class="dt">Cons</span> 0 zeros.
+
+<span class="dt">CoFixpoint</span> trues_falses : stream <span class="dt">bool</span> := <span class="dt">Cons</span> <span class="kw">true</span> falses_trues
+<span class="kw">with</span> falses_trues : stream <span class="dt">bool</span> := <span class="dt">Cons</span> <span class="kw">false</span> trues_falses.</code></pre>
+<p>The <em>guardedness condition</em> is that <em>every co-recursive call must be guarded by a constructor.</em> This loops, for example the following:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">CoFixpoint</span> looper : stream nat := looper.</code></pre>
+<p>This definition gives an error because the guardedness condition is violated here: the co-recursive call does not have a constructor between it and its definition.</p>
+<p>Some familiar functions are easier to write:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span> map.
+  <span class="dt">Variables</span> <span class="dt">A</span> <span class="dt">B</span> : Type<span class="kw">.</span>
+  <span class="dt">Variable</span> f : <span class="dt">A</span> -&gt; B<span class="kw">.</span>
+
+  <span class="dt">CoFixpoint</span> map (s : stream <span class="dt">A</span>) : stream <span class="dt">B</span> :=
+    <span class="kw">match</span> s <span class="kw">with</span>
+      | <span class="dt">Cons</span> h t =&gt; <span class="dt">Cons</span> (f h) (map t)
+    end.
+<span class="dt">End</span> map.</code></pre>
+<p>Here the application of ‘map’ is guarded by the constcutor ‘Cons’.</p>
+<p>Coq performs simplifications like expanding functions before checking for guardedness. For example the following weird definition of map’ is rejected by Coq and simplification reveals why:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Section</span> map'.
+  <span class="dt">Variables</span> <span class="dt">A</span> <span class="dt">B</span> : Type<span class="kw">.</span>
+  <span class="dt">Variable</span> f : <span class="dt">A</span> -&gt; B<span class="kw">.</span>
+
+  <span class="dt">CoFixpoint</span> interleave (s1 s2 : stream <span class="dt">A</span>) : stream <span class="dt">A</span> :=
+    <span class="kw">match</span> s1, s2 <span class="kw">with</span>
+      | <span class="dt">Cons</span> h1 t1, <span class="dt">Cons</span> h2 t2 =&gt; <span class="dt">Cons</span> h1 (<span class="dt">Cons</span> h2 (interleave t1 t2))
+   end.
+
+  <span class="dt">CoFixpoint</span> map' (s : stream <span class="dt">A</span>) : stream <span class="dt">B</span> :=
+    <span class="kw">match</span> s <span class="kw">with</span>
+      | <span class="dt">Cons</span> h t =&gt; interleave (<span class="dt">Cons</span> (f h) (map' t)) (<span class="dt">Cons</span> (f h) (map' t))
+    end.
+
+  <span class="co">(* inlining would give ...</span>
+<span class="co">  CoFixpoint map' (s : stream A) : stream B :=</span>
+<span class="co">    match s with</span>
+<span class="co">      | Cons h t =&gt; Cons (f h) (Cons (f h) (interleave (map' t) (map' t)))</span>
+<span class="co">    end.</span>
+<span class="co">  *)</span>
+<span class="dt">End</span> map'.</code></pre>
+<p>In the inlined version makes it obvious that the <code>map'</code> calls are not immediate arguments to constructors (but to <code>interleave</code>), which violates the guardedness condition.</p>
+<p>The guardedness condition is a syntactic check for <em>productivity</em> of co-recursive definitions. A <em>productive</em> co-recursive definition is one whose outputs can be forced in finite time to any finite approximation level.</p>
+<h2 id="infinite-proofs">5.2 Infinite Proofs</h2>
+<p>Running example:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">CoFixpoint</span> ones : stream nat := <span class="dt">Cons</span> 1 ones.
+<span class="dt">Definition</span> ones' := map <span class="dt">S</span> zeros.
+
+<span class="dt">Section</span> stream_eq.
+  <span class="dt">Variable</span> <span class="dt">A</span> : Type<span class="kw">.</span>
+
+  <span class="dt">CoInductive</span> stream_eq : stream <span class="dt">A</span> -&gt; stream <span class="dt">A</span> -&gt; <span class="dt">Prop</span> :=
+  | <span class="dt">Stream_eq</span> : forall h t1 t2,
+    stream_eq t1 t2 -&gt; stream_eq (<span class="dt">Cons</span> h t1) (<span class="dt">Cons</span> h t2).
+<span class="dt">End</span> stream_eq.
+
+
+<span class="dt">Theorem</span> ones_eq : stream_eq ones ones'.
+cofix.
+<span class="co">(* this proof looks like it might be easily completed now, but</span>
+<span class="co">   applying assumption now results in an error</span>
+<span class="co">   'unguarded recursive call in ones_eq'</span>
+<span class="co">*)</span>
+Abort<span class="kw">.</span>
+<span class="co">(* we can check if we have yet gone wrong in this way in a proof</span>
+<span class="co">   with the 'Guarded' command, which gives the error message before</span>
+<span class="co">   running Qed.</span>
+<span class="co">*)</span></code></pre>
+<p>Fixpoints only reduce when enough is known about the definitions of their arguments. Dually co-fixpoints only reduce when enough is known about <em>how their results will be used</em>. A <code>cofix</code> will only be expanded when it is the discriminee of a match.</p>
+<p>An induction principle is parameterized over a predicate characterizing what we want to prove <em>as a function of the inductive fact that we already know.</em></p>
+<hr />
+<hr />
+<h1 id="part-ii-programming-with-dependent-types">Part II: Programming With Dependent Types</h1>
+<hr />
+<hr />
+<h1 id="subset-types-and-variations">6. Subset Types and Variations</h1>
+<h1 id="general-recursion">7. General Recursion</h1>
+<h1 id="more-dependent-types">8. More Dependent Types</h1>
+<h1 id="dependent-data-structures">9. Dependent Data Structures</h1>
+<h1 id="reasoning-about-equality-proofs">10. Reasoning About Equality Proofs</h1>
+<h1 id="generic-programming">11. Generic Programming</h1>
+<h1 id="universes-and-axioms">12. Universes and Axioms</h1>
+<hr />
+<hr />
+<h1 id="part-iii-proof-engineering">Part III: Proof Engineering</h1>
+<hr />
+<hr />
+<h1 id="proof-search-by-logic-programming">13. Proof Search by Logic Programming</h1>
+<h1 id="proof-search-in-ltac">14. Proof Search in Ltac</h1>
+<h1 id="proof-by-reflection">15. Proof by Reflection</h1>
+<hr />
+<hr />
+<h1 id="part-iv-the-big-picture">Part IV: The Big Picture</h1>
+<hr />
+<hr />
+<h1 id="proving-in-the-large">16. Proving in the Large</h1>
+<h1 id="a-taste-of-reasoning-about-programming-language-syntax">17. A Taste of Reasoning About Programming Language Syntax</h1>
+<hr />
+<hr />
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
