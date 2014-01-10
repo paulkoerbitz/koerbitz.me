@@ -1,0 +1,1145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>Types and Tailcalls: Yet Another Programmer's Blog by Paul Koerbitz</title>
+        <link>http://paulkoerbitz.de</link>
+        <description><![CDATA[Thoughts and ideas about programming, with an eye towards functional programming techniques]]></description>
+        <atom:link href="http://paulkoerbitz.de/rss.xml" rel="self"
+                   type="application/rss+xml" />
+        <lastBuildDate>Fri, 10 Jan 2014 00:00:00 UT</lastBuildDate>
+        <item>
+    <title>Sum Types, Visitors, and the Expression Problem</title>
+    <link>http://paulkoerbitz.de/posts/Sum-Types-Visitors-and-the-Expression-Problem.html</link>
+    <description><![CDATA[<h1 class="title">Sum Types, Visitors, and the Expression Problem</h1>
+
+<p class="date">written on January 10, 2014</p>
+
+<p>I’ve heard that <em>the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> is just a poor way of getting the benefit of sum types</em><sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> in functional programming circles several times. I must admit that I never had completely thought this through, but I was nevertheless a bit surprised when I saw that walking the AST in Rust was implemented by what looks like a use of the visitor pattern. Languages with sum types usually use pattern matching to achieve the same effect and I had always considered this a superior approach. In this blog post I try to understand the differences and similarities of the two approaches a little better.</p>
+<p>To set the stage, both pattern matching and the visitor pattern solve one side of the <a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">expression problem</a>, which is the problem of adding both variants of a data type and functions that act on those variants without changing or recompiling old code and without loosing type safety.</p>
+<p>To make this a bit more concrete, consider a very simple expression languages consisting of numbers and addition as an example (no post on this topic can do without one!). We have two variants of expressions, (1) numbers and (2) addition. Let’s assume that we want to compute the values represented by an expression as a first operation.</p>
+<p>In Haskell a straightforward way of solving this problem is as follows</p>
+<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Expr</span> <span class="fu">=</span> <span class="dt">Val</span> <span class="dt">Int</span> <span class="fu">|</span> <span class="dt">Add</span> <span class="dt">Expr</span> <span class="dt">Expr</span>
+
+<span class="ot">eval ::</span> <span class="dt">Expr</span> <span class="ot">-&gt;</span> <span class="dt">Int</span>
+eval (<span class="dt">Val</span> i)     <span class="fu">=</span> i
+eval (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> eval e1 <span class="fu">+</span> eval e2</code></pre>
+<p>If you’re not familiar with Haskell, the first line defines a data type with two variants, it can either be a <code>Val</code>, which holds an <code>Int</code>, or it is an <code>Add</code> which holds two expressions. <code>Val</code> and <code>Add</code> are called constructors of <code>Expr</code>. The <code>eval</code> function pattern-matches and handles each case.</p>
+<p>Now imagine that we do not only want to evaluate expressions but also pretty-print them. Adding operations is easy in Haskell, we just write a new function:</p>
+<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">pprint ::</span> <span class="dt">Expr</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
+pprint (<span class="dt">Val</span> i)     <span class="fu">=</span> <span class="fu">show</span> i
+pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <span class="fu">++</span> <span class="st">&quot; + &quot;</span> <span class="fu">++</span> pprint e2</code></pre>
+<p>In Java we might achieve something similar by introducing an <code>Expr</code> class:</p>
+<pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> Expr {
+    <span class="kw">public</span> <span class="dt">int</span> <span class="fu">eval</span>();
+}
+
+<span class="kw">class</span> Val <span class="kw">implements</span> Expr {
+    <span class="kw">private</span> <span class="dt">final</span> <span class="dt">int</span> v;
+    <span class="kw">public</span> <span class="fu">Val</span>(<span class="dt">int</span> v) { <span class="kw">this</span>.<span class="fu">v</span> = v; }
+    <span class="kw">public</span> <span class="dt">int</span> eval { <span class="kw">return</span> v; }
+}
+
+<span class="kw">class</span> Add <span class="kw">implements</span> Expr {
+    <span class="kw">private</span> <span class="dt">final</span> Expr l;
+    <span class="kw">private</span> <span class="dt">final</span> Expr r;
+    <span class="kw">public</span> <span class="fu">Add</span>(Expr l, Expr r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
+    <span class="kw">public</span> <span class="dt">int</span> eval { <span class="kw">return</span> l.<span class="fu">eval</span>() + r.<span class="fu">eval</span>(); }
+}</code></pre>
+<p>But now, if we want to add the <code>pprint</code> operation, we have to touch every class. This is the side of the expression problem that functional languages tend to solve better than object oriented languages. However, the object oriented programming community has devised the visitor pattern as a way to solve this problem:</p>
+<pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> ExprVisitor {
+    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Val v);
+    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Add a);
+}
+
+<span class="kw">interface</span> Expr {
+    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">accept</span>(ExprVisitor visitor);
+}
+
+<span class="kw">class</span> Val <span class="kw">implements</span> Expr {
+    <span class="kw">private</span> <span class="dt">int</span> v;
+    <span class="kw">public</span> <span class="fu">Val</span>(<span class="dt">int</span> v) { <span class="kw">this</span>.<span class="fu">v</span> = v; }
+    <span class="kw">public</span> <span class="dt">int</span> <span class="fu">val</span>()  { <span class="kw">return</span> v; }
+    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">accept</span>(ExprVisitor visitor) { visitor.<span class="fu">visit</span>(<span class="kw">this</span>); }
+}
+
+<span class="kw">class</span> Add : <span class="kw">public</span> Expr {
+    <span class="kw">private</span> Expr l;
+    <span class="kw">private</span> Expr r;
+    <span class="kw">public</span> <span class="fu">Add</span>(Expr l, Expr r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
+    <span class="kw">public</span> Expr <span class="fu">l</span>() { <span class="kw">return</span> l; }
+    <span class="kw">public</span> Expr <span class="fu">r</span>() { <span class="kw">return</span> r; }
+    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">accept</span>(ExprVisitor visitor) { visitor.<span class="fu">visit</span>(*<span class="kw">this</span>); }
+}
+
+<span class="kw">class</span> EvalVisitor <span class="kw">implements</span> ExprVisitor {
+   <span class="kw">private</span> <span class="dt">int</span> result = <span class="dv">0</span>;
+   <span class="kw">public</span> <span class="dt">int</span> <span class="fu">result</span>() { <span class="kw">return</span> result; }
+   <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Val val) { result = val.<span class="fu">val</span>(); }
+   <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Add add) {
+        add.<span class="fu">l</span>().<span class="fu">accept</span>(<span class="kw">this</span>);
+        <span class="dt">int</span> result_l = result;
+        add.<span class="fu">r</span>().<span class="fu">accept</span>(<span class="kw">this</span>);
+        result += result_l;
+    }
+}</code></pre>
+<p>Ok, this is not exactly pretty, but let’s not forget that this is the side of the problem where OO languages are not good at. At least we can pull something of. And now we are in a situation where we can add new operations pretty easily:</p>
+<pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">class</span> PprintVisitor <span class="kw">extends</span> ExprVisitor {
+    <span class="kw">private</span> String result = <span class="st">&quot;&quot;</span>;
+    <span class="kw">public</span> String <span class="fu">result</span>() { <span class="kw">return</span> result; }
+    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Val val) override { result += val.<span class="fu">val</span>(); }
+    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Add add) override {
+        add.<span class="fu">l</span>().<span class="fu">visit</span>(<span class="kw">this</span>);
+        result += <span class="st">&quot; + &quot;</span>;
+        add.<span class="fu">r</span>().<span class="fu">visit</span>(<span class="kw">this</span>);
+    }
+}</code></pre>
+<p>This works, but the Haskell solution is clearly more elegant. Does the visitor pattern have any additional advantages? Well, neither approach solves the expression problem: if we want to add a new variant, say a <code>Mult</code>, then we have to change existing code in both cases.</p>
+<p>I can’t really think of an advantage for the visitor pattern. I’ve thought of two possibilities, <em>default implementations</em> and <em>almost-but-not-quite-solving-the-expression-problem</em>. But then I realized that the first problem is also similarly solvable in the pattern matching approach and that the second problem doesn’t work without loosing type safety or duplicating code:<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup></p>
+<ol style="list-style-type: decimal">
+<li><p><em>Default implementations</em> are easy to implement with both approaches: in the visitor pattern defaults can be achieved by inherenting from a visitor with default implementations and overriding only certain methods. In the pattern-matching approach we would match all the constructors where we want to override the defaults and insert a wildcard match for the rest and call the default implementaiton on the bound variable.</p></li>
+<li><p><em>Almost-but-not-quite-solving-the-expression-problem</em>: I first thought that we could use some inheritance based trickery to solve the expression problem at least for new code. But none of these seems to work: If we add a new variant, say <code>Mult</code>, it can’t derive from <code>Expr</code> because then it would have to implement <code>Expr</code>’s accept method, which it can’t sensibly do (because there is no right <code>visit</code> method in <code>ExprVisitor</code>).</p>
+<p>Thus we must introduce a new interface <code>Expr2</code>. <code>Expr2</code> cannot derive from <code>Expr</code>, lest we have the same problem as before. But the old variants don’t derive from <code>Expr2</code>, so this is of limited use. Whichever way we twist or turn it, there is no easy way to solve the expression problem with this pattern.</p></li>
+</ol>
+<p>So, as it stands, I can’t really come up with an advantage for the visitor pattern over pattern matching. If you work in a language without sum types then it is certainly a great workaround, but in a language that does pattern matching seems much both more concise and more efficient.<sup><a href="#fn3" class="footnoteRef" id="fnref3">3</a></sup></p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>These are also known as disjoint union or variant types.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>Both maintaining type safety and not duplicating code are requirements in the expression problem.<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>Due to the virtual method calls, which prevent inlining, I would expect the visitor pattern to be much slower than a direct function call.<a href="#fnref3">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Fri, 10 Jan 2014 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Sum-Types-Visitors-and-the-Expression-Problem.html</guid>
+</item>
+<item>
+    <title>Understanding Pointers, Ownership, and Lifetimes in Rust</title>
+    <link>http://paulkoerbitz.de/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</link>
+    <description><![CDATA[<h1 class="title">Understanding Pointers, Ownership, and Lifetimes in Rust</h1>
+
+<p class="date">written on December 21, 2013</p>
+
+<p>In the last couple of weeks I have been looking into <a href="http://www.rust-lang.org">Rust</a>, a new language developed by the good folks at Mozilla. Rust is fairly unique in that it is aimed at the same space as C++: a systems programming language that gives you full control over memory but also offers high level language features. In the past few years a few languages have come out that claim to target this space, for example <a href="http://www.go-lang.org">Go</a>, <a href="http://www.dlang.org">D</a>, and <a href="http://www.nimrod-lang.org">Nimrod</a>. However, these languages are garbage collected by default and loose their memory safety when memory is managed manually (D, Nimrod) or do not offer this possibility at all (Go). Therefore, these languages are not well equiped for applications which require full control over memory, which is the use case where C++ shines.</p>
+<p>I think it’s great that C++ finally gets some real competition. Even among C++ fans, few will deny that compatibility with C, decades of language evolution, and accidental language features have created a very complex language that is extremely difficult to master. I think it is quite sad that for a lot of applications, C++ is still the only sane choice. We need a simpler language that offers more modern language features while targeting the same space. Rust could just be that language.</p>
+<p>Ok now, the point of this post is not to argue the case for <a href="http://www.rust-lang.org">Rust</a> nor to heap (well deserved) praise onto the Rust designers and implementers. I want to talk about the ownership semantics in Rust and how they interact with the different type of pointers in Rust.</p>
+<h2 id="rusts-guiding-principles">Rust’s Guiding Principles</h2>
+<p>To me, understanding something means discovering and understanding the reasons and guiding principles behind the things on the surface. From these, it should be easy to reason about other things and quickly understand why they must be one way and not another. To me the guiding principles of memory managemend in Rust are the following:</p>
+<ol style="list-style-type: decimal">
+<li><p><strong><strong>Manual memory management</strong></strong>: There must be some way for the programmer to control when an object on the heap will be deleted.</p></li>
+<li><p><strong><strong>Memory safety</strong></strong>: Pointers must never point to areas of memory that have been changed or deleted.</p></li>
+<li><p><strong><strong>Safe Concurrency</strong></strong>: There should be no dataraces between threads. Multiple threads must not read and modify the same part of memory at the same time.</p></li>
+<li><p><strong><strong>Compile time checks</strong></strong>: Ensure correctness at compile time instead of runtime whenever possible.</p></li>
+</ol>
+<p>This, in conjunction with the features that Rust provides, will give us a good idea why certain things must be the way they are in Rust.</p>
+<h2 id="different-types-of-pointers-in-rust">Different Types of Pointers in Rust</h2>
+<p>There are several types of pointers in Rust: owned pointers and borrowed pointers are directly supported by the language. There used to be a third type, managed pointers, but these are currently being removed and replaced by garbage collected and reference counted pointers which live in the standard library. Each pointer serves a different purpose. This post will focus on owned and borrowed pointers.</p>
+<h3 id="owned-pointers">Owned Pointers</h3>
+<p>An <em>owned pointer</em> in Rust has ownership over a certain part of the heap. When it goes out of scope it deletes that part of the heap. This achieves <em>manual memory management</em>: the programmer has control over when memory is released by controlling when an owned pointer goes out of scope. Owned pointers are denoted and introduced by <code>~</code>, so <code>~int</code> is an owned pointer to an <code>int</code>. Like all pointers, owned pointers are derferenced by prefixing them with <code>*</code>.</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="co">// The type annotations in the let statements in this example</span>
+<span class="co">// (e.g. &#39;: ~int&#39;) are not necessary and only for clarity</span>
+
+<span class="kw">fn</span> owned_seven() -&gt; ~<span class="kw">int</span> {
+    <span class="co">// Allocate an int with value &#39;3&#39; on the heap, &#39;three&#39; points to it</span>
+    <span class="kw">let</span> three : ~<span class="kw">int</span> = ~<span class="dv">3</span>;
+    <span class="co">// The same for four</span>
+    <span class="kw">let</span> four : ~<span class="kw">int</span> = ~<span class="dv">4</span>;
+    <span class="co">// Dereference both &#39;three&#39; and &#39;four&#39;, add them, store the result</span>
+    <span class="co">// in a newly allocated variable on the heap</span>
+    ~(*three + *four)
+}   <span class="co">// &lt;-- &#39;three&#39; and &#39;four&#39; go out of scope, so the memory they own</span>
+    <span class="co">//     is released. The memory of the return value is owned by the</span>
+    <span class="co">//     return value so it survives the function call.</span>
+
+<span class="kw">fn</span> main() {
+    <span class="kw">let</span> seven : ~<span class="kw">int</span> = owned_seven();
+    <span class="co">// Writing (*seven).to_str() is not really necessary, because the &#39;.&#39;</span>
+    <span class="co">// operator auto-dereferences, so we can also write &#39;seven.to_str()&#39;</span>
+    println(<span class="st">&quot;3 + 4 = &quot;</span> + (*seven).to_str());
+}   <span class="co">// &lt;-- seven goes out of scope and the memory it points to is</span>
+    <span class="co">//     deallocated here</span></code></pre>
+<h3 id="borrowed-pointers">Borrowed Pointers</h3>
+<p>Having only owned pointers would make writing many programs difficult: there could only ever be one reference to every <em>thing</em>. Fortunately, Rust offers another type of pointer called a <em>borrowed pointer</em>. Borrowed pointers do not imply ownership and they can point to objects both on the heap and the stack, so they are quite flexible. We can create an owned pointer by taking the address of something with the <em>address-of</em> operator <code>&amp;</code>. In a slight abuse of notation, the types of borrowed pointers are also denoted by prefixing the type of the variable it points to by <code>&amp;</code>, so <code>&amp;int</code> is a borrowed pointer to an <code>int</code>.</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
+    <span class="kw">let</span> three : &amp;<span class="kw">int</span> = &amp;<span class="dv">3</span>;
+    <span class="kw">let</span> four : &amp;<span class="kw">int</span> = &amp;<span class="dv">4</span>;
+    println(<span class="st">&quot;3 + 4 = &quot;</span> + (*three + *four).to_str());
+}</code></pre>
+<p>Borrowed pointers are a lot like references and pass-by-reference bound variables in C and C++, but note that unlike C/C++-references borrowed pointers must be dereferenced to get to their values. I think this is really more consistent, because references, borrowed pointers and other pointers really hold the address to a memory location, so it makes sense to treat them similarly in terms of syntax. Rust also provides a number of safety mechanisms that C/C++ references lack, but more on that later.</p>
+<h3 id="reference-counted-and-garbage-collected-pointers">Reference Counted and Garbage Collected Pointers</h3>
+<p>Owned and borrowed pointers fit a lot of use cases, but sometimes they are not enough. With these pointer types, each piece of memory must have an ultimate owner. This means that the ownership of all objects on the heap must be representable as a directed acyclic graph. Up to version 0.8, Rust offered managed pointers with the syntactic form <code>@</code>. These are currently being removed and will be replaced by the <code>Rc</code> and <code>Gc</code> pointers in the standard library. This post will ignore these two pointer types.</p>
+<h2 id="move-semantics">Move Semantics</h2>
+<p><em>Memory safety</em> implies that owned pointers <em>cannot be copied or cloned</em>. Otherwise, two such pointers could point to the same block of memory and that memory would be deleted twice. Therefore, owned pointers have move semantics:<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> when owned pointer <code>o2</code> is initialized from owned pointer <code>o1</code>, <code>o1</code> is no longer valid. By guiding principle number four, we would perfer to ensure this at compile time, and Rust indeed does this.<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup></p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
+   <span class="kw">let</span> o1 = ~<span class="st">&quot;world&quot;</span>;
+   <span class="kw">let</span> o2 = o1;                <span class="co">// &lt;-- o1 is &#39;moved&#39; into o2 and now invalid</span>
+   println!(<span class="st">&quot;Hello, {}!&quot;</span>, o1); <span class="co">// &lt;-- this is a compile time error</span>
+}</code></pre>
+<p>Indeed the Rust compiler reports:</p>
+<pre><code>move.rs:4:26: 4:28 error: use of moved value: `o1`
+move.rs:4    println!(&quot;Hello, {}!&quot;, o1); // &lt;-- this is a compile time error
+                                    ^~</code></pre>
+<h3 id="structs-and-enums">Structs and Enums</h3>
+<p>In general Rust has what we might call <em>shallow copy semantics</em>: When an object is initialized via assignment or call-by-value then its memory is a bitwise copy of the object used to assign it. However, this is changed when an object contains an owned pointer: because the owned pointer has move semantics, the object containing it must also have move semantics, otherwise we would again incur two independent owning copies.</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">struct</span> Pod {x: <span class="kw">int</span>, y: <span class="kw">uint</span>, z: [<span class="dv">3.</span>.. <span class="kw">int</span>]}
+<span class="kw">struct</span> WithOptr {x: <span class="kw">int</span>, p: ~<span class="kw">int</span>}
+
+<span class="kw">fn</span> main() {
+   <span class="kw">let</span> a1 = Pod {x: <span class="dv">3</span>, y: <span class="dv">4u</span>, z: [<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>]};
+   <span class="kw">let</span> a2 = a1;
+   println!(<span class="st">&quot;{:?}&quot;</span>, a1);                   <span class="co">// &lt;-- OK, a1 has been copied</span>
+   <span class="kw">let</span> b1 = WithOptr {x: <span class="dv">3</span>, p: ~<span class="dv">4</span>};
+   <span class="kw">let</span> b2 = b1;
+   println!(<span class="st">&quot;{:?}&quot;</span>, b1);                   <span class="co">// &lt;-- Compile time error, b1 has been moved</span>
+}</code></pre>
+<p>The same rules apply to enums, but here the error messages can be a bit more confusing.</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">enum</span> MyEnum {
+     X(<span class="kw">int</span>),
+     Y(~<span class="kw">int</span>)
+}
+
+<span class="kw">fn</span> match_and_print(e: &amp;MyEnum) {
+    <span class="kw">match</span> *e {
+        X(x) =&gt; println!(<span class="st">&quot;{}&quot;</span>, x),  <span class="co">// &lt;-- OK, x can be copied</span>
+        Y(y) =&gt; println!(<span class="st">&quot;{}&quot;</span>, *y)  <span class="co">// &lt;-- Error, y cannot be moved out of a reference</span>
+    }
+}
+
+<span class="kw">fn</span> main() {
+   <span class="kw">let</span> x = &amp;X(<span class="dv">3</span>);
+   <span class="kw">let</span> y = &amp;Y(~<span class="dv">4</span>);
+   match_and_print(x);
+   match_and_print(y);
+}</code></pre>
+<p>In this case the compiler reports</p>
+<pre><code>move.rs:33:8: 33:12 error: cannot move out of dereference of &amp; pointer
+move.rs:33         Y(y) =&gt; println!(&quot;{}&quot;, *y)
+                   ^~~~</code></pre>
+<p>Standard pattern matches are pass-by-value, meaning that the contents of the enum is either copied or moved. However, this can only be done when we have ownership over the values to be moved. When we apply <code>match</code> to a dereferenced borrowed pointer, we cannot move because we don’t have ownership. Changing the <code>match_and_print</code> function to take a copy would work again:</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: MyEnum) {
+    <span class="kw">match</span> e {
+        X(x) =&gt; println!(<span class="st">&quot;{}&quot;</span>, x),
+        Y(y) =&gt; println!(<span class="st">&quot;{}&quot;</span>, *y)
+    }
+}</code></pre>
+<h3 id="the-ref-keyword">The <code>ref</code> Keyword</h3>
+<p>Copying or moving values in pattern matches is not always what we want. Sometimes we just want to take a reference. This way we can pattern match on values which we have obtained via borrowed pointers or we can simply avoid a move or copy. This is where the <code>ref</code> keyword comes into play: It changes the pass-by-value semantics of a pattern match to pass-by-borrowed-pointer semantics:</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: &amp;MyEnum) {
+    <span class="kw">match</span> *e {
+        X(x) =&gt; println!(<span class="st">&quot;{}&quot;</span>, x),
+        Y(<span class="kw">ref</span> y) =&gt;                 <span class="co">// OK, y is a borrowed ptr to ~int</span>
+            println!(<span class="st">&quot;{}&quot;</span>, **y)     <span class="co">// y has type &amp;~int and must be dereferenced twice</span>
+    }
+}</code></pre>
+<p>To bind mutable references there is also the <code>ref mut</code> version which allows modifying:</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: &amp;<span class="kw">mut</span> MyEnum) {
+    <span class="kw">match</span> *e {
+        X(x) =&gt; println!(<span class="st">&quot;{}&quot;</span>, x),
+        Y(<span class="kw">ref</span> <span class="kw">mut</span> y) =&gt; {
+            **y = <span class="dv">5</span>;
+            println!(<span class="st">&quot;{}&quot;</span>, **y)
+        }
+    }
+}
+
+<span class="kw">fn</span> main() {
+   <span class="kw">let</span> x = &amp;<span class="kw">mut</span> X(<span class="dv">3</span>);
+   <span class="kw">let</span> y = &amp;<span class="kw">mut</span> Y(~<span class="dv">4</span>);
+   match_and_print(x);
+   match_and_print(y);
+}</code></pre>
+<p>The <code>ref</code> keyword and its <code>ref mut</code> variant also work in <code>let</code> bindings:</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
+   <span class="kw">let</span> <span class="kw">mut</span> x = <span class="dv">3</span>;
+   <span class="kw">let</span> <span class="kw">ref</span> <span class="kw">mut</span> y = x;
+   *y = <span class="dv">4</span>;
+   println!(<span class="st">&quot;{}&quot;</span>, *y);
+}</code></pre>
+<h2 id="lifetimes">Lifetimes</h2>
+<p>The difficulty with borrowed pointers is that they themselves cannot ensure that they point to valid memory. What if the thing that owns the memory they point to goes out of scope or is reassigned? Since the borrowed pointer has no ownership that memory would be deleted and possibly reassigned. The borrowed pointer would become a <em>dangling reference</em>, which is precisely what we wanted to avoid per guiding principle number 2: <strong>memory safety</strong>.</p>
+<p>Therefore Rust must take a number of precautions to ensure these scenarios do not happen. First, the memory that a borrowed pointer points to must not be freed during that borrowed pointers <strong><strong>lifetime</strong></strong>. Second, this memory <strong><strong>must not change</strong></strong> while it is borrowed.</p>
+<p>The first requirement leads us to the concept of <strong><strong>lifetimes</strong></strong>, the amount of time that some object is guaranteed to exist.</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> lifetimes1() {
+    <span class="kw">let</span> name = ~<span class="st">&quot;world&quot;</span>;               <span class="co">//                 &lt;--+</span>
+    <span class="kw">if</span> (<span class="dv">3</span> &lt; <span class="dv">5</span>) {                       <span class="co">//                    |</span>
+        <span class="kw">let</span> bname = &amp;name;             <span class="co">// &lt;--+               | name&#39;s</span>
+        println!(<span class="st">&quot;Hello, {}!&quot;</span>, name);  <span class="co">//    | bname&#39;s       | lifetime</span>
+        println!(<span class="st">&quot;Hello, {}!&quot;</span>, bname); <span class="co">//    | lifetime      |</span>
+    }                                  <span class="co">// &lt;--+               |</span>
+}                                      <span class="co">//                 &lt;--+</span></code></pre>
+<p>In this example, it is quite clear that the lifetime of <code>bname</code> will be shorter than that of <code>name</code> and thus the compiler needs no help in figuring this out. However, things need not always be this simple, consider the following example:</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> lifetimes2() {
+    <span class="kw">let</span> <span class="kw">mut</span> x_ref = &amp;<span class="dv">3</span>;       <span class="co">//                 &lt;--+</span>
+    <span class="kw">if</span> <span class="kw">true</span> {                 <span class="co">//                    |</span>
+        <span class="kw">let</span> <span class="kw">mut</span> y_ref = &amp;<span class="dv">4</span>;   <span class="co">// &lt;--+ y_ref&#39;s       | x_ref&#39;s</span>
+        x_ref = y_ref;        <span class="co">//    | lifetime      | lifetime</span>
+    }                         <span class="co">// &lt;--+               |</span>
+}                             <span class="co">//                 &lt;--+</span></code></pre>
+<p>Here we have a problem: <code>x_ref</code> is reassigned to point to the same memory location as <code>y_ref</code>, but <code>y_ref</code>’s lifetime is shorter than <code>x_ref</code>’s. To ensure memory safety, the compiler must rejetct this program, which it does:</p>
+<pre><code>lifetimes.rs:21:24: 21:26 error: borrowed value does not live long enough
+lifetimes.rs:18:16: 24:1 note: borrowed pointer must be valid for the block at 18:16...
+lifetimes.rs:20:12: 23:5 note: ...but borrowed value is only valid for the block at 20:12</code></pre>
+<p>Things become even more interesting when we work with borrowed pointers inside of a function:</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> minLife(x: &amp;<span class="kw">int</span>, y: &amp;<span class="kw">int</span>) -&gt; &amp;<span class="kw">int</span> {
+    <span class="kw">if</span> (*x &lt; *y) {
+        x
+    } <span class="kw">else</span> {
+        y
+    }
+}</code></pre>
+<p>Here the lifetime of the result depends on the condition evaluated in the if statement: depending on it the lifetime will either be that of x or that of y. Clearly, the compiler can’t resolve this automatically, it would need to know the values to which x and y point, which may only be known at runtime:</p>
+<pre><code>lifetimes.rs:11:4: 15:5 error: cannot infer an appropriate lifetime due to conflicting requirements
+lifetimes.rs:10:37: 16:1 note: first, the lifetime cannot outlive the anonymous lifetime #2 defined on the block at 10:37...
+lifetimes.rs:11:4: 15:5 note: ...so that if and else have compatible types (expected `&amp;int` but found `&amp;int`)
+lifetimes.rs:10:37: 16:1 note: but, the lifetime must be valid for the anonymous lifetime #3 defined on the block at 10:37...
+lifetimes.rs:11:4: 15:5 note: ...so that types are compatible (expected `&amp;int` but found `&amp;int`)</code></pre>
+<p>Since the compiler can’t infer the lifetimes we must annotate them. Alas, we too would be hard pressed to give the exact lifetime in this example. However, there is a trick by which we can manage this</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> minLife&lt;<span class="ch">&#39;a&gt;(x: &amp;&#39;</span>a <span class="kw">int</span>, y: &amp;<span class="ch">&#39;a int) -&gt; &amp;&#39;</span>a <span class="kw">int</span> {
+    <span class="kw">if</span> (*x &lt; *y) {
+        x
+    } <span class="kw">else</span> {
+        y
+    }
+}</code></pre>
+<p>Here we explictly annotate the lifetime of the parameters and the return value. Lifetime parameters are introduced by a single tick <code>'</code> followed by an identifier. In functions these must be the first template parameters. As you can see we use the same parameter for the lifetime everywhere. If the compiler would take this information too literally, then this function whould be less flexible than we might wish: In this case we could only use it on borrowed pointers which have the exact same lifetime. Fortunately, the compiler interprets the provided lifetimes as a lower bound. Thus <code>'a</code> is the minimum of the lifetimes of <code>x</code> and <code>y</code>. There is one special lifetime, which is called <code>'static</code> and is for objects which are allocated for the entire life of the program.</p>
+<h2 id="freezing">Freezing</h2>
+<p>Another problem with borrowed pointers is that the memory must not be modified while it has been borrowed out. This is achieved by freezing the original object when a borrowed pointer to it exists:</p>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> freeze() {
+    <span class="kw">let</span> <span class="kw">mut</span> x = <span class="dv">3</span>;
+    {
+        <span class="kw">let</span> <span class="kw">mut</span> y = &amp;x;
+        x = <span class="dv">4</span>;       <span class="co">// &lt;-- Error: x has been borrowed and is thus `frozen`</span>
+    }
+    x = <span class="dv">4</span>;           <span class="co">// OK</span>
+}</code></pre>
+<p>In the block we cannot modify <code>x</code> because it is borrowed:</p>
+<pre><code>lifetimes.rs:22:8: 22:9 error: cannot assign to `x` because it is borrowed
+lifetimes.rs:22         x = 4;       // &lt;-- Error: x has been borrowed and is thus `frozen`
+                        ^
+lifetimes.rs:21:20: 21:22 note: borrow of `x` occurs here
+lifetimes.rs:21         let mut y = &amp;x;
+                                    ^~</code></pre>
+<p>Note that this restriction is irrespective of whether the borrowed pointer is mutable or not.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>The other alternative would be that owned pointers can never be reassigned, they would be non-copiable and non-moveable. This seems pretty cumbersome, fortunately Rust’s owned pointers have move semantics.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>Ensuring the validity of owned pointers at compile time is much better than the alternatives: If it was assured at runtime, there would be fewer correctness guarantees about the program and the check would have to be performed every time a pointer is dereferenced. Checking the validity of pointers at compile time is a major achievement of the Rust language: tracking such moves at compile time requires an advanced type-system feature called <a href="http://en.wikipedia.org/wiki/Type_system#Linear_types">linear types</a>. As far as I know Rust is the only mainstreamy language which has such a feature.<a href="#fnref2">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Sat, 21 Dec 2013 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</guid>
+</item>
+<item>
+    <title>Certified Red-Black Trees in Coq -- Part 0</title>
+    <link>http://paulkoerbitz.de/posts/Red-Black-Trees-In-Coq-Part-0.html</link>
+    <description><![CDATA[<h1 class="title">Certified Red-Black Trees in Coq -- Part 0</h1>
+
+<p class="date">written on October 24, 2013</p>
+
+<p>Now that I’ve learned about Coq <a href="/notes/Software-Foundations.html">for a while</a>, I’ve wondered if I could actually used it to prove something useful yet. One thing I thought would be interesting but not to hard was to prove that insert and delete operations on red-black trees are sound.</p>
+<p>Alas, I’ve discovered that comming up with structures and proves myself was a lot harder than just doing the exercises in software foundations. But I’ve kept at it and I now sort-a kind-a proved that the insert operations maintains the order of a red-black tree, one of its three defining properties (the others are perfect black balance, and non-consequitive left-leaning red nodes).</p>
+<p>The proofs are still full of holes, but they are holes that I am confident I can fix given a little more time (they should not be complicated). It ain’t pretty, but I am glad I got this far:</p>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml">
+<span class="dt">Require</span> <span class="dt">Export</span> SfLib<span class="kw">.</span>
+<span class="dt">Module</span> RbTrees<span class="kw">.</span>
+
+<span class="dt">Inductive</span> <span class="dt">RbColor</span> : <span class="dt">Type</span> :=
+  | <span class="dt">RbRed</span>
+  | RbBlack<span class="kw">.</span>
+
+<span class="dt">Definition</span> flipColor (c:RbColor) : <span class="dt">RbColor</span> :=
+  <span class="kw">match</span> c <span class="kw">with</span>
+    | <span class="dt">RbRed</span> =&gt; <span class="dt">RbBlack</span>
+    | <span class="dt">RbBlack</span> =&gt; <span class="dt">RbRed</span>
+  end.
+
+<span class="dt">Inductive</span> <span class="dt">RbTree</span> : <span class="dt">Type</span> :=
+  | tip : <span class="dt">RbTree</span>
+  | node : <span class="dt">RbColor</span> -&gt; nat -&gt; <span class="dt">RbTree</span> -&gt; <span class="dt">RbTree</span> -&gt; RbTree<span class="kw">.</span>
+
+<span class="dt">Fixpoint</span> rotLeft (t:RbTree) : <span class="dt">RbTree</span> :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | tip =&gt; tip
+    | node c n l r =&gt;
+      <span class="kw">match</span> r <span class="kw">with</span>
+        | tip =&gt; node c n l r
+        | node rc rn rl rr =&gt; node rc rn (node <span class="dt">RbRed</span> n l rl) rr
+      end
+  end.
+
+<span class="dt">Fixpoint</span> rotRight (t:RbTree) : <span class="dt">RbTree</span> :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | tip =&gt; tip
+    | node c n l r =&gt;
+      <span class="kw">match</span> l <span class="kw">with</span>
+        | tip =&gt; node c n l r
+        | node lc ln ll lr =&gt; node lc ln ll (node <span class="dt">RbRed</span> n lr r)
+      end
+  end.
+
+<span class="dt">Definition</span> rightIsRed (t:RbTree) : <span class="dt">bool</span> :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | node _ _ _ (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
+    | _ =&gt; <span class="kw">false</span>
+  end.
+
+<span class="dt">Definition</span> twoRedsOnLeft (t:RbTree) : <span class="dt">bool</span> :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | node _ _ (node <span class="dt">RbRed</span> _ (node <span class="dt">RbRed</span> _ _ _) _) _ =&gt; <span class="kw">true</span>
+    | _ =&gt; <span class="kw">false</span>
+  end.
+
+<span class="dt">Definition</span> balanceR (t:RbTree) : <span class="dt">RbTree</span> :=
+  <span class="kw">if</span> twoRedsOnLeft t <span class="kw">then</span> rotRight t <span class="kw">else</span> t.
+
+<span class="dt">Definition</span> balanceL (t:RbTree) : <span class="dt">RbTree</span> :=
+  <span class="kw">if</span> rightIsRed t <span class="kw">then</span> rotLeft t <span class="kw">else</span> t.
+
+<span class="dt">Definition</span> bothLeftAndRightAreRed (t:RbTree) : <span class="dt">bool</span> :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | node _ _ (node <span class="dt">RbRed</span> _ _ _) (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
+    | _ =&gt; <span class="kw">false</span>
+  end.
+
+<span class="co">(* these evidence carrying booleans would be nice here *)</span>
+<span class="dt">Definition</span> flipColors (t:RbTree) : <span class="dt">RbTree</span> :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> ln ll lr) (node <span class="dt">RbRed</span> rn rl rr) =&gt; node <span class="dt">RbRed</span> n (node <span class="dt">RbBlack</span> ln ll lr) (node <span class="dt">RbBlack</span> rn rl rr)
+    | _ =&gt; t
+  end.
+
+<span class="dt">Inductive</span> flipable : <span class="dt">RbTree</span> -&gt; <span class="dt">Prop</span> :=
+  | flip_intro : forall (n ln rn:nat) (ll lr rl rr : <span class="dt">RbTree</span>),
+                   flipable (node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> ln ll lr) (node <span class="dt">RbRed</span> rn rl rr)).
+
+<span class="dt">Inductive</span> <span class="dt">Cmp</span> : <span class="dt">Type</span> :=
+  | <span class="dt">LT</span>
+  | <span class="dt">EQ</span>
+  | GT<span class="kw">.</span>
+
+<span class="dt">Fixpoint</span> cmp (n m:nat) : <span class="dt">Cmp</span> :=
+  <span class="kw">if</span> beq_nat n m <span class="kw">then</span> <span class="dt">EQ</span> <span class="kw">else</span>
+    <span class="kw">if</span> ble_nat n m <span class="kw">then</span> <span class="dt">LT</span> <span class="kw">else</span> GT<span class="kw">.</span>
+
+<span class="dt">Fixpoint</span> insert (nn:nat) (t:RbTree) : <span class="dt">RbTree</span> :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | tip =&gt; node <span class="dt">RbBlack</span> nn tip tip
+    | node c n l r =&gt;
+      <span class="kw">match</span> cmp nn n <span class="kw">with</span>
+        | <span class="dt">EQ</span> =&gt; t
+        | <span class="dt">LT</span> =&gt; flipColors (balanceR (node c n (insert nn l) r))
+        | <span class="dt">GT</span> =&gt; flipColors (balanceL (node c n l (insert nn r)))
+      end
+  end.
+
+<span class="dt">Fixpoint</span> blt_nat (n m:nat) : <span class="dt">bool</span> :=
+  <span class="kw">match</span> n <span class="kw">with</span>
+    | <span class="dt">O</span>      =&gt; <span class="kw">match</span> m <span class="kw">with</span>
+                  | <span class="dt">O</span> =&gt; <span class="kw">false</span>
+                  | <span class="dt">S</span> m&#39; =&gt; <span class="kw">true</span>
+                end
+    | (<span class="dt">S</span> n&#39;) =&gt; ble_nat n&#39; m
+  end.
+
+<span class="dt">Definition</span> bgt_nat (n m:nat) : <span class="dt">bool</span> :=
+  blt_nat m n.
+
+<span class="dt">Fixpoint</span> rbForall (f : nat -&gt; <span class="dt">bool</span>) (t : <span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
+  <span class="kw">match</span> t <span class="kw">with</span>
+    | tip =&gt; <span class="kw">true</span>
+    | node _ n l r =&gt; andb (andb (rbForall f l) (f n)) (rbForall f r)
+  end.
+
+<span class="dt">Definition</span> gtTree (t:RbTree) (m:nat)  : <span class="dt">bool</span> :=
+  rbForall (bgt_nat m) t.
+
+<span class="dt">Definition</span> ltTree (t:RbTree) (m:nat) : <span class="dt">bool</span> :=
+  rbForall (blt_nat m) t.
+
+<span class="dt">Theorem</span> excluded_middle :
+  forall <span class="dt">P:Prop</span>, <span class="dt">P</span> \/ ~ P<span class="kw">.</span>
+Proof<span class="kw">.</span>
+Admitted<span class="kw">.</span>
+
+<span class="dt">Lemma</span> unflipable : forall (t:RbTree),
+  ~flipable t -&gt; flipColors t = t.
+Proof<span class="kw">.</span>
+  intros.
+  destruct t.
+  simpl. reflexivity.
+  destruct r. simpl. reflexivity.
+  destruct t1. simpl. reflexivity.
+  destruct r.
+  destruct t2. simpl. reflexivity.
+  destruct r. unfold not <span class="kw">in</span> H<span class="kw">.</span>
+  <span class="kw">assert</span> (flipable (node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> n0 t1_1 t1_2) (node <span class="dt">RbRed</span> n1 t2_1 t2_2))).
+  apply flip_intro. apply <span class="dt">H</span> <span class="kw">in</span> H0<span class="kw">.</span> inversion H0<span class="kw">.</span>
+  simpl. reflexivity.
+  simpl. reflexivity.
+Qed<span class="kw">.</span>
+
+<span class="dt">Lemma</span> rbForall_flipColors : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (flipColors t) = <span class="kw">true</span>.
+Proof<span class="kw">.</span>
+  intros. induction t.
+  <span class="dt">Case</span> <span class="st">&quot;t=tip&quot;</span>. simpl. assumption.
+  <span class="dt">Case</span> <span class="st">&quot;t=cons&quot;</span>.  remember (node r n t1 t2) <span class="kw">as</span> t.
+    <span class="kw">assert</span> (flipable t \/ ~ (flipable t)). apply excluded_middle.
+    inversion H0<span class="kw">.</span> destruct H1<span class="kw">.</span> simpl. simpl <span class="kw">in</span> H<span class="kw">.</span> apply H<span class="kw">.</span> <span class="kw">assert</span> (flipColors t = t).
+    apply unflipable. apply H1<span class="kw">.</span> rewrite H2<span class="kw">.</span> apply H<span class="kw">.</span>
+Qed<span class="kw">.</span>
+
+<span class="dt">Lemma</span> rbForall_balanceR : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceR t) = <span class="kw">true</span>.
+Proof<span class="kw">.</span>
+Admitted<span class="kw">.</span>
+
+<span class="dt">Lemma</span> rbForall_balanceL : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceL t) = <span class="kw">true</span>.
+Proof<span class="kw">.</span>
+Admitted<span class="kw">.</span>
+
+<span class="dt">Lemma</span> rbForall_insert : forall (n m:nat) (f : nat -&gt; nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+  rbForall (f n) t = <span class="kw">true</span> -&gt; f n m = <span class="kw">true</span> -&gt; rbForall (f n) (insert m t) = <span class="kw">true</span>.
+Proof<span class="kw">.</span>
+  intros. induction t.
+  <span class="dt">Case</span> <span class="st">&quot;t=tip&quot;</span>. simpl. unfold rbForall. unfold rbfold. rewrite H0<span class="kw">.</span> simpl. reflexivity.
+  <span class="dt">Case</span> <span class="st">&quot;t=cons&quot;</span>. remember (cmp m n0) <span class="kw">as</span> cmpEq. destruct cmpEq.
+    <span class="dt">SCase</span> <span class="st">&quot;m &lt; n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> apply rbForall_flipColors. apply rbForall_balanceR. admit.
+    <span class="dt">SCase</span> <span class="st">&quot;m = n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> assumption.
+    <span class="dt">SCase</span> <span class="st">&quot;m &gt; n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> apply rbForall_flipColors. apply rbForall_balanceL. admit.
+Qed<span class="kw">.</span>
+
+<span class="dt">Inductive</span> rbOrdered : <span class="dt">RbTree</span> -&gt; <span class="dt">Prop</span> :=
+  | <span class="dt">O_Tip</span> : rbOrdered tip
+  | <span class="dt">O_Cons</span> : forall (n:nat) (c : <span class="dt">RbColor</span>) (l r : <span class="dt">RbTree</span>),
+               rbOrdered l -&gt; rbOrdered r -&gt;
+               gtTree l n = <span class="kw">true</span> -&gt; ltTree r n = <span class="kw">true</span> -&gt;
+               rbOrdered (node c n l r).
+
+<span class="dt">Lemma</span> flipColor_keeps_order : forall (n:nat) (c:RbColor) (l r : <span class="dt">RbTree</span>),
+  rbOrdered (node c n l r) -&gt; rbOrdered (node (flipColor c) n l r).
+Proof<span class="kw">.</span>
+  intros. inversion H<span class="kw">.</span> apply O_Cons<span class="kw">.</span> assumption. assumption. assumption. assumption.
+Qed<span class="kw">.</span>
+
+<span class="dt">Lemma</span> flipColors_keeps_order : forall (t : <span class="dt">RbTree</span>),
+  rbOrdered t -&gt; rbOrdered (flipColors t).
+Proof<span class="kw">.</span>
+  intros. remember t <span class="kw">as</span> tt. induction H<span class="kw">.</span>
+  <span class="dt">Case</span> <span class="st">&quot;t = tip&quot;</span>.
+    simpl. apply O_Tip<span class="kw">.</span>
+  <span class="dt">Case</span> <span class="st">&quot;t = node ...&quot;</span>.
+    <span class="kw">assert</span> (flipable t \/ ~ (flipable t)). apply excluded_middle.
+    inversion H3<span class="kw">.</span> rewrite &lt;- <span class="dt">Heqtt</span> <span class="kw">in</span> H4<span class="kw">.</span> inversion H4<span class="kw">.</span> simpl.
+    constructor.
+    rewrite &lt;- <span class="dt">H8</span> <span class="kw">in</span> H<span class="kw">.</span> apply flipColor_keeps_order <span class="kw">in</span> H<span class="kw">.</span> simpl <span class="kw">in</span> H<span class="kw">.</span> apply H<span class="kw">.</span>
+    rewrite &lt;- <span class="dt">H9</span> <span class="kw">in</span> H0<span class="kw">.</span> apply flipColor_keeps_order <span class="kw">in</span> H0<span class="kw">.</span> simpl <span class="kw">in</span> H0<span class="kw">.</span> apply H0<span class="kw">.</span>
+    rewrite &lt;- <span class="dt">H8</span> <span class="kw">in</span> H1<span class="kw">.</span> unfold gtTree <span class="kw">in</span> H1<span class="kw">.</span> simpl <span class="kw">in</span> H1<span class="kw">.</span> unfold gtTree. simpl. apply H1<span class="kw">.</span>
+    rewrite &lt;- <span class="dt">H9</span> <span class="kw">in</span> H2<span class="kw">.</span> unfold ltTree <span class="kw">in</span> H2<span class="kw">.</span> simpl <span class="kw">in</span> H2<span class="kw">.</span> unfold ltTree. simpl. apply H2<span class="kw">.</span>
+    <span class="kw">assert</span> (flipColors t = t). apply unflipable. apply H4<span class="kw">.</span>
+    rewrite Heqtt<span class="kw">.</span> rewrite H5<span class="kw">.</span> rewrite &lt;- Heqtt<span class="kw">.</span> constructor; assumption.
+Qed<span class="kw">.</span>
+
+<span class="dt">Lemma</span> balanceL_keeps_order : forall (t : <span class="dt">RbTree</span>),
+  rbOrdered t -&gt; rbOrdered (balanceL t).
+Proof<span class="kw">.</span>
+Admitted<span class="kw">.</span>
+
+<span class="dt">Lemma</span> balanceR_keeps_order : forall (t : <span class="dt">RbTree</span>),
+  rbOrdered t -&gt; rbOrdered (balanceR t).
+Proof<span class="kw">.</span>
+Admitted<span class="kw">.</span>
+
+<span class="dt">Theorem</span> insert_keeps_order : forall (n:nat) (t : <span class="dt">RbTree</span>),
+  rbOrdered t -&gt; rbOrdered (insert n t).
+Proof<span class="kw">.</span>
+  intros. induction H<span class="kw">.</span>
+  <span class="dt">Case</span> <span class="st">&quot;O_Tip&quot;</span>. simpl. repeat constructor.
+  <span class="dt">Case</span> <span class="st">&quot;O_Cons&quot;</span>.
+    remember (cmp n n0) <span class="kw">as</span> Hcmp<span class="kw">.</span>
+    destruct Hcmp<span class="kw">.</span>
+    <span class="dt">SCase</span> <span class="st">&quot;n &lt; n0&quot;</span>.
+      simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span>
+      apply flipColors_keeps_order. apply balanceR_keeps_order. constructor. assumption. assumption.
+      unfold gtTree.
+      <span class="co">(*   rbForall (f n) t = true -&gt; f n m = true -&gt; rbForall (f n) (insert m t) = true. *)</span>
+      apply rbForall_insert. apply H1<span class="kw">.</span>
+      <span class="co">(* cmp n n0 = LT -&gt; bgt_nat n0 n = true *)</span> admit.
+      assumption.
+    <span class="dt">SCase</span> <span class="st">&quot;n = n0&quot;</span>. simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span> apply <span class="dt">O_Cons;</span> assumption.
+    <span class="dt">SCase</span> <span class="st">&quot;n &gt; n0&quot;</span>.
+      simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span>
+      apply flipColors_keeps_order. apply balanceL_keeps_order. apply O_Cons<span class="kw">.</span> assumption. assumption. assumption.
+      unfold ltTree. apply rbForall_insert. apply H2<span class="kw">.</span>
+      <span class="co">(* cmp n n0 = GT -&gt; blt_nat n0 n = true *)</span> admit.
+Qed<span class="kw">.</span></code></pre>
+<p>This is all quite rough of course, I think I can learn a lot but iterating upon it until I have a nice solution. Dependent types are not easy!</p>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Thu, 24 Oct 2013 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Red-Black-Trees-In-Coq-Part-0.html</guid>
+</item>
+<item>
+    <title>Efficient Quicksort in Haskell</title>
+    <link>http://paulkoerbitz.de/posts/Efficient-Quicksort-in-Haskell.html</link>
+    <description><![CDATA[<h1 class="title">Efficient Quicksort in Haskell</h1>
+
+<p class="date">written on September  9, 2013</p>
+
+<p>The Haskell wiki gives as one of the examples of the elegance of Haskell the following as a quicksort implementation in Haskell:</p>
+<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">qsort ::</span> <span class="kw">Ord</span> a <span class="ot">=&gt;</span> [a] <span class="ot">-&gt;</span> [a]
+qsort []    <span class="fu">=</span> []
+qsort (h<span class="fu">:</span>t) <span class="fu">=</span> qsort (<span class="fu">filter</span> (<span class="fu">&lt;=</span> h) t) <span class="fu">++</span> [h] <span class="fu">++</span> qsort (<span class="fu">filter</span> (<span class="fu">&gt;</span> h) t)</code></pre>
+<p>In terms of elegance, this solution is indeed hard to beat. It is as close to Wikipedia’s description of the essence of quicksort as code can get:<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup></p>
+<blockquote>
+<p>Quicksort first divides a large list into two smaller sub-lists: the low elements and the high elements. Quicksort can then recursively sort the sub-lists.</p>
+</blockquote>
+<p>However, <a href="http://augustss.blogspot.de/2007/08/quicksort-in-haskell-quicksort-is.html">you can argue</a> that this is not the <em>real</em> quicksort, because the beauty of quicksort is that it works in-place and does not require O(n) extra space as the version given above does. Therefore, the question is sometimes raised how the <em>real quicksort</em> would look in Haskell, given that it generally eschews mutuability and in-place update. There are of course various implementations floating around on the interwebs, but I wanted to see how an implementation using unboxed vectors looks like and how that compares in performance to a version in C++’s.</p>
+<h2 id="a-haskell-implementation">A Haskell Implementation</h2>
+<p>An efficient Quicksort implementation consists of two parts, the <em>partition</em> function, which rearranges the elements of an array so that the left part is less-or-equal to the pivot and the right part is greater and the main function which does the recursive calls on the sub-parts. Here is my Haskell version:</p>
+<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}</span>
+<span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span>
+<span class="kw">import</span>           Control.Monad.Primitive
+<span class="kw">import</span>           Control.Applicative ((&lt;$&gt;))
+<span class="kw">import</span> <span class="kw">qualified</span> Data.Vector.Unboxed <span class="kw">as</span> V
+<span class="kw">import</span> <span class="kw">qualified</span> Data.Vector.Unboxed.Mutable <span class="kw">as</span> M
+<span class="kw">import</span>           System.Environment (getArgs)
+<span class="kw">import</span>           System.Clock
+<span class="kw">import</span>           System.Exit (exitFailure, exitSuccess)
+<span class="kw">import</span>           Control.DeepSeq (deepseq)
+<span class="kw">import</span> <span class="kw">qualified</span> Data.ByteString <span class="kw">as</span> BS
+<span class="kw">import</span>           Data.ByteString.Char8 (readInt)
+
+<span class="ot">partition ::</span> (<span class="dt">PrimMonad</span> m, <span class="kw">Ord</span> a, <span class="dt">M.Unbox</span> a) <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">M.MVector</span> (<span class="dt">PrimState</span> m) a <span class="ot">-&gt;</span> m <span class="dt">Int</span>
+partition <span class="fu">!pi</span> <span class="fu">!</span>v <span class="fu">=</span> <span class="kw">do</span>
+    pv <span class="ot">&lt;-</span> M.unsafeRead v <span class="fu">pi</span>
+    M.unsafeSwap v <span class="fu">pi</span> lastIdx
+    pi&#39; <span class="ot">&lt;-</span> go pv <span class="dv">0</span> <span class="dv">0</span>
+    M.unsafeSwap v pi&#39; lastIdx
+    <span class="fu">return</span> pi&#39;
+  <span class="kw">where</span>
+    <span class="fu">!</span>lastIdx <span class="fu">=</span> M.length v <span class="fu">-</span> <span class="dv">1</span>
+
+    go <span class="fu">!</span>pv i <span class="fu">!</span>si <span class="fu">|</span> i <span class="fu">&lt;</span> lastIdx <span class="fu">=</span>
+       <span class="kw">do</span> iv <span class="ot">&lt;-</span> M.unsafeRead v i
+          <span class="kw">if</span> iv <span class="fu">&lt;</span> pv
+            <span class="kw">then</span> M.unsafeSwap v i si <span class="fu">&gt;&gt;</span> go pv (i<span class="fu">+</span><span class="dv">1</span>) (si<span class="fu">+</span><span class="dv">1</span>)
+            <span class="kw">else</span> go pv (i<span class="fu">+</span><span class="dv">1</span>) si
+    go _   _ <span class="fu">!</span>si                <span class="fu">=</span> <span class="fu">return</span> si
+
+<span class="ot">qsort ::</span> (<span class="dt">PrimMonad</span> m, <span class="kw">Ord</span> a, <span class="dt">M.Unbox</span> a) <span class="ot">=&gt;</span> <span class="dt">M.MVector</span> (<span class="dt">PrimState</span> m) a <span class="ot">-&gt;</span> m ()
+qsort v <span class="fu">|</span> M.length v <span class="fu">&lt;</span> <span class="dv">2</span> <span class="fu">=</span> <span class="fu">return</span> ()
+qsort v                    <span class="fu">=</span> <span class="kw">do</span>
+    <span class="kw">let</span> <span class="fu">!pi</span> <span class="fu">=</span> M.length v <span class="ot">`div`</span> <span class="dv">2</span>
+    pi&#39; <span class="ot">&lt;-</span> partition <span class="fu">pi</span> v
+    qsort (M.unsafeSlice <span class="dv">0</span> pi&#39; v)
+    qsort (M.unsafeSlice (pi&#39;<span class="fu">+</span><span class="dv">1</span>) (M.length v <span class="fu">-</span> (pi&#39;<span class="fu">+</span><span class="dv">1</span>)) v)
+
+<span class="ot">main ::</span> <span class="dt">IO</span> ()
+main <span class="fu">=</span> <span class="kw">do</span>
+    args <span class="ot">&lt;-</span> getArgs
+    <span class="kw">if</span> <span class="fu">length</span> args <span class="fu">&lt;</span> <span class="dv">2</span>
+      <span class="kw">then</span> <span class="fu">putStrLn</span> <span class="st">&quot;Usage: qsort RUNS FILENAME&quot;</span> <span class="fu">&gt;&gt;</span> exitFailure
+      <span class="kw">else</span> <span class="fu">return</span> ()
+    <span class="kw">let</span> (<span class="ot">nRuns::</span><span class="dt">Int</span>) <span class="fu">=</span> <span class="fu">read</span> (args <span class="fu">!!</span> <span class="dv">0</span>)
+    nums <span class="ot">&lt;-</span> V.unfoldr (\s <span class="ot">-&gt;</span> <span class="fu">readInt</span> <span class="fu">$</span> BS.dropWhile isWs s) <span class="fu">&lt;$&gt;</span> BS.readFile (args <span class="fu">!!</span> <span class="dv">1</span>)
+    loop nRuns (<span class="kw">do</span> nums&#39; <span class="ot">&lt;-</span> V.thaw nums
+                   start <span class="ot">&lt;-</span> getTime <span class="dt">ProcessCPUTime</span>
+                   qsort nums&#39;
+                   time <span class="ot">&lt;-</span> getTime <span class="dt">ProcessCPUTime</span> <span class="fu">-</span> start
+                   <span class="fu">putStrLn</span> <span class="fu">$</span> <span class="fu">show</span> <span class="fu">$</span> <span class="fu">fromIntegral</span> (sec time) <span class="fu">+</span>
+                                     ((<span class="fu">fromIntegral</span> <span class="fu">$</span> nsec time) <span class="fu">/</span> <span class="dv">1000000000</span>))
+    exitSuccess
+  <span class="kw">where</span>
+    loop <span class="dv">0</span> _ <span class="fu">=</span> <span class="fu">return</span> ()
+    loop n a <span class="fu">=</span> a <span class="fu">&gt;&gt;</span> loop (n<span class="fu">-</span><span class="dv">1</span>) a
+
+    isWs <span class="fu">!</span>c <span class="fu">=</span> c <span class="fu">==</span> <span class="dv">10</span> <span class="fu">||</span> c <span class="fu">==</span> <span class="dv">20</span> <span class="fu">||</span> c <span class="fu">==</span> <span class="dv">9</span></code></pre>
+<p>All in all I’d say this is a pretty direct translation from the imperative version. For comparison, here is an implementation in C++:</p>
+<pre class="sourceCode Cpp"><code class="sourceCode cpp"><span class="ot">#include &lt;iostream&gt;</span>
+<span class="ot">#include &lt;sstream&gt;</span>
+<span class="ot">#include &lt;vector&gt;</span>
+<span class="ot">#include &lt;cstdlib&gt;</span>
+<span class="ot">#include &lt;fstream&gt;</span>
+
+<span class="kw">template</span>&lt;<span class="kw">class</span> T&gt;
+<span class="dt">void</span> swap(std::vector&lt;T&gt;&amp; arr, size_t i1, size_t i2)
+{
+  T buff = arr[i1];
+  arr[i1] = arr[i2];
+  arr[i2] = buff;
+}
+
+<span class="kw">template</span>&lt;<span class="kw">class</span> T&gt;
+size_t partition(std::vector&lt;T&gt;&amp; arr, size_t lo, size_t hi, size_t pi)
+{
+  swap(arr, pi, hi);
+  T pv = arr[hi];
+  size_t si=lo;
+  <span class="kw">for</span> (size_t i=lo; i&lt;hi; ++i) {
+    <span class="kw">if</span> (arr[i] &lt; pv) {
+      swap(arr, i, si++);
+    }
+  }
+  swap(arr, si, hi);
+  <span class="kw">return</span> si;
+}
+
+<span class="kw">template</span>&lt;<span class="kw">class</span> T&gt;
+<span class="dt">void</span> qsort(std::vector&lt;T&gt;&amp; arr, size_t lo, size_t hi)
+{
+  size_t n = hi-lo<span class="dv">+1</span>;
+  <span class="kw">if</span> (n &lt; <span class="dv">2</span>)
+    <span class="kw">return</span>;
+  size_t pi = partition(arr, lo, hi, lo + (hi-lo)/<span class="dv">2</span>);
+  qsort(arr, lo,   pi<span class="dv">-1</span>);
+  qsort(arr, pi<span class="dv">+1</span>, hi);
+}
+
+<span class="dt">int</span> main(<span class="dt">int</span> ac, <span class="dt">char</span>** av)
+{
+  <span class="kw">if</span> (ac &lt;= <span class="dv">2</span>)
+  {
+    std::cerr &lt;&lt; <span class="st">&quot;Usage: qsort RUNS FILENAME&quot;</span> &lt;&lt; std::endl;
+    exit(<span class="dv">1</span>);
+  }
+  <span class="dt">int</span> nRuns = atoi(av[<span class="dv">1</span>]);
+
+  std::ifstream infile(av[<span class="dv">2</span>]);
+  <span class="kw">if</span> (!infile.good())
+  {
+    std::cerr &lt;&lt; <span class="st">&quot;Can&#39;t open file: &quot;</span> &lt;&lt; av[<span class="dv">2</span>] &lt;&lt; std::endl;
+    exit(<span class="dv">1</span>);
+  }
+
+  std::vector&lt;<span class="dt">int</span>&gt; input;
+  <span class="kw">while</span> (infile.good())
+  {
+    <span class="dt">int</span> i;
+    infile &gt;&gt; i;
+    input.push_back(i);
+  }
+
+  <span class="kw">for</span> (<span class="dt">int</span> n=<span class="dv">0</span>; n &lt; nRuns; ++n)
+  {
+    std::vector&lt;<span class="dt">int</span>&gt; unsorted(input);
+    <span class="dt">auto</span> start = clock();
+    qsort(unsorted, <span class="dv">0</span>, unsorted.size()-<span class="dv">1</span>);
+    <span class="dt">auto</span> end = clock();
+    printf(<span class="st">&quot;%11.9f</span><span class="ch">\n</span><span class="st">&quot;</span>, ((<span class="dt">double</span>) (end-start)) / CLOCKS_PER_SEC);
+  }
+  <span class="kw">return</span> <span class="dv">0</span>;
+}</code></pre>
+<p>Let’s see how the two versions compare in terms of performance. For the comparison I generated 10.000.000 random integers, and measured the time it takes to sort them 50 times. The C++ version averages about 0.87 seconds while the Haskell version takes about 1.3 seconds. Not a bad result, but of course I would like the Haskell version to be just as fast. However, with my limited optimization skills I wasn’t able to eek out any more performance of the Haskell version.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p><a href="http://en.wikipedia.org/wiki/Quicksort">Wikipedia article on quicksort</a>.<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Mon, 09 Sep 2013 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Efficient-Quicksort-in-Haskell.html</guid>
+</item>
+<item>
+    <title>Let Your Prompt Tell You When To Pull</title>
+    <link>http://paulkoerbitz.de/posts/Let-Your-Prompt-Tell-You-When-To-Pull.html</link>
+    <description><![CDATA[<h1 class="title">Let Your Prompt Tell You When To Pull</h1>
+
+<p class="date">written on August 20, 2013</p>
+
+<p>During the last weeks, I have on numerous occasions simply forgotten to check repositories for updates. I have then often re-implemented functionality (after swearing that whoever was responsible for it hadn’t done it yet) that was in fact already implemented in the remote repository.</p>
+<p>This is of course quite terrible, mostly because it makes me feel like an absolute idiot (rightly so?) and because it makes me waste time (admittedly the functionality had been quite small, otherwise I probably would have pulled, but still). So I set out to modify my <a href="http://www.yawl.org/" title="Yet Another Workflow Language">zsh</a> prompt so that it will inform me when the remote repository is ahead of my local repository. The solution turned out to be quite simple, I just had to add</p>
+<pre><code>ZSH_THEME_GIT_PROMPT_BEHIND_REMOTE=&quot;%{$fg_bold[red]%}↓↓↓%{$reset_color%}&quot;
+ZSH_THEME_GIT_PROMPT_AHEAD_REMOTE=&quot;%{$fg_bold[red]%}↑↑↑%{$reset_color%}&quot;
+ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_color%}&quot;</code></pre>
+<p>to my current zsh scheme.</p>
+<p>Now, whenever a remote repository that I am tracking has new functionality my prompt informs me by showing me something along these lines:</p>
+<div class="figure">
+<img src="/images/zsh_screenshot.png" title="My zsh prompt" />
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Tue, 20 Aug 2013 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Let-Your-Prompt-Tell-You-When-To-Pull.html</guid>
+</item>
+<item>
+    <title>Stripping out the Business Logic</title>
+    <link>http://paulkoerbitz.de/posts/Stripping-out-the-Business-Logic.html</link>
+    <description><![CDATA[<h1 class="title">Stripping out the Business Logic</h1>
+
+<p class="date">written on August  7, 2013</p>
+
+<p>What I am writing day-in and day-out can probably best be described as <em>business programs</em>. To me <em>business programs</em> are programs whose essential purpose it is to keep track of some state, control processes, make decisions, and communicate with external services. One question that intrigues me is how one can seperate out the <em>business logic</em> from the rest of the program.</p>
+<p>Business logic is, as the name implies, about business first and logic second, and since business needs can change on a whim, the business logic needs to change too, usually much more often than the rest of the application. Furthermore, the business logic is the raison d’être of the whole application, so it makes sense to have this logic in one place instead of intermingling it with implementation specific logic. Finally, when I write such programs it always seems I have to do way too much work to achieve what I want. To me, seperating out the business logic into a seperate domain specific language (DSL), module, workflow pattern, or whatever, holds the promise that to create additional functionality I only need to implement that functionality in the business logic DSL or module, reducing the amount of work needed and thus speeding up development considerably.</p>
+<p>However, while there is surely some interest in this topic, I have yet to find the best way to achieve this. As far as I can tell there may be a lot of activity, but this activity doesn’t result in well communicated solutions that are easy to comprehend. Maybe I just don’t get it, but I have yet to find somebody to tell me: this is how you do it. It seems that quite often business logic is simply mixed with the rest of the application. In this post I want to explore several possibilities of how business logic can be seperated from the rest of the application and described concisely.</p>
+<h2 id="goals">Goals</h2>
+<p>In an ideal world, the representation of the business logic should fulfill the following criteria:</p>
+<dl>
+<dt>Succinct</dt>
+<dd><p>Since one of the objectives is to have the business logic in one place, the representation of it should be as small as possible. Boilerplate and verboseness should be avoided.</p>
+</dd>
+<dt>Unambiguous</dt>
+<dd><p>Each instance of a representation should have only one meaning. This may seem obvious, but as far as I understand this is not necessarily true for <a href="http://www.bpmn.org/" title="Business Process Model and Notation">BPMN</a>. This means that a <em>rountrip translation</em> (representation <span class="math"> → </span> program <span class="math"> → </span> representation) should at least be theoretically possible and lead to equivalent results.</p>
+</dd>
+<dt>Easy to understand</dt>
+<dd><p>The representation of the business logic should convey the logic to a reasonably intelligent reader. The reader should not have to have intimate knowledge with how this representation is translated to a program in order to understand what will happen.</p>
+</dd>
+<dt>Testable</dt>
+<dd><p>Since the representation will contain the entire business logic, which will change often and might be complex, it is important that this logic is easily testable to make sure we got everything right.</p>
+</dd>
+<dt>Representable</dt>
+<dd><p>The representation should be easily representable in the language one is working with. If it is it becomes easier to serialize and deserialize a representation along with its state and to display it to a (support) user.</p>
+</dd>
+<dt>Complete</dt>
+<dd><p>We should be able to represent everything we want to represent in this representation, otherwise we’ll have to work around it at which point we would have probably better done without it.</p>
+</dd>
+</dl>
+<h2 id="some-possible-solutions">Some Possible Solutions</h2>
+<h3 id="finite-state-machines">Finite-State Machines</h3>
+<p><a href="http://en.wikipedia.org/wiki/Finite_state_machine" title="Wikipedia: Finite State Machines">Finite-state machines</a> are sometimes<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup><sup>,</sup><sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup> suggested for this task. Finite-state machines are well understood, easy to draw and are able to model all processes which only have a, well, finite number of states. On a high level, this should include all sensible business processes. However, once we include storing and modifying arbitrary data in our application, we are clearly out of finite-state machine territory. Therefore, to describe <em>all</em> of the business logic we will clearly need some extension to finite state machines. If that extension is <em>ad-hoc</em> then we might lose the benefits that finite-state machines provide in the first place.</p>
+<h3 id="workflow-languages">Workflow Languages</h3>
+<p>There are also a large number of workflow languages, many of which are found in some enterprise software vendors packages.<sup><a href="#fn3" class="footnoteRef" id="fnref3">3</a></sup><sup>,</sup><sup><a href="#fn4" class="footnoteRef" id="fnref4">4</a></sup> To me the most interesting are the <em>Business Process Modell and Notation</em><sup><a href="#fn5" class="footnoteRef" id="fnref5">5</a></sup> and the <em>Yet Another Workflow Language</em><sup><a href="#fn6" class="footnoteRef" id="fnref6">6</a></sup> which was created by Arthur ter Hofstede, an academic how studies the field and has written an influential review paper.<sup><a href="#fn7" class="footnoteRef" id="fnref7">7</a></sup> These languages seem interesting and have clearly some industry weight behind them, it seems fairly difficult to find good introductory material on them that is not (a) a 1000-page tome of a standard or (b) some software vendors sales pitch documents. Some of these languages also have problems, for example there seems to be no general unambiguous way to translate BPMN into a program.<sup><a href="#fn8" class="footnoteRef" id="fnref8">8</a></sup></p>
+<p>Overall, I am a little disappointed with the quality of the introductory information that I have found so far. The most promising document seems to be the review paper by ter Hofstede and the YAWL language.</p>
+<h3 id="a-process-dsl">A Process DSL</h3>
+<p>What we have done at work is that we have basically defined an expression language that is a C++ DSL. With this language you can write expressions such as</p>
+<pre class="sourceCode cpp"><code class="sourceCode cpp">if_(customerHasValidEmailAddress())
+.then_(completeLogin())
+.else_(sendVerificationEmail() <span class="kw">and</span> showEmailVerificationPage())</code></pre>
+<p>and so on. Each of the mentioned steps has to be implemented in the host language to perform the desired action. This means of course that the implementation burden is still there, but at least steps that are already defined can be reused in a different context.</p>
+<p>One problem I see with this approach is that there is no way to store state inside the process description, in essence this is a language that has boolean expressions and stores everything else in global state. This also means that for every new piece of state, however temporary, requires a new <em>thing</em> that can contain it. I have found that this can limit reuse and sometimes make these processes confusing. But this DSL seems essentially like an implementation of the previously described workflow languages.</p>
+<h3 id="a-more-powerful-dsl">A More Powerful DSL</h3>
+<p>This is where I would like to go. A DSL that can hold some temporary state, where variables can be bound and reused at a later state. Ideally, this DSL would also permit a way to manage the data model directly, so that it would essentially be able to implement the entire business logic without having to fall back to implementations in the host language all the time. Alas, right now, this is only an idea and I am not sure how it will work.</p>
+<h2 id="outlook">Outlook</h2>
+<p>This post has barely scratched the surface of the task of abstracting out the business language into a seperate representation. I hope I have transmitted the idea of why this is desireable and outlined a few of the possible approaches that I have found during my inital research of the topic. In future posts I hope that I’ll be able to explore some of these approaches in more depth.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p><a href="http://stackoverflow.com/questions/11327564/web-development-complex-processes-are-state-machines-the-only-way-to-go">My question</a> on stackoverflow about a year ago on the same topic.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>Shopify technical blog: <a href="http://www.shopify.com/technology/3383012-why-developers-should-be-force-fed-state-machines">Why developers should be force-fed finite state machines</a>.<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p><a href="http://static.springsource.org/spring-webflow/docs/2.0.x/reference/html/index.html">Spring Web Flow Reference Guide</a>.<a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p><a href="https://java.net/projects/osworkflow">OS Workflow</a>.<a href="#fnref4">↩</a></p></li>
+<li id="fn5"><p><a href="http://www.bpmn.org/" title="Business Process Model and Notation">Business Process Modell and Notation website</a>.<a href="#fnref5">↩</a></p></li>
+<li id="fn6"><p><a href="http://www.yawlfoundation.org">Yet Another Workflow Language website</a>.<a href="#fnref6">↩</a></p></li>
+<li id="fn7"><p><a href="http://eprints.qut.edu.au/9950/1/9950.pdf">Workflow Patterns</a> review paper by of workflow pattern systems by Arthur ter Hofstede.<a href="#fnref7">↩</a></p></li>
+<li id="fn8"><p><a href="http://www.infoq.com/articles/bpelbpm">Why BPEL is not the holy grail for BPM</a>.<a href="#fnref8">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Wed, 07 Aug 2013 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Stripping-out-the-Business-Logic.html</guid>
+</item>
+<item>
+    <title>Getting Started With Dependent Types</title>
+    <link>http://paulkoerbitz.de/posts/Getting-Started-With-Dependent-Types.html</link>
+    <description><![CDATA[<h1 class="title">Getting Started With Dependent Types</h1>
+
+<p class="date">written on July 31, 2013</p>
+
+<p>Dependent types, that is type systems where types may depend on values, are the hot new thing. Dependent types seem like a logical succession to <a href="/posts/Why-I-love-Haskell.html">Haskell</a>, which <a href="http://stackoverflow.com/questions/12961651/why-not-be-dependently-typed/#answer-13241158">people much smarter than me argue</a> is becoming a dependently typed language itself. I am interested in learning more about dependent types and want to list some resources here that I have used or am planing on using.</p>
+<h2 id="why-dependent-types">Why dependent types?</h2>
+<p>Why bother learning languages with dependent types? Given that <a href="/posts/Why-I-love-Haskell.html#encode-your-invariants-in-the-type-system">I’ve argued</a> that it is beneficial to encode a program’s invariants in the type system, it is only natural to want a type system that allows you to do more of this. Dependent types give you this possibilitye, however there is a trade off: writing programs in dependently typed languages is more complex (you may have to write some proofs!) and we don’t have that much experience with it.</p>
+<p>I can’t really answer the question if the more powerful type system is worth the additional difficulties, but it seems like things are in motion and that now is an interesting time to find out:</p>
+<ul>
+<li><p>New dependently typed languages that are more or less intended to be used as real programming languages have started to appear in recent years. These languages include <a href="http://wiki.portal.chalmers.se/agda/">Agda</a>, <a href="http://idris-lang.org">Idris</a> and <a href="http://www.ats-lang.org">ATS</a>. At least the latter two are clearly intended to be used as <em>real programming languages</em> (as opposed to theorem provers) and they do appear to be quite usuable to the casual observer.</p></li>
+<li><p>New books have come out which make heavy use of the theorem prover <a href="http://coq.inria.fr">Coq</a> and are intended to teach the use of dependently typed languages. These books make the use of Coq accessible to a much larger audience (including me ;).</p></li>
+<li><p>Domain specific languages (DSLs) and specifically embedded domain specific languages (EDSLs) are becomming more and more important. Dependent types allow you to typecheck these languages with the build-in type checker.</p></li>
+<li><p>Haskell is moving towards dependent types and so the smart people behind Haskell seem to think this is a good idea. Who am I to disagree?</p></li>
+</ul>
+<p>It is of course quite possible that these indications mean nothing or that it simply looks like a trend to me since I have only recently started to look at this topic. However, if Haskell has taught me one thing then it is that great ideas, however different, may eventually become successful when pursued with the necessary tenacity and that things that look like huge inconveniences (purity!) may actually turn out to be great advantages once we get accustomed to them. Non-total functions have always felt like a wart in Haskell, and that is why I am willing to bet on dependently typed languages now. I think there will be a lot of exploring and a lot of learning before these languages will be anything near mainstream (like where Haskell is now), but now seems like an exciting time to be part of this development.</p>
+<h2 id="resources">Resources</h2>
+<h3 id="programming-languages">Programming languages</h3>
+<p>There are now a number of interesting languages with dependent types. This list makes no attempt to be exhaustive and is slanted towards the things that interest me.</p>
+<ul>
+<li><p><a href="http://coq.inria.fr">Coq</a> is the 800-pound Gorilla in dependent type land. Coq is first and foremost a theorem prover, but at its heart sits a dependently typed language called Gallina, which itself is an extensions of the <em>calculus of indicutive constructions</em>.</p></li>
+<li><p><a href="http://wiki.portal.chalmers.se/agda/">Agda</a> is also a theorem prover based on the <em>intuitionistic type theory</em> develop by Martin-Löf. The syntax is heavily influenced by Haskell (as opposed to Coq whose syntax closer to ML). A major difference between Agda and Coq is that Agda has no tactics language for proving theorems.</p></li>
+<li><p><a href="http://idris-lang.org/">Idris</a> is the new kid on the block, having appeared only in 2011. It is also heavily influenced by Haskell (the <a href="http://www.cs.st-andrews.ac.uk/~eb/drafts/impldtp.pdf">introducing paper</a> asked the question <em>“What if Haskell had full dependent types?”</em> ). It differs from Coq and Agda in that it is not described as a theorem prover but as a general programming language. Indeed, functions must be annotated if one wants them to be checked for totality. This is a kind of escape hatch that will make developing regular programs easier in Idris. While it has (appart from dependent types) a lot in common with Haskell, it defaults to eager evaluation (with optional lazy evaluation available with special annotations).</p></li>
+<li><p><a href="http://www.ats-lang.org/">ATS</a> (which stands for <em>applied type system</em>) looks like a fusion of C and ML with dependent types thrown in for good measure. I am not really sure what to think of this language but at first sight it feels very different from the other ones listed here. What makes this language really interesting is that it is intended for systems programming, i.e. for the domain where one would usually use C or C++. I think this is great because those two have very little competition in their fields.<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> Furthermore, when programming in C it is so easy to make mistakes that the dependent types and linear types that ATS has could be a real boon. That said, from my very limited impression the language seems a bit messy and therefore I think it is not the best place to start learning about dependent types.</p></li>
+</ul>
+<h3 id="books-and-papers">Books and Papers</h3>
+<p>There are also a few books that have come out recently-ish that make dependently typed languages (primarily Coq) much more accessible. This is of course of huge importance to an autodidact like me.</p>
+<ul>
+<li><p><a href="http://www.cis.upenn.edu/~bcpierce/sf/">Software foundations</a> by Benjamin Pierce teaches Coq, functional programming, basic typing theory and the universe. There are basically no prerequisites (except for being able to install Emacs ;)) and lots and lots of little excercises. It seems a bit slow at the start but working through all of the excercises will probably give a lot of familiarity with Coq, so that may be worth it.</p></li>
+<li><p><a href="http://adam.chlipala.net/cpdt/">Certified programming with dependent types</a> by Adam Chlipala. This book seems much more advanced than software foundations. It states in the introduction that it wants to initiate a discussion on best practices for developing certified programs in dependently typed languages. The author argues that every proof should be automated so that no manual steps are required (once the right lemmata have been developed).</p></li>
+<li><p><a href="http://www.cis.upenn.edu/~bcpierce/tapl/">Types and programming languages</a> by Benjamin Pierce. This book is not really on dependent types but introduces the foundations for programming language theory such as the typing rules, operational semantics, the (simply typed) lambda calculus, subtyping and a few more. I’ve meant to read it completely but I am stuck half way. It is certainly a very accessible book and a fun read.</p></li>
+<li><p><a href="http://people.cs.uu.nl/andres/LambdaPi/LambdaPi.pdf">A tutorial implmentation of a dependently typed lambda calculus</a> by Andres Löh et al. I am not sure if I can give you a better summary than the title. Doesn’t it just make you want to read the paper?</p></li>
+<li><p><a href="https://en.wikipedia.org/wiki/Intuitionistic_type_theory">Martin Löf’s type theory</a> is the foundation for Agda. I think learning the theory might not acutally be necessary for a working understanding of dependent types and to get an idea of what you can do with them, but it would sure be nice to know more about the foundations.</p></li>
+<li><p><a href="http://homotopytypetheory.org/">HoTT</a> or <em>Homotopy Type Theory</em> refers to a new interpretation of Martin-Löf’s system of intensional, constructive type theory into abstract homotopy theory. The book’s authors believe that univalent foundations will eventually become a viable alternative to set theory as the “implicit foundation” for the unformalized mathematics done by most mathematicians.<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup> I am not sure I’ll ever make it this far, but it seems like a very interesting theory. Advanced Haskellers seem to get a lot out of category theory, maybe the same will be said for HoTT and dependent types.</p></li>
+</ul>
+<h3 id="videos">Videos</h3>
+<p>There are also a few videos and screencasts which revolve around dependent types or some programming language that features dependent types. First of all there is a four day course on Idris with <a href="http://www.idris-lang.org/dependently-typed-functional-programming-with-idris-course-videos-and-slides/">videos and excercises</a> held by the creator of Idris Edwin Brady. I have found the video and the excercises to be a good way to get started with Idris. There is also an introduction to Agda with <a href="https://www.youtube.com/playlist?list=PL44F162A8B8CB7C87">nine lectures</a> by Conner McBride.</p>
+<h2 id="my-plan">My plan</h2>
+<p>While I do appreciate some theoretical background, I am not sure that I have the stamina to work through a huge amount of theory without also seeing some applications. I have thus decided to try an approach that combines theory with practice. First of all, I would like to work through <em>Sofware Foundations</em>. While this is theoretically a book, there are so many exercises that it nicely combines theory and practice. Once I am done with that I would like to work my way through <em>Certified Programming with Dependent Types</em>. At the same time I am going to try to port some nice Haskell program to Idris and attempt to prove the totality of as many functions as possible. Since Wouter Swierstra has already ported <a href="http://www.staff.science.uu.nl/~swier004/Publications/XmonadInCoq.pdf">Xmonad to Coq</a>, this seems like an interesting candidate. Besides, I am running xmonad and like it a lot, so what could be a better opportunity to learn more about it?</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>The only other language that I am aware of that appeared during the last 10 years and does not require garbage collection is <a href="http://www.rust-lang.org">Rust</a>.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>I’ve lifted the last two sentences from the books website for obvious reasons. See <a href="http://homotopytypetheory.org/">here</a> and <a href="http://homotopytypetheory.org/book/">here</a>.<a href="#fnref2">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Wed, 31 Jul 2013 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Getting-Started-With-Dependent-Types.html</guid>
+</item>
+<item>
+    <title>Why I love Haskell</title>
+    <link>http://paulkoerbitz.de/posts/Why-I-love-Haskell.html</link>
+    <description><![CDATA[<h1 class="title">Why I love Haskell</h1>
+
+<p class="date">written on July 19, 2013</p>
+
+<p>I really like Haskell. But why? In this post I try to articulate why I like this language so much and why I think it would be worth most programmers’ while to learn it. None of this is new, but I want to express my own view in my own words. I write this in part to clarify my thinking and in part to improve my ability to articulate these points.</p>
+<p>Many of my arguments apply to other strongly typed functional programming languages. I just happen to know Haskell much better than any of the other ones and thus I am focussing on Haskell.</p>
+<h2 id="purity-is-good-for-yousimon-peyton-jones-escape-from-the-ivory-tower-the-haskell-journey-from-1990-to-2011.">Purity is good for you<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup></h2>
+<p>When I first started to learn Haskell purity<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup> seemed like a crazy concept. Programming by modifying some kind of state and interacting with the ‘real world’ is so ingrained in mainstream programming languages that it is hard to imagine how you can get anything done without it. Ironically, after having programmed in Haskell for a while, impure languages now make my toenails curl. <em>What do you mean, I have to look <strong>at the function body</strong> to find out if it writes to a file, makes calls over the network, or talks to the database? That is <strong>insane</strong>!</em></p>
+<p>The beauty of Haskell’s way of dealing with pure and impure functions is that you can tell from the type signature what a function is and isn’t allowed to do. You can still do all those impure calls-over-the-network and array-update-in-place things that regular languages allow you to do, but you have to tell everyone about it in your function’s type signature.</p>
+<p>This, and the Haskell community, pushes you to make your program as pure as possible. I have found that this has huge benefits: Pure functions are easy to understand: just by the name and type signature it is usually obvious what a function does. When you do inspect a function’s body you don’t have to keep track of what state the world is in right now (or all the states that it could theoretically be in), its behavior only depends on your input parameters. As a result, this makes programs (large parts of which are now pure functions) much easier to understand. In fact, I find that one of the hardest things about understanding programs is to keep track of state. This burden is hugely reduced in the pure part of your code.</p>
+<p>Purity makes testing a breeze. Most of the time the hard part about writing tests is to construct the state where the tests should run, verify it was changed in the intended ways, and clean up afterwards. Worse, the code you want to test could depend on a global state that you can’t modify easily, such as the system time or the random number generator. If you have pure functions, you just pass in the arguments and check the result. Testing becomes much easier.</p>
+<p>Pure functions simplify conceptualizing and designing programs. In functional programming you have two concepts: functions and data. The two are orthogonal in their purpose. The functions modify your data until you get to the result. I find that conceptualizing and reasoning about data that gets successively modified by a number of (pure) functions is much easier than doing the equivalent with an object oriented approach. It is just very difficult to mentally enumerate all the possible states that a number of different objects could be in at any given time. But understanding all possible states is necessary to draw conclusions about the behavior of a program.</p>
+<p>Have you ever tried to reuse some piece of code and found to your dismay that it reads or writes stuff from or to disk, uses the system time function in a way that is now inappropriate, talks over the network, prints to the console or pops up dialogs? These things are hugely inconvenient and often inhibit reuse. State just does not compose well and having the ability to modify state tends to create implicit dependencies. If you have a pure function, you can call it anywhere you want!</p>
+<p>You can, of course, try to reap most of those benefits by discipline, e.g. by trying to minimize state whenever possible and to make as many functions pure as possible. In fact, doing that is probably the way in which Haskell has most changed how I write code in other languages. I now strive to minimize the amount of code that causes side effects wherever possible. Alas, I find that the type system really makes a difference here: when you have to inspect each and every function to find out (or recall) if it is pure or not, the benefit of writing pure functions is significantly reduced. I also find that other languages are lacking the <em>cultural</em> aspect of seeing state as bad and striving for purity. So you have ‘time()’, ‘random()’ and calls to the outside world all over the place. It might seem easier at first, but more often than not, it will come back to bite you. Purity has had such a profound impact on me that I cannot imagine that I will ever call a language that does not have control over effects in the type system my favorite programming language.</p>
+<h2 id="terse-syntax">Terse syntax</h2>
+<p>Haskell is a pretty terse language. When you compare the amount of code you have to write to get typical tasks done it is usually right up there with Python, Ruby, Clojure and the likes. And this is the case even though Haskell has a strong static type system which in mainstream languages is often associated with verbosity. I do not consider syntax to be all that important, but not having to read or write huge amounts of boilerplate is definitely a plus.</p>
+<h2 id="believe-the-typeproudly-stolen-from-learn-you-a-haskell.">Believe the Type!<sup><a href="#fn3" class="footnoteRef" id="fnref3">3</a></sup></h2>
+<p>Haskell is often lauded for its strong type system and rightly so. But what does having a strong type system mean? Why is Haskell’s type system <em>stronger</em> than Java’s, C++’s or that of other languages that are considered to have a strong static type system?</p>
+<h3 id="more-precision">More precision</h3>
+<p>Haskell’s type system is stronger than that of many other languages because it is more precise: you can distinguish more things based on their type. A prime example of this is the null reference or pointer present in many languages. A null pointer is fundamentally type-unsafe: If the pointer is null most operations that you could usually do with the pointer will be invalid, and <em>the compiler is going to do zilch about you doing it in error</em>. Many people, including its inventor,<sup><a href="#fn4" class="footnoteRef" id="fnref4">4</a></sup> consider null references a mistake, yet they persist in all mainstream languages.</p>
+<p>This is an example where more type safety actively eliminates a class of errors which are hard to get rid off in other languages. In general, the more things that can be expressed and checked at compile time, the more errors you will be able to rule out before ever running your program.</p>
+<h3 id="sum-types">Sum types</h3>
+<p>The previous example with null pointers is actually part of a bigger concept which is usually referred to as <em>sum types</em> or <em>tagged unions</em>. The idea is that values of a certain type can have several forms, based on what state they are in. Most languages don’t have support for sum types, yet they are a very powerful concept. They allow you to rule out many things that should be impossible at the type level, giving you more precise types.</p>
+<p>As an example, imagine you want to keep track of the state of a financial transaction. If the transaction has been initialized you have the init time, the amount, and a currency. If the transaction has succeeded we furthermore have a succeeded time stamp, and an authorization code. If it has failed it has a failed time stamp, and a failure reason, but no auth code. In a language without sum types this might be represented like this:</p>
+<pre class="sourceCode Cpp"><code class="sourceCode cpp"><span class="kw">struct</span> Amount
+{
+  <span class="dt">int</span> amount;
+  string currency;
+};
+
+<span class="kw">struct</span> Transaction
+{
+  TransactionState state;
+  Timestamp initTime;
+  Amount amount;
+  Timestamp failedTime;
+  string failedReason;
+  Timestamp succeededTime;
+  string authCode;
+};</code></pre>
+<p>It is of course possible to infer from the field names, to some degree, which field should be used when, but it is nonetheless not entirely clear. Does a failed transaction have an amount? Or an auth code? Instead consider the following definition in Haskell:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Amount</span> <span class="fu">=</span> <span class="dt">Amount</span> {<span class="ot"> amount ::</span> <span class="dt">Int</span>,<span class="ot"> currency ::</span> <span class="dt">String</span> }
+
+<span class="kw">data</span> <span class="dt">Transaction</span> <span class="fu">=</span>
+     <span class="dt">InitialTransaction</span>    {<span class="ot"> itInitTime ::</span> <span class="dt">Timestamp</span>
+                           ,<span class="ot"> itAmount ::</span> <span class="dt">Amount</span> }
+   <span class="fu">|</span> <span class="dt">FailedTransaction</span>     {<span class="ot"> ftInitTime ::</span> <span class="dt">Timestamp</span>
+                           ,<span class="ot"> ftAmount ::</span> <span class="dt">Amount</span>
+                           ,<span class="ot"> failedReason ::</span> <span class="dt">String</span> }
+   <span class="fu">|</span> <span class="dt">SuccessfulTransaction</span> {<span class="ot"> stInitTime ::</span> <span class="dt">Timestamp</span>
+                           ,<span class="ot"> stAmount ::</span> <span class="dt">Amount</span>
+                           ,<span class="ot"> authCode ::</span> <span class="dt">String</span> }</code></pre>
+<p>The Haskell representation of the transaction can have one of three states each of which carries the data relevant for this state (the example also reveals one of Haskell’s weak points, namely that the accessors of a record cannot have the same name). This clearly communicates to any reader of the code what state must be present in each case and what is not going to be present. What is more, in a function using this data type, the compiler will check that you handled all the cases and you can’t even write a program that accesses data that is not available in a case. If you later have to add a case, the compiler will inform you of all the places where this case is not handled yet. This hugely helps you avoiding bugs.</p>
+<h3 id="compiler-checked-documentation">Compiler checked documentation</h3>
+<p>More precise types also communicate more to other programmers. Have you ever worked with code where you and your cocoders had the mutual understanding that a certain pointer or reference can never be null? That certain keys must be present in a map or that some string field in a struct will always be null if conditions X and Y hold? The problem with this knowledge is that it is implicit. Implicit knowledge is not enforced in interfaces, at best a comment will document it. Unfortunately comments are notorious for not being kept up to date with the code. Since it is not verified and does not affect the resulting program, it is all too easy to let comments and code diverge. Then the comments become actively misleading and therefore many have argued to use comments as sparingly as possible.<sup><a href="#fn5" class="footnoteRef" id="fnref5">5</a></sup></p>
+<p>Yet conveying this kind of information is critically important when programming in teams. If certain invariants should hold then it is important that everyone understands this and thus it should be documented somewhere and checked somehow. What better place to do this than in the types? It clearly conveys the required information to the programmers and ’ye old compiler assures you that these invariants actually hold. If they are not, your code won’t compile and there are few incentives that work better on programmers.</p>
+<h3 id="encode-your-invariants-in-the-type-system">Encode your invariants in the type system</h3>
+<p>All the above points really harp on the same idea: it is better to <strong>encode your invariants in the type system</strong>. Doing so will move more knowledge into an area of the code that is easily seen and the compiler will be your alley in maintaining those invariants. A more powerful type system will allow you to do more of this, which is, all other things being equal, good.</p>
+<p>Of course, there is always the question of tradeoffs. Dynamically typed languages are popular for some reason after all: a type system can get in the way. Yet I find that (after a learning period) Haskell’s type system does so surprisingly little and that its power is far too large to give it up for the occasional inconvenience.</p>
+<h2 id="the-right-kind-of-abstractions">The right kind of abstractions</h2>
+<p>Another magical thing about Haskell is that its creators and its community just come up with the right, often mathematically inspired, abstractions. That can mean that things are a bit abstract at times but that is part of the beauty.</p>
+<p>What is a good abstraction? To me it is a small, useful concept that abstracts an underlying pattern from a number of concrete contexts. By that measure we can judge an abstraction by (a) how simple the concept is, and (b) the number of different contexts to which it applies. Alas (a) is often not clear until you fully grasp the abstraction, which, given its abstract nature, can be hard.</p>
+<p>Let’s check out Haskell’s most famous abstraction the monad. A monad is an abstraction for doing things sequentially where the second thing can depend on the result of the first. It is unbelievable in how many situations it applies, for example optional values, lists, things that carry state around (e.g. random number generators), parsers, IO, software transactional memory, and lots and lots of other concepts. Note that these are quite unrelated, or did you ever think that an optional value was basically the same thing as a parser? When you understand this abstraction then you will have a really good intuition on what a certain kind of monad is supposed to do even if you have no idea how it is implemented. You’re going to think: this is a monad, so it should do this in this situation and you’re going to be right. This is the right kind of abstraction and I would kill to get more of them.</p>
+<p>This is just one example and Haskell’s abstractions don’t stop there. In fact, many abstractions are so deceptively simple it is easy to forget about them until we compare to how this would be done in a language that doesn’t offer them. One such concept is ‘higher-order-functions’, that is functions that take other functions as arguments. This is called the ‘strategy pattern’ in OO design patterns. But in Haskell this concept is so simple that you will never think <em>“hm, should I use the strategy pattern here?,”</em> instead you’re breathing these things without wasting the first thought on it. That these powerful patterns become so intuitive is really important. If you have to grab the design pattern book to recall how exactly that abstract factory pattern works then you’re unnecessarily spending precious brain cycles whne you should, instead, be spending them on solving your problem. Worse, you’re not nearly as likely to come up with solutions that make heavy use of these patterns because it is much more difficult to get an intuitive understanding of them. This is necessary, however, to creatively solve problems. If you’re still struggeling with the concepts then it’s unlikely that you’ll use them to their full potential. This is why good abstractions are so imporant and Haskell has loads of them.</p>
+<h2 id="higher-order-thinking">Higher-order-thinking</h2>
+<p>In his 1977 Turing Award lecture, John Backus famously asked <a href="https://dl.acm.org/citation.cfm?id=359579"><em>“Can Programming Be Liberated from the van Neumann Style?”</em></a>. He bemoaned the lack of abstractions inherent in imperative programming languages and layed out the vision for a functional language in which operations would combine programs to form new programs, thus raising the bar of abstraction. 36 years later, we’re not quite there yet, but I think languages like Haskell are the closest we can get at the moment. They certainly allow you to abstract from the <em>“word-at-a-time”</em> programming most of the time and think on a higher level.</p>
+<p>Freeing your mind from unnecessary details lets you focus on higher order abstractions. I think the sheer number of powerful ideas that have come out of Haskell and similar languages (e.g. purity, type classes, monads, STM) indicate that Haskell makes a useful tradeoff.</p>
+<h2 id="the-future-is-already-here">The future is already here …</h2>
+<p>… it is just not very evenly distributed. Haskell has driven a lot of innovations that have slowly shown up in other languages and it is still going strong. Of course, I am not going to claim that all programming language innovation comes from Haskell. However, I think that it is fair to say that Haskell is responsible for a good chunk of new ideas and that the current bleeding edge is made up of languages that were heavily inspired by either Haskell or a member of the ML family. So if you’re the kind of person that likes to find out about the new possibilities sooner rather than later, I think you owe it to yourself to check out Haskell.</p>
+<h2 id="some-gripes">Some gripes</h2>
+<p>Is it all love and roses then? Of course not. There are some gripes I have with Haskell and eventually I think it is going to be replaced by an even better language. But Haskell has driven the state of the art forward, has allowed me to evolve my thinking, and is currently the most practical language combining a number of very innovative features. Additionally, I think of Haskell more as a set of ideas than as a specific language implementation. The languages that will eventually supersede Haskell have so much in common with it that to me they all fall into the <em>Haskell camp</em>. If you’re comming from the traditional imperative-OO ship then learning Haskell is probably the biggest jump you’ll have to make.</p>
+<h2 id="the-end">The end</h2>
+<p>So that is my super long Haskell love letter. If your interest is piqued, I encourage you to check it out. The learning curve can be a bit steep at times, but hey, that means you’re actually learning something new instead of the same old stuff dressed up slightly differently!</p>
+<p>To get started, I think <a href="http://www.learnyouahaskell.com">Learn you a Haskell</a> is a great resource. The <a href="https://www.fpcomplete.com/school">School of Haskell</a> is also quite nice, especially if you like to experiment with things interactively. If you have difficulty understanding monads I recommend <a href="http://blog.sigfpe.com/2006/08/you-could-have-invented-monads-and.html">You could have invented monads (and maybe you already have)</a>. <a href="http://www.haskell.org/haskellwiki/All_About_Monads">All about monads</a> is also quite good, but more demanding. Just keep going, you will understand them eventually and then wonder why you found them difficult in the first place ;). The Haskell <a href="http://www.haskell.org/haskellwiki/IRC_channel">irc channel</a> and the super-friendly haskell-beginners and haskell-cafe <a href="http://www.haskell.org/haskellwiki/Mailing_lists#Mailing_lists_in_detail">mailing lists</a> are also worth checking out.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Simon Peyton Jones: <a href="http://yow.eventer.com/events/1004/talks/1054">Escape from the Ivory Tower: The Haskell Journey from 1990 to 2011</a>.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>In Haskell, <em>purity</em> means that a function must be free from side effects such as printing to the console or modifying variables.<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>Proudly stolen from <a href="http://learnyouahaskell.com">Learn you a Haskell</a>.<a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p>Tony Hoare created ALGOL W which introduced null references. He has called this his <a href="https://en.wikipedia.org/wiki/Tony_Hoare#Quotations"><em>billion dollar mistake</em></a>.<a href="#fnref4">↩</a></p></li>
+<li id="fn5"><p>Whatever you think of Robert Martin and <a href="http://books.google.de/books?id=_i6bDeoCQzsC">Clean Code</a>, I think this is a point that he makes persuasively.<a href="#fnref5">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Fri, 19 Jul 2013 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Why-I-love-Haskell.html</guid>
+</item>
+<item>
+    <title>Sun / Oracle Grid Engine - Exclusive Host Access</title>
+    <link>http://paulkoerbitz.de/posts/2012-01-13-Sun-Oracle-Grind-Engine-Exclusive-Host-Access.html</link>
+    <description><![CDATA[<h1 class="title">Sun / Oracle Grid Engine - Exclusive Host Access</h1>
+
+<p class="date">written on January 13, 2012</p>
+
+<p>I am running a cluster on EC2 (with starcluster) and wanted my jobs to have exclusive access to nodes (i.e. only one job should run on one node at the time). I had to piece this together from different sources and now almost forgot about it again, so here it goes: First create a new parallel environment</p>
+<pre><code>$ qconf -ap your_pe_name</code></pre>
+<p>The ‘-ap’ stands for add parallel environment, see ‘qconf -help’ for a list of options. The following config file comes up, change slots to something big:</p>
+<pre><code>pe_name            your_pe_name
+slots              1024
+user_lists         NONE
+xuser_lists        NONE
+start_proc_args    /bin/true
+stop_proc_args     /bin/true
+allocation_rule    $pe_slots
+control_slaves     FALSE
+job_is_first_task  TRUE
+urgency_slots      min
+accounting_summary FALSE</code></pre>
+<p>Ok, so now you have created a new parallel environment. Let’s add it to a queue. Call</p>
+<pre><code>$ qconf -mq all.q</code></pre>
+<p>and add the name of your parallel environment (’your_pe_name’ above) to the section parallel environments. To submit a job using this parallel environment do</p>
+<pre><code>$ qsub -pe your_pe_name 4 ./your_job_file.sh</code></pre>
+<p>The newly submitted job will occupy 4 slots. Adjust so that it occupies all cores on the machine (if you have 8 cores use 8 instead of 4) and it should be the only job that gets run on a machine.</p>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Fri, 13 Jan 2012 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/2012-01-13-Sun-Oracle-Grind-Engine-Exclusive-Host-Access.html</guid>
+</item>
+<item>
+    <title>List tricks in Python</title>
+    <link>http://paulkoerbitz.de/posts/2011-12-26-List-tricks-in-Python.html</link>
+    <description><![CDATA[<h1 class="title">List tricks in Python</h1>
+
+<p class="date">written on December 26, 2011</p>
+
+<p>Flattening a list of lists</p>
+<pre class="sourceCode python" new_class="brush: Python;"><code class="sourceCode python">&gt;&gt;&gt; <span class="dt">sum</span>([[<span class="dv">1</span>],[<span class="dv">2</span>],[<span class="dv">3</span>],[<span class="dv">4</span>]], [])
+[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">4</span>]</code></pre>
+<p>Transposing a list of lists</p>
+<pre class="sourceCode python" new_class="brush: Python;"><code class="sourceCode python">&gt;&gt;&gt; <span class="dt">zip</span>(*[[<span class="dv">1</span>,<span class="dv">2</span>],[<span class="dv">3</span>,<span class="dv">4</span>]])
+[(<span class="dv">1</span>,<span class="dv">3</span>),(<span class="dv">2</span>,<span class="dv">4</span>)]</code></pre>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Mon, 26 Dec 2011 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/2011-12-26-List-tricks-in-Python.html</guid>
+</item>
+
+    </channel> 
+</rss>
