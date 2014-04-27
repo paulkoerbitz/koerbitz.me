@@ -7,7 +7,7 @@
           border:0px;
           margin:0px;
           padding:0px;
-          background: url(file:///home/pkoerbitz/dev/html/boda_page/bgnd1.jpg) no-repeat center center fixed;
+          background: url(/images/bgnd1.jpg) no-repeat center center fixed;
           -webkit-background-size: cover;
           -moz-background-size: cover;
           -o-background-size: cover;
@@ -51,8 +51,8 @@
     <div class="nav">
       <ul>
         <li><a href="http://s1292.photobucket.com/user/monicaypaul/slideshow/">Official Pictures</a></li>
-        <li><a href="hasfdsfaas">Official Video</a></li>
-        <li><a href="hasfdsfaas">Claudia's Pictures</a></li>
+        <!-- <li><a href="hasfdsfaas">Official Video</a></li>
+        <li><a href="hasfdsfaas">Claudia's Pictures</a></li> -->
       </ul>
     </div>
     <script>
@@ -62,12 +62,12 @@
            if (bgndIndex > 9) {
                bgndIndex = 1;
            }
-           document.body.style.background = "url('file:///home/pkoerbitz/dev/html/boda_page/bgnd" + bgndIndex + ".jpg') no-repeat center center fixed";
+           document.body.style.background = "url('/images/bgnd" + bgndIndex + ".jpg') no-repeat center center fixed";
       }
       var Images = [];
       for (var i=2; i<10; i++) {
           Images[i] = new Image(window.innerWidth, window.innerHeight);
-          Images[i].src = "file:///home/pkoerbitz/dev/html/boda_page/bgnd" + i + ".jpg";
+          Images[i].src = "/images/bgnd" + i + ".jpg";
       }
     </script>
   </body>
