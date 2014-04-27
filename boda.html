@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href='http://fonts.googleapis.com/css?family=Dancing+Script' rel='stylesheet' type='text/css'>
+    <style>
+      body {
+          border:0px;
+          margin:0px;
+          padding:0px;
+          background: url(file:///home/pkoerbitz/dev/html/boda_page/bgnd1.jpg) no-repeat center center fixed;
+          -webkit-background-size: cover;
+          -moz-background-size: cover;
+          -o-background-size: cover;
+          background-size: cover;
+          font-family: 'Dancing Script', cursive;
+          color: #f14adf;
+          /*color: #7b006e;*/
+          text-align: center;
+      }
+      a {
+          color: #f14adf;
+      }
+      a:visited {
+          color: #7b006e;
+      }
+      h1 {
+          text-align:center;
+          font-size: 3em;
+          margin-top: 0.5em;
+      }
+      .nav {
+          display: inline-block;
+          /*position: fixed;
+          top:85%;
+          left:20%;
+          margin: 0 auto;*/
+          /*width: 400px;*/
+          margin-top: 36%;
+          font-size: 2.5em;
+      }
+      .nav li {
+        display: block;
+        float: left;
+        margin-right: 1em;
+      }
+    </style>
+  </head>
+  <body onload="setInterval(carousel, 10000)">
+    <!-- <img src="edu1.png" height="300" style="position:relative; top:80%;"/> -->
+    <h1>Monica & Paul's Wedding</h1>
+    <div class="nav">
+      <ul>
+        <li><a href="http://s1292.photobucket.com/user/monicaypaul/slideshow/">Official Pictures</a></li>
+        <li><a href="hasfdsfaas">Official Video</a></li>
+        <li><a href="hasfdsfaas">Claudia's Pictures</a></li>
+      </ul>
+    </div>
+    <script>
+      var bgndIndex=1;
+      function carousel() {
+           bgndIndex++;
+           if (bgndIndex > 9) {
+               bgndIndex = 1;
+           }
+           document.body.style.background = "url('file:///home/pkoerbitz/dev/html/boda_page/bgnd" + bgndIndex + ".jpg') no-repeat center center fixed";
+      }
+      var Images = [];
+      for (var i=2; i<10; i++) {
+          Images[i] = new Image(window.innerWidth, window.innerHeight);
+          Images[i].src = "file:///home/pkoerbitz/dev/html/boda_page/bgnd" + i + ".jpg";
+      }
+    </script>
+  </body>
+</html>
