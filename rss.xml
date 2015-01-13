@@ -6,8 +6,384 @@
         <description><![CDATA[Thoughts and ideas about programming, with an eye towards functional programming techniques]]></description>
         <atom:link href="http://paulkoerbitz.de/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Sat, 14 Jun 2014 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Tue, 13 Jan 2015 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Release It - Summary and Review</title>
+    <link>http://paulkoerbitz.de/posts/Release-It-Summary-And-Review.html</link>
+    <description><![CDATA[<h1 class="title">Release It - Summary and Review</h1>
+
+<p class="date">written on January 13, 2015</p>
+
+<p>So I have finally finished reading Michael Nygard’s terribly named but quite interesting book <em>Release It</em>. It covers stability patterns and anti-patterns and offers some interesting ideas and concepts for improving stability.</p>
+<h2 id="part-i-stability">Part I: Stability</h2>
+<p>The part on stability starts out with an interesting case study that describes how an uncaught exception in a connection pool caused the flight search application of an airline to hang which in turn caused a failure in all check-in systems. The uncaught exception was a programming error, but some errors will inevitably occur. However, these errors must not bring down the entire IT infrastructure of a company! It is thus critical to identify how small errors can cause entire applications to fail and what can be done to mitigate the spread of such failures. The former is examined in ‘Stability Antipatterns’, the latter in ‘Stability Patterns’.</p>
+<h3 id="stability-antipatterns">Stability Antipatterns</h3>
+<ol style="list-style-type: decimal">
+<li><p>Integration Points</p>
+<p>Problems are often caused at integration points b/c the remote application may not always act as specified. There is a huge number of failure modes simply connected to TCP connections that an application must protect against if it integrates other applications.</p>
+<ul>
+<li><p>Every integration point will eventually fail in some way.</p></li>
+<li><p>There are many forms of failure</p></li>
+<li><p>Peel back abstractions to discover failure modes</p></li>
+<li><p>Failures can propagate quickly - stop them!</p></li>
+<li><p>Use stability patterns to mitigate: Timeouts, Circuit Breaker, Decoupling Middleware, Handshaking</p></li>
+</ul></li>
+<li><p>Chain Reactions</p>
+<p>Occur when a failure somewhere makes failures somewhere else more likely, but do not causes this directly. For example when one server dies due to a memory leak and other servers must pick up the extra traffic these servers will be more likely to go down due to the same leak because they now must deal with more traffic.</p>
+<ul>
+<li><p>One server down jeopardizes the rest</p></li>
+<li><p>Hunt for resource leaks &amp; timing bugs</p></li>
+<li><p>Defend with bulkheads</p></li>
+</ul></li>
+<li><p>Cascading Failures</p>
+<p>Cascading failures happen when failures are one system can jump to the next system. For example, if a hung server somewhere causes client applications to hang because they wait for responses that never come (While they clearly cannot display a response then they should deal with not receiving one in time).</p>
+<ul>
+<li><p>Deal with failures in remote systems</p></li>
+<li><p>Scrutinize resource pools</p></li>
+<li><p>Defend with Timeout and Circuit Breaker</p></li>
+</ul></li>
+<li><p>Users</p>
+<p>This deals with te resources that users use. For example memory used up for a user session.</p>
+<ul>
+<li><p>Users consume memory</p></li>
+<li><p>Users do weird things</p></li>
+<li><p>Malicious users are out there</p></li>
+<li><p>Users will gang up on you</p></li>
+</ul></li>
+<li><p>Blocked Threads</p>
+<p>Threads waiting for responses or resources to free up which never or are very slow to come or free up can cause the application to hang.</p>
+<p>Blocked threads can also be caused by deadlocks resulting from concurrency errors. This is obviously a large and complicated topic.</p>
+<ul>
+<li><p>Blocked threads are the proximate cause of most system failures</p></li>
+<li><p>Scrutinize resource pools</p></li>
+<li><p>Use proven concurrency primitives (FP!!!)</p></li>
+<li><p>Use Timeouts</p></li>
+<li><p>Beware of vendor libraries.</p></li>
+</ul></li>
+<li><p>Attacks of Self-Denial</p>
+<p>E.g. deep-links which require sessions and a lot of internal requests of extremely attractive offers on shopping sites. Educate the marketing department.</p>
+<ul>
+<li><p>Keep lines of communication open</p></li>
+<li><p>Expect rapid redistribution of any valuable offer</p></li>
+</ul></li>
+<li><p>Scaling Effects</p>
+<p>Communication patterns that may have been fine with two servers might not scale (e.g. O(n) or worse connections required).</p>
+<ul>
+<li><p>Examine production vs QA and dev environment to spot scaling effects.</p></li>
+<li><p>Watch out for point-to-point communcation</p></li>
+<li><p>Watch out for shared resources</p></li>
+</ul></li>
+<li><p>Unbalanced Capacities</p>
+<p>E.g. larger front-end capacities can overwhelm smaller back-end capacities</p>
+<ul>
+<li><p>Examine server and thread counts</p></li>
+<li><p>Stress both sides of the interface</p></li>
+</ul></li>
+<li><p>Slow Responses</p>
+<p>Extremely slow responses cna prevent timeouts from working yet have much the same effect as not receiving a response.</p>
+<ul>
+<li><p>Slow responses trigger <em>Cascading Failures</em>: upstream systems also slow down.</p></li>
+<li><p>Users will hit the reload button -&gt; more traffic.</p></li>
+<li><p>Consider to <em>Fail Fast</em>.</p></li>
+<li><p>Hunt for memory leaks and resource contention.</p></li>
+</ul></li>
+<li><p>SLA Inversion</p>
+<p>The availability of a set of system is the product of their availabilities. Thus a system depending on five other systems which each provide a 99% guarantee can only guarantee 99%^5=95.1% availability.</p>
+<ul>
+<li><p>Examine every dependency: DNS, Email, network equipment, database, …</p></li>
+<li><p>Decouple dependencies: Make sure you can maintain service even when dependencies go down.</p></li>
+</ul></li>
+<li><p>Unbounded Result Sets</p>
+<p>Applications should also be more sceptical of their databases and e.g. limit the number of results that they are willing to process.</p>
+<ul>
+<li><p>Limit to realistic data volumes.</p></li>
+<li><p>Don’t rely on the producer, enforce limits yourself.</p></li>
+<li><p>Put limits into other application level protocols.</p></li>
+</ul></li>
+</ol>
+<h3 id="stability-patterns">Stability Patterns</h3>
+<ol style="list-style-type: decimal">
+<li><p>Use Timeouts</p>
+<p>Hung threads waiting for responses that may never come or come slowly can lead the entire application to block (all threads in a pool are hung). Use timeouts to report an error when this happens.</p>
+<ul>
+<li><p>Apply to <em>Integration Points</em>, <em>Blocked Threads</em>, <em>Slow Responses</em>.</p></li>
+<li><p>Give up and keep moving: it may not matter if we ge a response eventually, time is of the essence.</p></li>
+<li><p>Delay retries: Most timeouts are caused by things that don’t resolve imediately, wait a little before trying again.</p></li>
+</ul></li>
+<li><p>Circuit Breaker</p>
+<p>A circuit breaker detects when there is a problem at an integration point and acts accordingly. A circuit breaker counts the number of failures, if these exceed a sensible threshold it triggers and prevents subsequent calls to talk to the integration point. After a timeout a single / few call(s) may be retried, if they work the circuit breaker goes back to its normal state, if not it stays open.</p>
+<ul>
+<li><p>If there is a problem with an integration point stop calling it!</p></li>
+<li><p>Use together with <em>Timeouts</em>: A <em>Timeout</em> detects the problem, a <em>Circuit Breaker</em> keeps us from retrying too often too soon.</p></li>
+<li><p>Make it visible to operations: popping a <em>Circuit Breaker</em> usually indicates a serious problem.</p></li>
+</ul></li>
+<li><p>Bulkheads</p>
+<p>Bulkheads partition the system into independent units. When one unit fails the other units are still operational. There are trade-offs with efficient resource usage.</p>
+<ul>
+<li>Very important when other applications depend on your system: the largest part should keep functioning when there is some problem.</li>
+</ul></li>
+<li><p>Steady State</p>
+<p>Applications should be able to run indefintely without requireing human interventions. The latter leads to fiddeling, which causes errors. This inlcudes cleaning up log-files and disk space at the same rate that they are produced.</p>
+<ul>
+<li><p>Avoid human interaction, it causes problems.</p></li>
+<li><p>Purge data with application logic (e.g. DB entries).</p></li>
+<li><p>Limit caching.</p></li>
+<li><p>Roll logs.</p></li>
+</ul></li>
+<li><p>Fail Fast</p>
+<p>This pattern deals with the problems caused by ‘slow responses’. An application should determine as soon as possbile if it can service a request and if not it should fail as quickly as possible. There are some trade offs with maintaining encapsulation here.</p>
+<ul>
+<li><p>Verify integration points early: If required resources are not available it’s time to fail fast.</p></li>
+<li><p>Validate input as early as possible.</p></li>
+</ul></li>
+<li><p>Handshaking</p>
+<p>Can be used to determine if an application can accept additional requests. This does double the number of requests and request-latency. Building in the ability to reject requests directly seems more useful to me.</p></li>
+<li><p>Test Harness</p>
+<p>A sufficiently evil test harness can test the response of an application to misbehaving integration points. It is the point of this test harness to test failure modes which are not specified. For example misbehaving TCP connections or extremely slow responses can be tested with such a test harness.</p>
+<p>Consider the following network failures:</p>
+<ul>
+<li><p>It can be refused.</p></li>
+<li><p>It can sit in a listen queue until the caller times out.</p></li>
+<li><p>The remote end can reply with a SYN/ACK and then never send any data.</p></li>
+<li><p>The remote end can send nothing but RESET packets.</p></li>
+<li><p>The remote end can report a full receive window and never drain the data.</p></li>
+<li><p>The connection can be established, but the remote end never sends a byte of data.</p></li>
+<li><p>The connection can be established, but packets could be lost causing retransmit delays.</p></li>
+<li><p>The connection can be established, but the remote end never acknowledges receiving a packet, causing endless retransmits.</p></li>
+<li><p>The service can accept a request, send response headers (supposing HTTP), and never send the response body.</p></li>
+<li><p>The service can send one byte of the response every thirty seconds.</p></li>
+<li><p>The service can send a response of HTML instead of the expected XML.</p></li>
+<li><p>The service can send megabytes when kilobytes are expected.</p></li>
+<li><p>The service can refuse all authentication credentials.</p></li>
+</ul>
+<p>Remember these:</p>
+<ul>
+<li><p>Emulate out-of-spec failures</p></li>
+<li><p>Stress the caller: Slow responses, no responses, garbage responses</p></li>
+<li><p>Leverage a killer harness for common failures</p></li>
+<li><p>Supplement, don’t replace, other testing methods</p></li>
+</ul></li>
+<li><p>Decoupling Middleware</p>
+<p>Asynchronous middleware (e.g. Pub-Sub or messaging communication solutions) force the programmers with the possibility of not receiving a response right away and thus make systems more resilient. They are more difficult to work with than synchronous middleware (but represent the underlying architecture more correctly).</p>
+<ul>
+<li><p>Total decoupling can avoid many failure modes.</p></li>
+<li><p>Learn many architectures, choose the best one for the job.</p></li>
+</ul></li>
+</ol>
+<h2 id="part-ii-capacity">Part II: Capacity</h2>
+<p>Another case study rings in the part on capacity: This one is on an online retailer that re-build their system from scratch over three years. When entering load testing it didn’t meet capacity requirements by a factor of 20, after months of testing this imporoved ten-fold.</p>
+<p>It crashed badly when it went live, because all the tests had been simulating <em>nice</em> users: users that used the site how it was meant to. In the real world a lot of bots, search engines and other things used the site in non-anticipated ways which it was not prepared for.</p>
+<h3 id="introducing-capacity">Introducing Capacity</h3>
+<ol style="list-style-type: decimal">
+<li><p>Defining Capacity</p>
+<p>Performance: How fast does the system process a single transaction?</p>
+<p>Throughput: Number of transactions the system can process in a given timespan.</p>
+<p>Scalability: Used to describe either (a) how throughput changes under different loads or (b) modes of scaling supported by the system.</p>
+<p>Capacity: maximum throughput a system can sustain while meeting performance criteria (e.g. response time).</p></li>
+<li><p>Constraints</p>
+<p>Aka bottlenecks. At any given point, there will usually one (or more) things constraining capacity. Improving any other factors will not yield more capacity.</p></li>
+<li><p>Interrelations</p>
+<p>Things are not independent. Decreased performance in one layer can affect other layers.</p></li>
+<li><p>Scalability</p>
+<p>Horizontal vs. vertical scaling.</p></li>
+<li><p>Myths About Capacity</p>
+<p>While hardware as such (compared to programmer time) is cheap, dealing with inefficiencies can become more expensive. Optimization may still make sense. All of CPU, storage and bandwith may be more expensive than it seems at first sight.</p></li>
+</ol>
+<h3 id="capacity-antipatterns">Capacity Antipatterns</h3>
+<ol style="list-style-type: decimal">
+<li><p>Resource Pool Contention</p>
+<p>Requests waiting for resources to become available are a scalability problem.</p></li>
+<li><p>Excessive JSP fragments</p>
+<p>Java specific. JSP fragments reside in memory and can constrain application server memory.</p></li>
+<li><p>Ajax Overkill</p>
+<p>Ajax can be used to hammer a server. Don’t build an essantially static homepage with 100 Ajax requests.</p></li>
+<li><p>Overstaying Sessions</p>
+<p>Sessions memory and are removed with the timeout after user goes away. Should not be kept longer than necessary. Ideal: Information for user is still available even when session expires.</p></li>
+<li><p>Wasted Space in HTML</p>
+<p>Can add up.</p></li>
+<li><p>The Reload Button</p>
+<p>Slow requests increase load by causing users to hammer the reload button.</p></li>
+<li><p>Handcrafted SQL</p>
+<p>In Java land thy shall not work without an ORM.</p></li>
+<li><p>Database Eutrophication</p>
+<p>The database becomes bigger over time, so things that were OK at on point might not always be.</p></li>
+<li><p>Integration Point Latency</p>
+<p>Integration points take time to respond and latency adds up.</p></li>
+<li><p>Cookie Monsters</p>
+<p>Large cookies must be transfered back and forth a lot. Can’t be trusted.</p></li>
+</ol>
+<h3 id="capacity-patterns">Capacity Patterns</h3>
+<ol style="list-style-type: decimal">
+<li><p>Pool Connections</p>
+<p>Creating a new connection can take upwards of 250ms. So pooling makes sense. Some considerations:</p>
+<ul>
+<li><p>connections with an error must be detected and fixed</p></li>
+<li><p>for which scope should connections be checked out?</p></li>
+</ul></li>
+<li><p>Use Caching Carefully</p>
+<p>It’s a trade off, caching things that are seldomly used and not expensive to generate doesn’t make sense.</p></li>
+<li><p>Precompute Content</p>
+<p>When it changes much less frequently than it is requested (and it’s worth the effort).</p></li>
+<li><p>Tune the GC</p>
+<p>JVM specific. GC should ideally take no more than 2% of time.</p></li>
+</ol>
+<h2 id="part-iii-general-design-issues">Part III: General Design Issues</h2>
+<h3 id="networking">Networking</h3>
+<ol style="list-style-type: decimal">
+<li><p>Multihomed Servers: Contrary to the setup in dev and QA, servers will listen on multiple IPs, not all of them public. This must be accounted for in development.</p></li>
+<li><p>Routing: Different NICs might be on different VLANs, remote backend services might require connection through a VPN. Must pay attention to every integration point.</p></li>
+<li><p>Virtual IP Addresses: Cluster servers, some info on how virtual IP addresses can be moved from one NIC to another.</p></li>
+</ol>
+<h3 id="security">Security</h3>
+<ol style="list-style-type: decimal">
+<li><p>Principle of Least Privilege: Processes should have as few privledges as possible.</p></li>
+<li><p>Configured Passwords: Should be kept separate from other configuration files, core dumps should be disabled for production (trade-offs …).</p></li>
+</ol>
+<h3 id="availability">Availability</h3>
+<ol style="list-style-type: decimal">
+<li><p>Gathering Availability Requirements: High availability costs money and the requirements must thus be balanced with the costs. Rule of thumb: Each additional ‘9’ increases the implementation cost by a factor of 10 and the operational cost by a factor of 2.</p></li>
+<li><p>Documenting Availability Requirements: Once things go down everyone has a different opinion of what available was defined to mean. Important to really define it. Availability should be defined per feature and not be responsible for remote systems one has no control over. A good definition might answer the following questions:</p></li>
+</ol>
+<ul>
+<li><p>How often will the monitoring device execute its synthetic transaction?</p></li>
+<li><p>What is the maximum acceptable response time for each step of the transaction?</p></li>
+<li><p>What response codes or text patterns indicate success?</p></li>
+<li><p>What response codes or text patterns indicate failure?</p></li>
+<li><p>How frequently should the synthetic transaction be executed?</p></li>
+<li><p>From how many locations?</p></li>
+<li><p>Where will the data be recorded?</p></li>
+<li><p>What formula will be used to compute the percentage availability? Based on time or number of samples?</p></li>
+</ul>
+<ol start="3" style="list-style-type: decimal">
+<li>Load Balancing</li>
+</ol>
+<ul>
+<li><p>DNS Round-Robin: Several IPs configured for a domain name, DNS returns a different one each time, thus distributing load over the IPs.</p>
+<p>Several problems: server IPs must be public (instead of some proxy), too much control over load balancing in clients hands, workloads might still be unbalanced, no failover in case one server goes down. Url rewriting variant with Apache (www7.example.com) even worse.</p></li>
+<li><p>Reverse Proxy: intercepts each requests and multiplexes it onto a number of servrs behind it, can cache static content, examples: Squid, Akamai.</p></li>
+<li><p>Hardware Load Balancer: specialized networking gear, expensive, SSL a challenge (terminating SSL at the load balancer puts it under a lot of stress).</p></li>
+</ul>
+<ol start="4" style="list-style-type: decimal">
+<li>Clustering: Unlike in load balancing servers are aware of each. Can be used for load balancing (active/active) or failover. Do not scale linearly like load-balanced shared nothing architectures. Nygard considers them a band-aid for applications that don’t do clustering / scaling themselves.</li>
+</ol>
+<h3 id="administration">Administration</h3>
+<p>Easy administration leads to good uptime.</p>
+<ol style="list-style-type: decimal">
+<li><p>Does QA match Production?</p>
+<p>Most often it doesn’t. Differences in topology responsible for many outages. It’s advantageous to maintain a similar topology (e.g. seperation of services through firewalls, same multiplicty of connections) in QA as in production.</p>
+<p>The cost of downtime often exceeds the cost of the extra network gear required to run the same setup in QA and in production. Pennywise and pound foolish?</p></li>
+<li><p>Configuration Files</p>
+<p>Don’t keep configuration settings that must be changed by sys admins next to the essential (hard-wired) configuration for the application.</p>
+<p>Name configuration properties according to their function, e.g. ‘authenticationServer’ instead of ‘hostname’.</p></li>
+<li><p>Start-up and Shutdown</p>
+<p>Applications should start up and shut down cleanly and do some minimal checks that they are configured correctly before accepting work (Fail Fast).</p></li>
+<li><p>Administrative Interfaces</p>
+<p>GUIs look nice but command line interfaces are essential for automation.</p></li>
+</ol>
+<h2 id="part-iv-operations">Part IV: Operations</h2>
+<h3 id="transparency">Transparency</h3>
+<p>Transparency allows to gain an understanding of historical trends, present conditions and future projections. Transparency has four facets: historical trends, predictive forecasting, present status and instantaneous behaviour.</p>
+<ol style="list-style-type: decimal">
+<li><p>Perspectives</p>
+<ul>
+<li><p>Historical Trending</p></li>
+<li><p>Records have to be stored somewhere -&gt; OpsDB</p></li>
+<li><p>Can be used to discover new relationships - should be available through tools such as Excel.</p></li>
+<li><p>Forecasts</p></li>
+<li><p>What’s the capacity?</p></li>
+<li><p>When do we have to buy more servers?</p></li>
+<li><p>Present Status</p></li>
+<li><p>Memory</p></li>
+<li><p>Garbage Collection</p></li>
+<li><p>Worker threads for each thread pool</p></li>
+<li><p>Database connections, for each pool</p></li>
+<li><p>Traffic statistics for each request channel</p></li>
+<li><p>Business transactions for each type</p></li>
+<li><p>Users: demographics, percentage registered, number of users, usage patterns</p></li>
+<li><p>Integration points: current state, times used, latency statistics, error count.</p></li>
+<li><p>Circuit breakers: current state, error count, latency statistics, number of state transitions.</p></li>
+</ul>
+<p>The current state can be displayed on a dashboard, e.g. as a traffic light for the system and each component.</p>
+<ul>
+<li>Instantaneous Behaviour: WTF is going on???</li>
+</ul>
+<p>Errors, log file entries, thread dumps, … Can, but may not immediately show up in <em>Present Status</em>.</p></li>
+<li><p>Desiging for Transparency</p>
+<p>Transparency is hard to add later. Both local and global visibility is necessary.</p></li>
+<li><p>Enabling Technologies: White box (visibility into the processes) vs. black box (only externally visible metrics)</p></li>
+<li><p>Logging</p>
+<ul>
+<li>Make log file output easy to scan with the eye (p. 246)</li>
+</ul></li>
+<li><p>Monitoring Systems</p></li>
+<li><p>Standards, De Jure and De Facto</p>
+<ul>
+<li><p>Simple Network Management Protocol: De Facto standard, ASN.1 a bit awkward.</p></li>
+<li><p>JMX (Java Management Extensions) de facto standard in the Java world.</p></li>
+</ul></li>
+<li><p>Operations Database</p>
+<p>Good for historical data, forecasts and current status. Not well suited for instantaneous behavior. Receives reports from applications, servers and batch jobs.</p>
+<ul>
+<li><p>Applications: status variables, business metrics, internal metrics</p></li>
+<li><p>Servers: performance, utilization</p></li>
+<li><p>Batch Jobs: start, end, abort, completion status, items processed</p></li>
+</ul>
+<p>The OpsDB can be used to produce a dashboard, various reports and for planning capacity.</p>
+<p>Observations should record their type, the measurement, the event and the status.</p></li>
+<li><p>Supporting Processes</p>
+<p>Must stay in feedback loop when providing data - automated report that nobody reads are <strong>worse than useless</strong>: The cost time and money to create and maintain and provide a false sense of security, yet nobody reads them.</p></li>
+</ol>
+<h3 id="adaption">Adaption</h3>
+<ol style="list-style-type: decimal">
+<li><p>Adaptation Over Time</p></li>
+<li><p>Adaptable Software Desgin</p>
+<ul>
+<li><p>Dependency Injection: enables loose coupling, aids testability</p></li>
+<li><p>Object Design: Claim: it exists ;)</p></li>
+<li><p>XP Coding Practices: Unit testing</p></li>
+<li><p>Agile Databases:</p></li>
+<li><p>databases must be able to change</p></li>
+</ul></li>
+<li><p>Adaptable Enterprise Architecture</p>
+<p>Prefer loosely clustered, somewhat independent services that can change independently</p>
+<ul>
+<li>Dependencies Between Systems: Protocols</li>
+</ul>
+<p>Simultaneous updates at several endpoints is hard, this can be avoided by speaking multiple protocols (or versions of) for a limited time.</p>
+<ul>
+<li>Dependencies Between Systems: Databases</li>
+</ul>
+<p>Don’t share databases between services!!!</p></li>
+<li><p>Releases Shouldn’t Hurt</p>
+<p>Painful releases mean software is released seldomly, automated, zero downtime releases rock!</p></li>
+</ol>
+<h2 id="my-takeaway">My Takeaway</h2>
+<p>Apart from the title, I really did like this book and enjoyed reading it. I found the chapters on stability (anti-)patterns to be very valuable and enlightening. These are patterns that I will definteley introduce in my daily work and as such, even one successful pattern is worth many times the price of the book.</p>
+<p>Almost inevitably, the other parts of the book were not quite able to deliver as much useful insights but many had some interesting tidbits nevertheless. While some chapters are a little light on information (e.g. Security and Networking), others (e.g. Transparency) provide useful ideas that will make you think of practical concerns while designing an application. I have certainly seen a number of systems that failed to deliver on every item discussed in the book.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>. Some topics are covered on a fairly high level and can thus not provide the nitty-gritty detail needed when dealing with the discussed topics hands on, but this is inevitable when trying to cover such a broad range of topics.</p>
+<p>All in all I did enjoy the book and recommend it. If you’re short on time I recommend focussing on the part on stability, particularly chapters 3, 4 and 5 which delivered the most value for me.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Building a perfectly designed application that delivers on all fronts is much more difficult in practice than in theory of course. ;)<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Tue, 13 Jan 2015 00:00:00 UT</pubDate>
+    <guid>http://paulkoerbitz.de/posts/Release-It-Summary-And-Review.html</guid>
+</item>
+<item>
     <title>Solving the Expression Problem in Haskell and Java</title>
     <link>http://paulkoerbitz.de/posts/Solving-the-Expression-Problem-in-Haskell-and-Java.html</link>
     <description><![CDATA[<h1 class="title">Solving the Expression Problem in Haskell and Java</h1>
@@ -18,7 +394,7 @@
 <h2 id="expression-problem-recap">Expression Problem Recap</h2>
 <p>The term <em>Expression Problem</em> was coined by Philip Waldler in a <a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">mail</a> to the Java Generics mailing list. The goal is to be able to define datatypes by cases and functions over these datatypes in a way that is extensible: one should be able to add both new cases and new functions without touching or recompiling old code and while maintaining static type safety.</p>
 <p>As an example I’ll reuse the simple expression language from the last post. To represent such an expression language we will have a number of variants to capture the different types of expressions, for example literal integers, addition, and multiplication. To work with this representation we will have different functions to transform such expressions, for example evaluating or pretty-printing them.</p>
-<p>Once we have defined the cases and functions how difficult will it be to add new cases and new functions? Statically type-checked functional languages make it easy to add new functions (see <a href="/posts/Sum-Types-Visitors-and-the-Expression-Problem.html">last post</a>) while the object oriented languages make it easy to add new cases. The default appraoch in both languages does not make it easy<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> to add the other variant. That means that the default approach in both languages does not solve the Expression Problem. However, it turns out that solutions are possible in both types of languages. This post will describe a possible solution in both Haskell and Java.</p>
+<p>Once we have defined the cases and functions how difficult will it be to add new cases and new functions? Statically type-checked functional languages make it easy to add new functions (see <a href="/posts/Sum-Types-Visitors-and-the-Expression-Problem.html">last post</a>) while the object oriented languages make it easy to add new cases. The default approach in both languages does not make it easy<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> to either add new cases or new functions. That means that the default approach in both languages does not solve the Expression Problem. However, it turns out that solutions are possible in both types of languages. This post will describe a possible solution in both Haskell and Java.</p>
 <h2 id="a-haskell-solution">A Haskell Solution</h2>
 <p>The key to solving the Expression Problem in Haskell is to define typeclasses for the desired functions and make the datatypes instances of these typeclasses. We also define the different variants as their own datatypes, though this is not strictly necessary yet. For our expression language the setup looks as follows:</p>
 <pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Lit</span> <span class="fu">=</span> <span class="dt">Lit</span> <span class="dt">Int</span>
@@ -37,11 +413,11 @@
 <span class="ot">  pprint ::</span> x <span class="ot">-&gt;</span> <span class="dt">String</span>
 
 <span class="kw">instance</span> <span class="dt">PPrint</span> <span class="dt">Lit</span> <span class="kw">where</span>
-  pprint (<span class="dt">Lit</span> x) <span class="fu">=</span> <span class="fu">show</span> x
+  pprint (<span class="dt">Lit</span> x) <span class="fu">=</span> show x
 
 <span class="kw">instance</span> (<span class="dt">PPrint</span> l, <span class="dt">PPrint</span> r) <span class="ot">=&gt;</span> <span class="dt">PPrint</span> (<span class="dt">Add</span> l r) <span class="kw">where</span>
   pprint (<span class="dt">Add</span> l r) <span class="fu">=</span> <span class="st">&quot;(&quot;</span> <span class="fu">++</span> pprint l <span class="fu">++</span> <span class="st">&quot; + &quot;</span> <span class="fu">++</span> pprint r <span class="fu">++</span> <span class="st">&quot;)&quot;</span></code></pre>
-<p>Adding a new case is the interesting part, because this is the side of the Expression Problem which the standard approach in Haskell can’t handle. However, with the setup we have introduced above this becomes quite easy: we just add a new datatype and then add instances for each of our typeclasses:</p>
+<p>OK, so adding new functions is still easy, how about adding new cases? Adding a new case is the interesting part, because this is the side of the Expression Problem which the standard approach in Haskell can’t handle. However, with the setup we have introduced above this becomes quite easy: we just add a new datatype and then add instances for each of our typeclasses:</p>
 <pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Mult</span> l r <span class="fu">=</span> <span class="dt">Mult</span> l r
 
 <span class="kw">instance</span> (<span class="dt">Eval</span> l, <span class="dt">Eval</span> r) <span class="ot">=&gt;</span> <span class="dt">Eval</span> (<span class="dt">Mult</span> l r) <span class="kw">where</span>
@@ -54,10 +430,10 @@
 threePlus5Times7 <span class="fu">=</span> <span class="dt">Mult</span> threePlus5 (<span class="dt">Lit</span> <span class="dv">7</span>)
 
 main <span class="fu">=</span> <span class="kw">do</span>
-  <span class="fu">putStrLn</span> <span class="fu">$</span> pprint threePlus5 <span class="fu">++</span> <span class="st">&quot; = &quot;</span> <span class="fu">++</span> <span class="fu">show</span> (eval threePlus5)
-  <span class="fu">putStrLn</span> <span class="fu">$</span> pprint threePlus5Times7 <span class="fu">++</span> <span class="st">&quot; = &quot;</span> <span class="fu">++</span> <span class="fu">show</span> (eval threePlus5Times7)</code></pre>
+  putStrLn <span class="fu">$</span> pprint threePlus5 <span class="fu">++</span> <span class="st">&quot; = &quot;</span> <span class="fu">++</span> show (eval threePlus5)
+  putStrLn <span class="fu">$</span> pprint threePlus5Times7 <span class="fu">++</span> <span class="st">&quot; = &quot;</span> <span class="fu">++</span> show (eval threePlus5Times7)</code></pre>
 <h2 id="a-java-solution">A Java Solution</h2>
-<p>Solving the Expression Problem in classical (statically typed) OO languages is a bit more difficult. The solution I’ll present here is taken from the paper <a href="http://www.cs.utexas.edu/~wcook/Drafts/2012/ecoop2012.pdf">Extensibility for the masses (PDF)</a> which has won the ECOOP 2012 best paper award. The idea is to use <em>object algebras</em> which implement so-called <em>algebraic signatures</em>. We will use the same example as above. The algebraic signature for the expression language looks as follows:<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup></p>
+<p>Solving the Expression Problem in classical (statically typed) OO languages is a bit more difficult. The solution I’ll present here is taken from the paper <a href="http://www.cs.utexas.edu/~wcook/Drafts/2012/ecoop2012.pdf">Extensibility for the masses (PDF)</a> which has won the ECOOP 2012 best paper award. The idea is to use <em>object algebras</em> which implement so-called <em>algebraic signatures</em>. We will use the same example as above. The algebraic signature for the expression language looks as follows:<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
 <pre><code>signature E
     lit:  Int -&gt; E
     add:  E x E -&gt; E</code></pre>
@@ -100,9 +476,9 @@ main <span class="fu">=</span> <span class="kw">do</span>
         <span class="kw">return</span> Impl1.<span class="fu">make3Plus5</span>(<span class="kw">new</span> <span class="fu">Alg1EvalFactory</span>()).<span class="fu">eval</span>();
     }
 }</code></pre>
-<p>So we first define a generic interface called <code>Alg1</code> which represents the algebraic signature above.<sup><a href="#fn3" class="footnoteRef" id="fnref3">3</a></sup> Programs such as <code>make3Plus5</code> can use this interface completely generically without needing to know what <code>E</code> acutally is.</p>
+<p>So we first define a generic interface called <code>Alg1</code> which represents the algebraic signature above.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> Programs such as <code>make3Plus5</code> can use this interface completely generically without needing to know what <code>E</code> acutally is.</p>
 <p>Only when we acutally want to use the objects created from the <code>Alg1</code> interface do we need to define a concrete interface such as <code>Eval</code> and classes that implement it. We also need a class that implements <code>Alg1&lt;E&gt;</code>, in the code above this is <code>Alg1EvalFactory</code>. An instance of this factory is passed to the generic program <code>make3Plus5</code> which then produces an object which implements <code>Eval</code> so that we can call the <code>eval()</code> method on it.</p>
-<p>Comparing this approach to the Haskell one there are some similarities: The <code>interface Eval</code> here plays the role of the <code>typeclass Eval</code> in the Haskell version and the classes <code>ELit</code> and <code>EAdd</code> correspond to the instance declarations. The piece that is missing from the Haskell version is the <code>Alg1</code> interface and its implementation, but I think there are some similarities to what the Haskell compiler does behind the scenes.<sup><a href="#fn4" class="footnoteRef" id="fnref4">4</a></sup></p>
+<p>Comparing this approach to the Haskell one there are some similarities: The <code>interface Eval</code> here plays the role of the <code>typeclass Eval</code> in the Haskell version and the classes <code>ELit</code> and <code>EAdd</code> correspond to the instance declarations. The piece that is missing from the Haskell version is the <code>Alg1</code> interface and its implementation, but I think there are some similarities to what the Haskell compiler does behind the scenes.<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a></p>
 <p>Now let’s check if we can extend this setup with both new functions and new variants. First, adding new functions is fairly easy: The interface <code>Alg1</code> can stay unchanged, we merely need to create a new interface <code>PPrint</code> which will take the place of <code>Eval</code> and corresponding classes <code>PLit</code> and <code>PAdd</code> that implement this interface. To actually make use of <code>Alg1</code> instantiated to this new interface we also need a new factory.</p>
 <pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> PPrint {
     <span class="kw">public</span> String <span class="fu">pprint</span>();
@@ -215,7 +591,7 @@ main <span class="fu">=</span> <span class="kw">do</span>
 
 <p class="date">written on January 10, 2014</p>
 
-<p>I’ve heard that <em>the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> is just a poor way of getting the benefit of sum types</em><sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> in functional programming circles several times. I must admit that I never had completely thought this through, but I was nevertheless a bit surprised when I saw that walking the AST in Rust was implemented by what looks like a use of the visitor pattern. Languages with sum types usually use pattern matching to achieve the same effect and I had always considered this a superior approach. In this blog post I try to understand the differences and similarities of the two approaches a little better.</p>
+<p>I’ve heard that <em>the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> is just a poor way of getting the benefit of sum types</em><a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> in functional programming circles several times. I must admit that I never had completely thought this through, but I was nevertheless a bit surprised when I saw that walking the AST in Rust was implemented by what looks like a use of the visitor pattern. Languages with sum types usually use pattern matching to achieve the same effect and I had always considered this a superior approach. In this blog post I try to understand the differences and similarities of the two approaches a little better.</p>
 <p>To set the stage, both pattern matching and the visitor pattern solve one side of the <a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">expression problem</a>, which is the problem of adding both variants of a data type and functions that act on those variants without changing or recompiling old code and without loosing type safety.</p>
 <p>To make this a bit more concrete, consider a very simple expression languages consisting of numbers and addition as an example (no post on this topic can do without one!). We have two variants of expressions, (1) numbers and (2) addition. Let’s assume that we want to compute the values represented by an expression as a first operation.</p>
 <p>In Haskell a straightforward way of solving this problem is as follows</p>
@@ -227,7 +603,7 @@ eval (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> eval e1 <span
 <p>If you’re not familiar with Haskell, the first line defines a data type with two variants, it can either be a <code>Val</code>, which holds an <code>Int</code>, or it is an <code>Add</code> which holds two expressions. <code>Val</code> and <code>Add</code> are called constructors of <code>Expr</code>. The <code>eval</code> function pattern-matches and handles each case.</p>
 <p>Now imagine that we do not only want to evaluate expressions but also pretty-print them. Adding operations is easy in Haskell, we just write a new function:</p>
 <pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">pprint ::</span> <span class="dt">Expr</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
-pprint (<span class="dt">Val</span> i)     <span class="fu">=</span> <span class="fu">show</span> i
+pprint (<span class="dt">Val</span> i)     <span class="fu">=</span> show i
 pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <span class="fu">++</span> <span class="st">&quot; + &quot;</span> <span class="fu">++</span> pprint e2</code></pre>
 <p>In Java we might achieve something similar by introducing an <code>Expr</code> class:</p>
 <pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> Expr {
@@ -295,13 +671,13 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
     }
 }</code></pre>
 <p>This works, but the Haskell solution is clearly more elegant. Does the visitor pattern have any additional advantages? Well, neither approach solves the expression problem: if we want to add a new variant, say a <code>Mult</code>, then we have to change existing code in both cases.</p>
-<p>I can’t really think of an advantage for the visitor pattern. I’ve thought of two possibilities, <em>default implementations</em> and <em>almost-but-not-quite-solving-the-expression-problem</em>. But then I realized that the first problem is also similarly solvable in the pattern matching approach and that the second problem doesn’t work without loosing type safety or duplicating code:<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup></p>
+<p>I can’t really think of an advantage for the visitor pattern. I’ve thought of two possibilities, <em>default implementations</em> and <em>almost-but-not-quite-solving-the-expression-problem</em>. But then I realized that the first problem is also similarly solvable in the pattern matching approach and that the second problem doesn’t work without loosing type safety or duplicating code:<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
 <ol style="list-style-type: decimal">
 <li><p><em>Default implementations</em> are easy to implement with both approaches: in the visitor pattern defaults can be achieved by inherenting from a visitor with default implementations and overriding only certain methods. In the pattern-matching approach we would match all the constructors where we want to override the defaults and insert a wildcard match for the rest and call the default implementaiton on the bound variable.</p></li>
 <li><p><em>Almost-but-not-quite-solving-the-expression-problem</em>: I first thought that we could use some inheritance based trickery to solve the expression problem at least for new code. But none of these seems to work: If we add a new variant, say <code>Mult</code>, it can’t derive from <code>Expr</code> because then it would have to implement <code>Expr</code>’s accept method, which it can’t sensibly do (because there is no right <code>visit</code> method in <code>ExprVisitor</code>).</p>
 <p>Thus we must introduce a new interface <code>Expr2</code>. <code>Expr2</code> cannot derive from <code>Expr</code>, lest we have the same problem as before. But the old variants don’t derive from <code>Expr2</code>, so this is of limited use. Whichever way we twist or turn it, there is no easy way to solve the expression problem with this pattern.</p></li>
 </ol>
-<p>So, as it stands, I can’t really come up with an advantage for the visitor pattern over pattern matching. If you work in a language without sum types then it is certainly a great workaround, but in a language that does pattern matching seems much both more concise and more efficient.<sup><a href="#fn3" class="footnoteRef" id="fnref3">3</a></sup></p>
+<p>So, as it stands, I can’t really come up with an advantage for the visitor pattern over pattern matching. If you work in a language without sum types then it is certainly a great workaround, but in a language that does pattern matching seems much both more concise and more efficient.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a></p>
 <div class="footnotes">
 <hr />
 <ol>
@@ -333,6 +709,10 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
 
 <p class="date">written on December 21, 2013</p>
 
+<hr />
+<h2 id="update-2014-10-14">Update 2014-10-14</h2>
+<p>I have updated this post to reflect the new syntax for owned pointers in in rust 0.11.</p>
+<hr />
 <p>In the last couple of weeks I have been looking into <a href="http://www.rust-lang.org">Rust</a>, a new language developed by the good folks at Mozilla. Rust is fairly unique in that it is aimed at the same space as C++: a systems programming language that gives you full control over memory but also offers high level language features. In the past few years a few languages have come out that claim to target this space, for example <a href="http://www.go-lang.org">Go</a>, <a href="http://www.dlang.org">D</a>, and <a href="http://www.nimrod-lang.org">Nimrod</a>. However, these languages are garbage collected by default and loose their memory safety when memory is managed manually (D, Nimrod) or do not offer this possibility at all (Go). Therefore, these languages are not well equiped for applications which require full control over memory, which is the use case where C++ shines.</p>
 <p>I think it’s great that C++ finally gets some real competition. Even among C++ fans, few will deny that compatibility with C, decades of language evolution, and accidental language features have created a very complex language that is extremely difficult to master. I think it is quite sad that for a lot of applications, C++ is still the only sane choice. We need a simpler language that offers more modern language features while targeting the same space. Rust could just be that language.</p>
 <p>Ok now, the point of this post is not to argue the case for <a href="http://www.rust-lang.org">Rust</a> nor to heap (well deserved) praise onto the Rust designers and implementers. I want to talk about the ownership semantics in Rust and how they interact with the different type of pointers in Rust.</p>
@@ -347,8 +727,8 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
 <p>This, in conjunction with the features that Rust provides, will give us a good idea why certain things must be the way they are in Rust.</p>
 <h2 id="different-types-of-pointers-in-rust">Different Types of Pointers in Rust</h2>
 <p>There are several types of pointers in Rust: owned pointers and borrowed pointers are directly supported by the language. There used to be a third type, managed pointers, but these are currently being removed and replaced by garbage collected and reference counted pointers which live in the standard library. Each pointer serves a different purpose. This post will focus on owned and borrowed pointers.</p>
-<h3 id="owned-pointers">Owned Pointers</h3>
-<p>An <em>owned pointer</em> in Rust has ownership over a certain part of the heap. When it goes out of scope it deletes that part of the heap. This achieves <em>manual memory management</em>: the programmer has control over when memory is released by controlling when an owned pointer goes out of scope. Owned pointers are denoted and introduced by <code>~</code>, so <code>~int</code> is an owned pointer to an <code>int</code>. Like all pointers, owned pointers are derferenced by prefixing them with <code>*</code>.</p>
+<h3 id="boxes-or-owned-pointers"><em>Boxes</em> or Owned Pointers</h3>
+<p>A <em>box</em> or <em>owned pointer</em> in Rust has ownership over a certain part of the heap. When it goes out of scope it deletes that part of the heap. This achieves <em>manual memory management</em>: the programmer has control over when memory is released by controlling when an owned pointer goes out of scope. Owned pointers are denoted and introduced by <code>box</code>, so <code>box int</code> is the type of an owned pointer to an <code>int</code> and <code>box 3</code> is the literal notation for allocating space on the heap for an int, putting 3 into it and handling back an owned pointer. Like all pointers, owned pointers are derferenced by prefixing them with <code>*</code>.</p>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="co">// The type annotations in the let statements in this example</span>
 <span class="co">// (e.g. &#39;: ~int&#39;) are not necessary and only for clarity</span>
 
@@ -382,11 +762,11 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
 <h3 id="reference-counted-and-garbage-collected-pointers">Reference Counted and Garbage Collected Pointers</h3>
 <p>Owned and borrowed pointers fit a lot of use cases, but sometimes they are not enough. With these pointer types, each piece of memory must have an ultimate owner. This means that the ownership of all objects on the heap must be representable as a directed acyclic graph. Up to version 0.8, Rust offered managed pointers with the syntactic form <code>@</code>. These are currently being removed and will be replaced by the <code>Rc</code> and <code>Gc</code> pointers in the standard library. This post will ignore these two pointer types.</p>
 <h2 id="move-semantics">Move Semantics</h2>
-<p><em>Memory safety</em> implies that owned pointers <em>cannot be copied or cloned</em>. Otherwise, two such pointers could point to the same block of memory and that memory would be deleted twice. Therefore, owned pointers have move semantics:<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> when owned pointer <code>o2</code> is initialized from owned pointer <code>o1</code>, <code>o1</code> is no longer valid. By guiding principle number four, we would perfer to ensure this at compile time, and Rust indeed does this.<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup></p>
+<p><em>Memory safety</em> implies that owned pointers <em>cannot be copied or cloned</em>. Otherwise, two such pointers could point to the same block of memory and that memory would be deleted twice. Therefore, owned pointers have move semantics:<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> when owned pointer <code>o2</code> is initialized from owned pointer <code>o1</code>, <code>o1</code> is no longer valid. By guiding principle number four, we would perfer to ensure this at compile time, and Rust indeed does this.<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
    <span class="kw">let</span> o1 = ~<span class="st">&quot;world&quot;</span>;
    <span class="kw">let</span> o2 = o1;                <span class="co">// &lt;-- o1 is &#39;moved&#39; into o2 and now invalid</span>
-   println!(<span class="st">&quot;Hello, {}!&quot;</span>, o1); <span class="co">// &lt;-- this is a compile time error</span>
+   <span class="ot">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, o1); <span class="co">// &lt;-- this is a compile time error</span>
 }</code></pre>
 <p>Indeed the Rust compiler reports:</p>
 <pre><code>move.rs:4:26: 4:28 error: use of moved value: `o1`
@@ -400,10 +780,10 @@ move.rs:4    println!(&quot;Hello, {}!&quot;, o1); // &lt;-- this is a compile t
 <span class="kw">fn</span> main() {
    <span class="kw">let</span> a1 = Pod {x: <span class="dv">3</span>, y: <span class="dv">4u</span>, z: [<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>]};
    <span class="kw">let</span> a2 = a1;
-   println!(<span class="st">&quot;{:?}&quot;</span>, a1);                   <span class="co">// &lt;-- OK, a1 has been copied</span>
+   <span class="ot">println!</span>(<span class="st">&quot;{:?}&quot;</span>, a1);                   <span class="co">// &lt;-- OK, a1 has been copied</span>
    <span class="kw">let</span> b1 = WithOptr {x: <span class="dv">3</span>, p: ~<span class="dv">4</span>};
    <span class="kw">let</span> b2 = b1;
-   println!(<span class="st">&quot;{:?}&quot;</span>, b1);                   <span class="co">// &lt;-- Compile time error, b1 has been moved</span>
+   <span class="ot">println!</span>(<span class="st">&quot;{:?}&quot;</span>, b1);                   <span class="co">// &lt;-- Compile time error, b1 has been moved</span>
 }</code></pre>
 <p>The same rules apply to enums, but here the error messages can be a bit more confusing.</p>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">enum</span> MyEnum {
@@ -413,8 +793,8 @@ move.rs:4    println!(&quot;Hello, {}!&quot;, o1); // &lt;-- this is a compile t
 
 <span class="kw">fn</span> match_and_print(e: &amp;MyEnum) {
     <span class="kw">match</span> *e {
-        X(x) =&gt; println!(<span class="st">&quot;{}&quot;</span>, x),  <span class="co">// &lt;-- OK, x can be copied</span>
-        Y(y) =&gt; println!(<span class="st">&quot;{}&quot;</span>, *y)  <span class="co">// &lt;-- Error, y cannot be moved out of a reference</span>
+        X(x) =&gt; <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, x),  <span class="co">// &lt;-- OK, x can be copied</span>
+        Y(y) =&gt; <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, *y)  <span class="co">// &lt;-- Error, y cannot be moved out of a reference</span>
     }
 }
 
@@ -431,26 +811,26 @@ move.rs:33         Y(y) =&gt; println!(&quot;{}&quot;, *y)
 <p>Standard pattern matches are pass-by-value, meaning that the contents of the enum is either copied or moved. However, this can only be done when we have ownership over the values to be moved. When we apply <code>match</code> to a dereferenced borrowed pointer, we cannot move because we don’t have ownership. Changing the <code>match_and_print</code> function to take a copy would work again:</p>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: MyEnum) {
     <span class="kw">match</span> e {
-        X(x) =&gt; println!(<span class="st">&quot;{}&quot;</span>, x),
-        Y(y) =&gt; println!(<span class="st">&quot;{}&quot;</span>, *y)
+        X(x) =&gt; <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
+        Y(y) =&gt; <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, *y)
     }
 }</code></pre>
 <h3 id="the-ref-keyword">The <code>ref</code> Keyword</h3>
 <p>Copying or moving values in pattern matches is not always what we want. Sometimes we just want to take a reference. This way we can pattern match on values which we have obtained via borrowed pointers or we can simply avoid a move or copy. This is where the <code>ref</code> keyword comes into play: It changes the pass-by-value semantics of a pattern match to pass-by-borrowed-pointer semantics:</p>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: &amp;MyEnum) {
     <span class="kw">match</span> *e {
-        X(x) =&gt; println!(<span class="st">&quot;{}&quot;</span>, x),
+        X(x) =&gt; <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
         Y(<span class="kw">ref</span> y) =&gt;                 <span class="co">// OK, y is a borrowed ptr to ~int</span>
-            println!(<span class="st">&quot;{}&quot;</span>, **y)     <span class="co">// y has type &amp;~int and must be dereferenced twice</span>
+            <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, **y)     <span class="co">// y has type &amp;~int and must be dereferenced twice</span>
     }
 }</code></pre>
 <p>To bind mutable references there is also the <code>ref mut</code> version which allows modifying:</p>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: &amp;<span class="kw">mut</span> MyEnum) {
     <span class="kw">match</span> *e {
-        X(x) =&gt; println!(<span class="st">&quot;{}&quot;</span>, x),
+        X(x) =&gt; <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
         Y(<span class="kw">ref</span> <span class="kw">mut</span> y) =&gt; {
             **y = <span class="dv">5</span>;
-            println!(<span class="st">&quot;{}&quot;</span>, **y)
+            <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, **y)
         }
     }
 }
@@ -466,7 +846,7 @@ move.rs:33         Y(y) =&gt; println!(&quot;{}&quot;, *y)
    <span class="kw">let</span> <span class="kw">mut</span> x = <span class="dv">3</span>;
    <span class="kw">let</span> <span class="kw">ref</span> <span class="kw">mut</span> y = x;
    *y = <span class="dv">4</span>;
-   println!(<span class="st">&quot;{}&quot;</span>, *y);
+   <span class="ot">println!</span>(<span class="st">&quot;{}&quot;</span>, *y);
 }</code></pre>
 <h2 id="lifetimes">Lifetimes</h2>
 <p>The difficulty with borrowed pointers is that they themselves cannot ensure that they point to valid memory. What if the thing that owns the memory they point to goes out of scope or is reassigned? Since the borrowed pointer has no ownership that memory would be deleted and possibly reassigned. The borrowed pointer would become a <em>dangling reference</em>, which is precisely what we wanted to avoid per guiding principle number 2: <strong>memory safety</strong>.</p>
@@ -476,8 +856,8 @@ move.rs:33         Y(y) =&gt; println!(&quot;{}&quot;, *y)
     <span class="kw">let</span> name = ~<span class="st">&quot;world&quot;</span>;               <span class="co">//                 &lt;--+</span>
     <span class="kw">if</span> (<span class="dv">3</span> &lt; <span class="dv">5</span>) {                       <span class="co">//                    |</span>
         <span class="kw">let</span> bname = &amp;name;             <span class="co">// &lt;--+               | name&#39;s</span>
-        println!(<span class="st">&quot;Hello, {}!&quot;</span>, name);  <span class="co">//    | bname&#39;s       | lifetime</span>
-        println!(<span class="st">&quot;Hello, {}!&quot;</span>, bname); <span class="co">//    | lifetime      |</span>
+        <span class="ot">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, name);  <span class="co">//    | bname&#39;s       | lifetime</span>
+        <span class="ot">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, bname); <span class="co">//    | lifetime      |</span>
     }                                  <span class="co">// &lt;--+               |</span>
 }                                      <span class="co">//                 &lt;--+</span></code></pre>
 <p>In this example, it is quite clear that the lifetime of <code>bname</code> will be shorter than that of <code>name</code> and thus the compiler needs no help in figuring this out. However, things need not always be this simple, consider the following example:</p>
@@ -507,7 +887,7 @@ lifetimes.rs:11:4: 15:5 note: ...so that if and else have compatible types (expe
 lifetimes.rs:10:37: 16:1 note: but, the lifetime must be valid for the anonymous lifetime #3 defined on the block at 10:37...
 lifetimes.rs:11:4: 15:5 note: ...so that types are compatible (expected `&amp;int` but found `&amp;int`)</code></pre>
 <p>Since the compiler can’t infer the lifetimes we must annotate them. Alas, we too would be hard pressed to give the exact lifetime in this example. However, there is a trick by which we can manage this</p>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> minLife&lt;<span class="ch">&#39;a&gt;(x: &amp;&#39;</span>a <span class="kw">int</span>, y: &amp;<span class="ch">&#39;a int) -&gt; &amp;&#39;</span>a <span class="kw">int</span> {
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> minLife&lt;<span class="ot">&#39;a</span>&gt;(x: &amp;<span class="ot">&#39;a</span> <span class="kw">int</span>, y: &amp;<span class="ot">&#39;a</span> <span class="kw">int</span>) -&gt; &amp;<span class="ot">&#39;a</span> <span class="kw">int</span> {
     <span class="kw">if</span> (*x &lt; *y) {
         x
     } <span class="kw">else</span> {
@@ -574,7 +954,7 @@ lifetimes.rs:21         let mut y = &amp;x;
   | <span class="dt">RbRed</span>
   | RbBlack<span class="kw">.</span>
 
-<span class="dt">Definition</span> flipColor (c:RbColor) : <span class="dt">RbColor</span> :=
+<span class="dt">Definition</span> flipColor (c:<span class="dt">RbColor</span>) : <span class="dt">RbColor</span> :=
   <span class="kw">match</span> c <span class="kw">with</span>
     | <span class="dt">RbRed</span> =&gt; <span class="dt">RbBlack</span>
     | <span class="dt">RbBlack</span> =&gt; <span class="dt">RbRed</span>
@@ -584,7 +964,7 @@ lifetimes.rs:21         let mut y = &amp;x;
   | tip : <span class="dt">RbTree</span>
   | node : <span class="dt">RbColor</span> -&gt; nat -&gt; <span class="dt">RbTree</span> -&gt; <span class="dt">RbTree</span> -&gt; RbTree<span class="kw">.</span>
 
-<span class="dt">Fixpoint</span> rotLeft (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Fixpoint</span> rotLeft (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | tip =&gt; tip
     | node c n l r =&gt;
@@ -594,7 +974,7 @@ lifetimes.rs:21         let mut y = &amp;x;
       end
   end.
 
-<span class="dt">Fixpoint</span> rotRight (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Fixpoint</span> rotRight (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | tip =&gt; tip
     | node c n l r =&gt;
@@ -604,32 +984,32 @@ lifetimes.rs:21         let mut y = &amp;x;
       end
   end.
 
-<span class="dt">Definition</span> rightIsRed (t:RbTree) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> rightIsRed (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | node _ _ _ (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
     | _ =&gt; <span class="kw">false</span>
   end.
 
-<span class="dt">Definition</span> twoRedsOnLeft (t:RbTree) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> twoRedsOnLeft (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | node _ _ (node <span class="dt">RbRed</span> _ (node <span class="dt">RbRed</span> _ _ _) _) _ =&gt; <span class="kw">true</span>
     | _ =&gt; <span class="kw">false</span>
   end.
 
-<span class="dt">Definition</span> balanceR (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Definition</span> balanceR (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">if</span> twoRedsOnLeft t <span class="kw">then</span> rotRight t <span class="kw">else</span> t.
 
-<span class="dt">Definition</span> balanceL (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Definition</span> balanceL (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">if</span> rightIsRed t <span class="kw">then</span> rotLeft t <span class="kw">else</span> t.
 
-<span class="dt">Definition</span> bothLeftAndRightAreRed (t:RbTree) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> bothLeftAndRightAreRed (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | node _ _ (node <span class="dt">RbRed</span> _ _ _) (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
     | _ =&gt; <span class="kw">false</span>
   end.
 
 <span class="co">(* these evidence carrying booleans would be nice here *)</span>
-<span class="dt">Definition</span> flipColors (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Definition</span> flipColors (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> ln ll lr) (node <span class="dt">RbRed</span> rn rl rr) =&gt; node <span class="dt">RbRed</span> n (node <span class="dt">RbBlack</span> ln ll lr) (node <span class="dt">RbBlack</span> rn rl rr)
     | _ =&gt; t
@@ -648,7 +1028,7 @@ lifetimes.rs:21         let mut y = &amp;x;
   <span class="kw">if</span> beq_nat n m <span class="kw">then</span> <span class="dt">EQ</span> <span class="kw">else</span>
     <span class="kw">if</span> ble_nat n m <span class="kw">then</span> <span class="dt">LT</span> <span class="kw">else</span> GT<span class="kw">.</span>
 
-<span class="dt">Fixpoint</span> insert (nn:nat) (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Fixpoint</span> insert (nn:nat) (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | tip =&gt; node <span class="dt">RbBlack</span> nn tip tip
     | node c n l r =&gt;
@@ -677,18 +1057,18 @@ lifetimes.rs:21         let mut y = &amp;x;
     | node _ n l r =&gt; andb (andb (rbForall f l) (f n)) (rbForall f r)
   end.
 
-<span class="dt">Definition</span> gtTree (t:RbTree) (m:nat)  : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> gtTree (t:<span class="dt">RbTree</span>) (m:nat)  : <span class="dt">bool</span> :=
   rbForall (bgt_nat m) t.
 
-<span class="dt">Definition</span> ltTree (t:RbTree) (m:nat) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> ltTree (t:<span class="dt">RbTree</span>) (m:nat) : <span class="dt">bool</span> :=
   rbForall (blt_nat m) t.
 
 <span class="dt">Theorem</span> excluded_middle :
-  forall <span class="dt">P:Prop</span>, <span class="dt">P</span> \/ ~ P<span class="kw">.</span>
+  forall <span class="dt">P</span>:<span class="dt">Prop</span>, <span class="dt">P</span> \/ ~ P<span class="kw">.</span>
 Proof<span class="kw">.</span>
 Admitted<span class="kw">.</span>
 
-<span class="dt">Lemma</span> unflipable : forall (t:RbTree),
+<span class="dt">Lemma</span> unflipable : forall (t:<span class="dt">RbTree</span>),
   ~flipable t -&gt; flipColors t = t.
 Proof<span class="kw">.</span>
   intros.
@@ -705,7 +1085,7 @@ Proof<span class="kw">.</span>
   simpl. reflexivity.
 Qed<span class="kw">.</span>
 
-<span class="dt">Lemma</span> rbForall_flipColors : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+<span class="dt">Lemma</span> rbForall_flipColors : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
   rbForall f t = <span class="kw">true</span> -&gt; rbForall f (flipColors t) = <span class="kw">true</span>.
 Proof<span class="kw">.</span>
   intros. induction t.
@@ -716,17 +1096,17 @@ Proof<span class="kw">.</span>
     apply unflipable. apply H1<span class="kw">.</span> rewrite H2<span class="kw">.</span> apply H<span class="kw">.</span>
 Qed<span class="kw">.</span>
 
-<span class="dt">Lemma</span> rbForall_balanceR : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+<span class="dt">Lemma</span> rbForall_balanceR : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
   rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceR t) = <span class="kw">true</span>.
 Proof<span class="kw">.</span>
 Admitted<span class="kw">.</span>
 
-<span class="dt">Lemma</span> rbForall_balanceL : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+<span class="dt">Lemma</span> rbForall_balanceL : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
   rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceL t) = <span class="kw">true</span>.
 Proof<span class="kw">.</span>
 Admitted<span class="kw">.</span>
 
-<span class="dt">Lemma</span> rbForall_insert : forall (n m:nat) (f : nat -&gt; nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+<span class="dt">Lemma</span> rbForall_insert : forall (n m:nat) (f : nat -&gt; nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
   rbForall (f n) t = <span class="kw">true</span> -&gt; f n m = <span class="kw">true</span> -&gt; rbForall (f n) (insert m t) = <span class="kw">true</span>.
 Proof<span class="kw">.</span>
   intros. induction t.
@@ -744,7 +1124,7 @@ Qed<span class="kw">.</span>
                gtTree l n = <span class="kw">true</span> -&gt; ltTree r n = <span class="kw">true</span> -&gt;
                rbOrdered (node c n l r).
 
-<span class="dt">Lemma</span> flipColor_keeps_order : forall (n:nat) (c:RbColor) (l r : <span class="dt">RbTree</span>),
+<span class="dt">Lemma</span> flipColor_keeps_order : forall (n:nat) (c:<span class="dt">RbColor</span>) (l r : <span class="dt">RbTree</span>),
   rbOrdered (node c n l r) -&gt; rbOrdered (node (flipColor c) n l r).
 Proof<span class="kw">.</span>
   intros. inversion H<span class="kw">.</span> apply O_Cons<span class="kw">.</span> assumption. assumption. assumption. assumption.
@@ -794,7 +1174,7 @@ Proof<span class="kw">.</span>
       apply rbForall_insert. apply H1<span class="kw">.</span>
       <span class="co">(* cmp n n0 = LT -&gt; bgt_nat n0 n = true *)</span> admit.
       assumption.
-    <span class="dt">SCase</span> <span class="st">&quot;n = n0&quot;</span>. simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span> apply <span class="dt">O_Cons;</span> assumption.
+    <span class="dt">SCase</span> <span class="st">&quot;n = n0&quot;</span>. simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span> apply <span class="dt">O_Cons</span>; assumption.
     <span class="dt">SCase</span> <span class="st">&quot;n &gt; n0&quot;</span>.
       simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span>
       apply flipColors_keeps_order. apply balanceL_keeps_order. apply O_Cons<span class="kw">.</span> assumption. assumption. assumption.
@@ -826,10 +1206,10 @@ Qed<span class="kw">.</span></code></pre>
 <p class="date">written on September  9, 2013</p>
 
 <p>The Haskell wiki gives as one of the examples of the elegance of Haskell the following as a quicksort implementation in Haskell:</p>
-<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">qsort ::</span> <span class="kw">Ord</span> a <span class="ot">=&gt;</span> [a] <span class="ot">-&gt;</span> [a]
+<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">qsort ::</span> <span class="dt">Ord</span> a <span class="ot">=&gt;</span> [a] <span class="ot">-&gt;</span> [a]
 qsort []    <span class="fu">=</span> []
-qsort (h<span class="fu">:</span>t) <span class="fu">=</span> qsort (<span class="fu">filter</span> (<span class="fu">&lt;=</span> h) t) <span class="fu">++</span> [h] <span class="fu">++</span> qsort (<span class="fu">filter</span> (<span class="fu">&gt;</span> h) t)</code></pre>
-<p>In terms of elegance, this solution is indeed hard to beat. It is as close to Wikipedia’s description of the essence of quicksort as code can get:<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup></p>
+qsort (h<span class="fu">:</span>t) <span class="fu">=</span> qsort (filter (<span class="fu">&lt;=</span> h) t) <span class="fu">++</span> [h] <span class="fu">++</span> qsort (filter (<span class="fu">&gt;</span> h) t)</code></pre>
+<p>In terms of elegance, this solution is indeed hard to beat. It is as close to Wikipedia’s description of the essence of quicksort as code can get:<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a></p>
 <blockquote>
 <p>Quicksort first divides a large list into two smaller sub-lists: the low elements and the high elements. Quicksort can then recursively sort the sub-lists.</p>
 </blockquote>
@@ -838,24 +1218,24 @@ qsort (h<span class="fu">:</span>t) <span class="fu">=</span> qsort (<span class
 <p>An efficient Quicksort implementation consists of two parts, the <em>partition</em> function, which rearranges the elements of an array so that the left part is less-or-equal to the pivot and the right part is greater and the main function which does the recursive calls on the sub-parts. Here is my Haskell version:</p>
 <pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}</span>
 <span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span>
-<span class="kw">import</span>           Control.Monad.Primitive
-<span class="kw">import</span>           Control.Applicative ((&lt;$&gt;))
-<span class="kw">import</span> <span class="kw">qualified</span> Data.Vector.Unboxed <span class="kw">as</span> V
-<span class="kw">import</span> <span class="kw">qualified</span> Data.Vector.Unboxed.Mutable <span class="kw">as</span> M
-<span class="kw">import</span>           System.Environment (getArgs)
-<span class="kw">import</span>           System.Clock
-<span class="kw">import</span>           System.Exit (exitFailure, exitSuccess)
-<span class="kw">import</span>           Control.DeepSeq (deepseq)
-<span class="kw">import</span> <span class="kw">qualified</span> Data.ByteString <span class="kw">as</span> BS
-<span class="kw">import</span>           Data.ByteString.Char8 (readInt)
+<span class="kw">import           </span><span class="dt">Control.Monad.Primitive</span>
+<span class="kw">import           </span><span class="dt">Control.Applicative</span> ((&lt;$&gt;))
+<span class="kw">import qualified</span> <span class="dt">Data.Vector.Unboxed</span> <span class="kw">as</span> <span class="dt">V</span>
+<span class="kw">import qualified</span> <span class="dt">Data.Vector.Unboxed.Mutable</span> <span class="kw">as</span> <span class="dt">M</span>
+<span class="kw">import           </span><span class="dt">System.Environment</span> (getArgs)
+<span class="kw">import           </span><span class="dt">System.Clock</span>
+<span class="kw">import           </span><span class="dt">System.Exit</span> (exitFailure, exitSuccess)
+<span class="kw">import           </span><span class="dt">Control.DeepSeq</span> (deepseq)
+<span class="kw">import qualified</span> <span class="dt">Data.ByteString</span> <span class="kw">as</span> <span class="dt">BS</span>
+<span class="kw">import           </span><span class="dt">Data.ByteString.Char8</span> (readInt)
 
-<span class="ot">partition ::</span> (<span class="dt">PrimMonad</span> m, <span class="kw">Ord</span> a, <span class="dt">M.Unbox</span> a) <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">M.MVector</span> (<span class="dt">PrimState</span> m) a <span class="ot">-&gt;</span> m <span class="dt">Int</span>
-partition <span class="fu">!pi</span> <span class="fu">!</span>v <span class="fu">=</span> <span class="kw">do</span>
-    pv <span class="ot">&lt;-</span> M.unsafeRead v <span class="fu">pi</span>
-    M.unsafeSwap v <span class="fu">pi</span> lastIdx
+<span class="ot">partition ::</span> (<span class="dt">PrimMonad</span> m, <span class="dt">Ord</span> a, <span class="dt">M.Unbox</span> a) <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">M.MVector</span> (<span class="dt">PrimState</span> m) a <span class="ot">-&gt;</span> m <span class="dt">Int</span>
+partition <span class="fu">!</span>pi <span class="fu">!</span>v <span class="fu">=</span> <span class="kw">do</span>
+    pv <span class="ot">&lt;-</span> M.unsafeRead v pi
+    M.unsafeSwap v pi lastIdx
     pi&#39; <span class="ot">&lt;-</span> go pv <span class="dv">0</span> <span class="dv">0</span>
     M.unsafeSwap v pi&#39; lastIdx
-    <span class="fu">return</span> pi&#39;
+    return pi&#39;
   <span class="kw">where</span>
     <span class="fu">!</span>lastIdx <span class="fu">=</span> M.length v <span class="fu">-</span> <span class="dv">1</span>
 
@@ -864,33 +1244,33 @@ partition <span class="fu">!pi</span> <span class="fu">!</span>v <span class="fu
           <span class="kw">if</span> iv <span class="fu">&lt;</span> pv
             <span class="kw">then</span> M.unsafeSwap v i si <span class="fu">&gt;&gt;</span> go pv (i<span class="fu">+</span><span class="dv">1</span>) (si<span class="fu">+</span><span class="dv">1</span>)
             <span class="kw">else</span> go pv (i<span class="fu">+</span><span class="dv">1</span>) si
-    go _   _ <span class="fu">!</span>si                <span class="fu">=</span> <span class="fu">return</span> si
+    go _   _ <span class="fu">!</span>si                <span class="fu">=</span> return si
 
-<span class="ot">qsort ::</span> (<span class="dt">PrimMonad</span> m, <span class="kw">Ord</span> a, <span class="dt">M.Unbox</span> a) <span class="ot">=&gt;</span> <span class="dt">M.MVector</span> (<span class="dt">PrimState</span> m) a <span class="ot">-&gt;</span> m ()
-qsort v <span class="fu">|</span> M.length v <span class="fu">&lt;</span> <span class="dv">2</span> <span class="fu">=</span> <span class="fu">return</span> ()
+<span class="ot">qsort ::</span> (<span class="dt">PrimMonad</span> m, <span class="dt">Ord</span> a, <span class="dt">M.Unbox</span> a) <span class="ot">=&gt;</span> <span class="dt">M.MVector</span> (<span class="dt">PrimState</span> m) a <span class="ot">-&gt;</span> m ()
+qsort v <span class="fu">|</span> M.length v <span class="fu">&lt;</span> <span class="dv">2</span> <span class="fu">=</span> return ()
 qsort v                    <span class="fu">=</span> <span class="kw">do</span>
-    <span class="kw">let</span> <span class="fu">!pi</span> <span class="fu">=</span> M.length v <span class="ot">`div`</span> <span class="dv">2</span>
-    pi&#39; <span class="ot">&lt;-</span> partition <span class="fu">pi</span> v
+    <span class="kw">let</span> <span class="fu">!</span>pi <span class="fu">=</span> M.length v <span class="ot">`div`</span> <span class="dv">2</span>
+    pi&#39; <span class="ot">&lt;-</span> partition pi v
     qsort (M.unsafeSlice <span class="dv">0</span> pi&#39; v)
     qsort (M.unsafeSlice (pi&#39;<span class="fu">+</span><span class="dv">1</span>) (M.length v <span class="fu">-</span> (pi&#39;<span class="fu">+</span><span class="dv">1</span>)) v)
 
 <span class="ot">main ::</span> <span class="dt">IO</span> ()
 main <span class="fu">=</span> <span class="kw">do</span>
     args <span class="ot">&lt;-</span> getArgs
-    <span class="kw">if</span> <span class="fu">length</span> args <span class="fu">&lt;</span> <span class="dv">2</span>
-      <span class="kw">then</span> <span class="fu">putStrLn</span> <span class="st">&quot;Usage: qsort RUNS FILENAME&quot;</span> <span class="fu">&gt;&gt;</span> exitFailure
-      <span class="kw">else</span> <span class="fu">return</span> ()
-    <span class="kw">let</span> (<span class="ot">nRuns::</span><span class="dt">Int</span>) <span class="fu">=</span> <span class="fu">read</span> (args <span class="fu">!!</span> <span class="dv">0</span>)
-    nums <span class="ot">&lt;-</span> V.unfoldr (\s <span class="ot">-&gt;</span> <span class="fu">readInt</span> <span class="fu">$</span> BS.dropWhile isWs s) <span class="fu">&lt;$&gt;</span> BS.readFile (args <span class="fu">!!</span> <span class="dv">1</span>)
+    <span class="kw">if</span> length args <span class="fu">&lt;</span> <span class="dv">2</span>
+      <span class="kw">then</span> putStrLn <span class="st">&quot;Usage: qsort RUNS FILENAME&quot;</span> <span class="fu">&gt;&gt;</span> exitFailure
+      <span class="kw">else</span> return ()
+    <span class="kw">let</span> (<span class="ot">nRuns::</span><span class="dt">Int</span>) <span class="fu">=</span> read (args <span class="fu">!!</span> <span class="dv">0</span>)
+    nums <span class="ot">&lt;-</span> V.unfoldr (\s <span class="ot">-&gt;</span> readInt <span class="fu">$</span> BS.dropWhile isWs s) <span class="fu">&lt;$&gt;</span> BS.readFile (args <span class="fu">!!</span> <span class="dv">1</span>)
     loop nRuns (<span class="kw">do</span> nums&#39; <span class="ot">&lt;-</span> V.thaw nums
                    start <span class="ot">&lt;-</span> getTime <span class="dt">ProcessCPUTime</span>
                    qsort nums&#39;
                    time <span class="ot">&lt;-</span> getTime <span class="dt">ProcessCPUTime</span> <span class="fu">-</span> start
-                   <span class="fu">putStrLn</span> <span class="fu">$</span> <span class="fu">show</span> <span class="fu">$</span> <span class="fu">fromIntegral</span> (sec time) <span class="fu">+</span>
-                                     ((<span class="fu">fromIntegral</span> <span class="fu">$</span> nsec time) <span class="fu">/</span> <span class="dv">1000000000</span>))
+                   putStrLn <span class="fu">$</span> show <span class="fu">$</span> fromIntegral (sec time) <span class="fu">+</span>
+                                     ((fromIntegral <span class="fu">$</span> nsec time) <span class="fu">/</span> <span class="dv">1000000000</span>))
     exitSuccess
   <span class="kw">where</span>
-    loop <span class="dv">0</span> _ <span class="fu">=</span> <span class="fu">return</span> ()
+    loop <span class="dv">0</span> _ <span class="fu">=</span> return ()
     loop n a <span class="fu">=</span> a <span class="fu">&gt;&gt;</span> loop (n<span class="fu">-</span><span class="dv">1</span>) a
 
     isWs <span class="fu">!</span>c <span class="fu">=</span> c <span class="fu">==</span> <span class="dv">10</span> <span class="fu">||</span> c <span class="fu">==</span> <span class="dv">20</span> <span class="fu">||</span> c <span class="fu">==</span> <span class="dv">9</span></code></pre>
@@ -962,10 +1342,10 @@ size_t partition(std::vector&lt;T&gt;&amp; arr, size_t lo, size_t hi, size_t pi)
   <span class="kw">for</span> (<span class="dt">int</span> n=<span class="dv">0</span>; n &lt; nRuns; ++n)
   {
     std::vector&lt;<span class="dt">int</span>&gt; unsorted(input);
-    <span class="dt">auto</span> start = clock();
-    qsort(unsorted, <span class="dv">0</span>, unsorted.size()-<span class="dv">1</span>);
-    <span class="dt">auto</span> end = clock();
-    printf(<span class="st">&quot;%11.9f</span><span class="ch">\n</span><span class="st">&quot;</span>, ((<span class="dt">double</span>) (end-start)) / CLOCKS_PER_SEC);
+    <span class="kw">auto</span> start = clock();
+    qsort(unsorted, <span class="dv">0</span>, unsorted.size()<span class="dv">-1</span>);
+    <span class="kw">auto</span> end = clock();
+    printf(<span class="st">&quot;</span><span class="ch">%11.9f\n</span><span class="st">&quot;</span>, ((<span class="dt">double</span>) (end-start)) / CLOCKS_PER_SEC);
   }
   <span class="kw">return</span> <span class="dv">0</span>;
 }</code></pre>
@@ -1059,9 +1439,9 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 </dl>
 <h2 id="some-possible-solutions">Some Possible Solutions</h2>
 <h3 id="finite-state-machines">Finite-State Machines</h3>
-<p><a href="http://en.wikipedia.org/wiki/Finite_state_machine" title="Wikipedia: Finite State Machines">Finite-state machines</a> are sometimes<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup><sup>,</sup><sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup> suggested for this task. Finite-state machines are well understood, easy to draw and are able to model all processes which only have a, well, finite number of states. On a high level, this should include all sensible business processes. However, once we include storing and modifying arbitrary data in our application, we are clearly out of finite-state machine territory. Therefore, to describe <em>all</em> of the business logic we will clearly need some extension to finite state machines. If that extension is <em>ad-hoc</em> then we might lose the benefits that finite-state machines provide in the first place.</p>
+<p><a href="http://en.wikipedia.org/wiki/Finite_state_machine" title="Wikipedia: Finite State Machines">Finite-state machines</a> are sometimes<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a><sup>,</sup><a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> suggested for this task. Finite-state machines are well understood, easy to draw and are able to model all processes which only have a, well, finite number of states. On a high level, this should include all sensible business processes. However, once we include storing and modifying arbitrary data in our application, we are clearly out of finite-state machine territory. Therefore, to describe <em>all</em> of the business logic we will clearly need some extension to finite state machines. If that extension is <em>ad-hoc</em> then we might lose the benefits that finite-state machines provide in the first place.</p>
 <h3 id="workflow-languages">Workflow Languages</h3>
-<p>There are also a large number of workflow languages, many of which are found in some enterprise software vendors packages.<sup><a href="#fn3" class="footnoteRef" id="fnref3">3</a></sup><sup>,</sup><sup><a href="#fn4" class="footnoteRef" id="fnref4">4</a></sup> To me the most interesting are the <em>Business Process Modell and Notation</em><sup><a href="#fn5" class="footnoteRef" id="fnref5">5</a></sup> and the <em>Yet Another Workflow Language</em><sup><a href="#fn6" class="footnoteRef" id="fnref6">6</a></sup> which was created by Arthur ter Hofstede, an academic how studies the field and has written an influential review paper.<sup><a href="#fn7" class="footnoteRef" id="fnref7">7</a></sup> These languages seem interesting and have clearly some industry weight behind them, it seems fairly difficult to find good introductory material on them that is not (a) a 1000-page tome of a standard or (b) some software vendors sales pitch documents. Some of these languages also have problems, for example there seems to be no general unambiguous way to translate BPMN into a program.<sup><a href="#fn8" class="footnoteRef" id="fnref8">8</a></sup></p>
+<p>There are also a large number of workflow languages, many of which are found in some enterprise software vendors packages.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a><sup>,</sup><a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> To me the most interesting are the <em>Business Process Modell and Notation</em><a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a> and the <em>Yet Another Workflow Language</em><a href="#fn6" class="footnoteRef" id="fnref6"><sup>6</sup></a> which was created by Arthur ter Hofstede, an academic how studies the field and has written an influential review paper.<a href="#fn7" class="footnoteRef" id="fnref7"><sup>7</sup></a> These languages seem interesting and have clearly some industry weight behind them, it seems fairly difficult to find good introductory material on them that is not (a) a 1000-page tome of a standard or (b) some software vendors sales pitch documents. Some of these languages also have problems, for example there seems to be no general unambiguous way to translate BPMN into a program.<a href="#fn8" class="footnoteRef" id="fnref8"><sup>8</sup></a></p>
 <p>Overall, I am a little disappointed with the quality of the introductory information that I have found so far. The most promising document seems to be the review paper by ter Hofstede and the YAWL language.</p>
 <h3 id="a-process-dsl">A Process DSL</h3>
 <p>What we have done at work is that we have basically defined an expression language that is a C++ DSL. With this language you can write expressions such as</p>
@@ -1128,7 +1508,7 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 <li><p><a href="http://coq.inria.fr">Coq</a> is the 800-pound Gorilla in dependent type land. Coq is first and foremost a theorem prover, but at its heart sits a dependently typed language called Gallina, which itself is an extensions of the <em>calculus of indicutive constructions</em>.</p></li>
 <li><p><a href="http://wiki.portal.chalmers.se/agda/">Agda</a> is also a theorem prover based on the <em>intuitionistic type theory</em> develop by Martin-Löf. The syntax is heavily influenced by Haskell (as opposed to Coq whose syntax closer to ML). A major difference between Agda and Coq is that Agda has no tactics language for proving theorems.</p></li>
 <li><p><a href="http://idris-lang.org/">Idris</a> is the new kid on the block, having appeared only in 2011. It is also heavily influenced by Haskell (the <a href="http://www.cs.st-andrews.ac.uk/~eb/drafts/impldtp.pdf">introducing paper</a> asked the question <em>“What if Haskell had full dependent types?”</em> ). It differs from Coq and Agda in that it is not described as a theorem prover but as a general programming language. Indeed, functions must be annotated if one wants them to be checked for totality. This is a kind of escape hatch that will make developing regular programs easier in Idris. While it has (appart from dependent types) a lot in common with Haskell, it defaults to eager evaluation (with optional lazy evaluation available with special annotations).</p></li>
-<li><p><a href="http://www.ats-lang.org/">ATS</a> (which stands for <em>applied type system</em>) looks like a fusion of C and ML with dependent types thrown in for good measure. I am not really sure what to think of this language but at first sight it feels very different from the other ones listed here. What makes this language really interesting is that it is intended for systems programming, i.e. for the domain where one would usually use C or C++. I think this is great because those two have very little competition in their fields.<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> Furthermore, when programming in C it is so easy to make mistakes that the dependent types and linear types that ATS has could be a real boon. That said, from my very limited impression the language seems a bit messy and therefore I think it is not the best place to start learning about dependent types.</p></li>
+<li><p><a href="http://www.ats-lang.org/">ATS</a> (which stands for <em>applied type system</em>) looks like a fusion of C and ML with dependent types thrown in for good measure. I am not really sure what to think of this language but at first sight it feels very different from the other ones listed here. What makes this language really interesting is that it is intended for systems programming, i.e. for the domain where one would usually use C or C++. I think this is great because those two have very little competition in their fields.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> Furthermore, when programming in C it is so easy to make mistakes that the dependent types and linear types that ATS has could be a real boon. That said, from my very limited impression the language seems a bit messy and therefore I think it is not the best place to start learning about dependent types.</p></li>
 </ul>
 <h3 id="books-and-papers">Books and Papers</h3>
 <p>There are also a few books that have come out recently-ish that make dependently typed languages (primarily Coq) much more accessible. This is of course of huge importance to an autodidact like me.</p>
@@ -1138,7 +1518,7 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 <li><p><a href="http://www.cis.upenn.edu/~bcpierce/tapl/">Types and programming languages</a> by Benjamin Pierce. This book is not really on dependent types but introduces the foundations for programming language theory such as the typing rules, operational semantics, the (simply typed) lambda calculus, subtyping and a few more. I’ve meant to read it completely but I am stuck half way. It is certainly a very accessible book and a fun read.</p></li>
 <li><p><a href="http://people.cs.uu.nl/andres/LambdaPi/LambdaPi.pdf">A tutorial implmentation of a dependently typed lambda calculus</a> by Andres Löh et al. I am not sure if I can give you a better summary than the title. Doesn’t it just make you want to read the paper?</p></li>
 <li><p><a href="https://en.wikipedia.org/wiki/Intuitionistic_type_theory">Martin Löf’s type theory</a> is the foundation for Agda. I think learning the theory might not acutally be necessary for a working understanding of dependent types and to get an idea of what you can do with them, but it would sure be nice to know more about the foundations.</p></li>
-<li><p><a href="http://homotopytypetheory.org/">HoTT</a> or <em>Homotopy Type Theory</em> refers to a new interpretation of Martin-Löf’s system of intensional, constructive type theory into abstract homotopy theory. The book’s authors believe that univalent foundations will eventually become a viable alternative to set theory as the “implicit foundation” for the unformalized mathematics done by most mathematicians.<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup> I am not sure I’ll ever make it this far, but it seems like a very interesting theory. Advanced Haskellers seem to get a lot out of category theory, maybe the same will be said for HoTT and dependent types.</p></li>
+<li><p><a href="http://homotopytypetheory.org/">HoTT</a> or <em>Homotopy Type Theory</em> refers to a new interpretation of Martin-Löf’s system of intensional, constructive type theory into abstract homotopy theory. The book’s authors believe that univalent foundations will eventually become a viable alternative to set theory as the “implicit foundation” for the unformalized mathematics done by most mathematicians.<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> I am not sure I’ll ever make it this far, but it seems like a very interesting theory. Advanced Haskellers seem to get a lot out of category theory, maybe the same will be said for HoTT and dependent types.</p></li>
 </ul>
 <h3 id="videos">Videos</h3>
 <p>There are also a few videos and screencasts which revolve around dependent types or some programming language that features dependent types. First of all there is a four day course on Idris with <a href="http://www.idris-lang.org/dependently-typed-functional-programming-with-idris-course-videos-and-slides/">videos and excercises</a> held by the creator of Idris Edwin Brady. I have found the video and the excercises to be a good way to get started with Idris. There is also an introduction to Agda with <a href="https://www.youtube.com/playlist?list=PL44F162A8B8CB7C87">nine lectures</a> by Conner McBride.</p>
@@ -1176,8 +1556,8 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 
 <p>I really like Haskell. But why? In this post I try to articulate why I like this language so much and why I think it would be worth most programmers’ while to learn it. None of this is new, but I want to express my own view in my own words. I write this in part to clarify my thinking and in part to improve my ability to articulate these points.</p>
 <p>Many of my arguments apply to other strongly typed functional programming languages. I just happen to know Haskell much better than any of the other ones and thus I am focussing on Haskell.</p>
-<h2 id="purity-is-good-for-yousimon-peyton-jones-escape-from-the-ivory-tower-the-haskell-journey-from-1990-to-2011.">Purity is good for you<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup></h2>
-<p>When I first started to learn Haskell purity<sup><a href="#fn2" class="footnoteRef" id="fnref2">2</a></sup> seemed like a crazy concept. Programming by modifying some kind of state and interacting with the ‘real world’ is so ingrained in mainstream programming languages that it is hard to imagine how you can get anything done without it. Ironically, after having programmed in Haskell for a while, impure languages now make my toenails curl. <em>What do you mean, I have to look <strong>at the function body</strong> to find out if it writes to a file, makes calls over the network, or talks to the database? That is <strong>insane</strong>!</em></p>
+<h2 id="purity-is-good-for-you">Purity is good for you<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a></h2>
+<p>When I first started to learn Haskell purity<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> seemed like a crazy concept. Programming by modifying some kind of state and interacting with the ‘real world’ is so ingrained in mainstream programming languages that it is hard to imagine how you can get anything done without it. Ironically, after having programmed in Haskell for a while, impure languages now make my toenails curl. <em>What do you mean, I have to look <strong>at the function body</strong> to find out if it writes to a file, makes calls over the network, or talks to the database? That is <strong>insane</strong>!</em></p>
 <p>The beauty of Haskell’s way of dealing with pure and impure functions is that you can tell from the type signature what a function is and isn’t allowed to do. You can still do all those impure calls-over-the-network and array-update-in-place things that regular languages allow you to do, but you have to tell everyone about it in your function’s type signature.</p>
 <p>This, and the Haskell community, pushes you to make your program as pure as possible. I have found that this has huge benefits: Pure functions are easy to understand: just by the name and type signature it is usually obvious what a function does. When you do inspect a function’s body you don’t have to keep track of what state the world is in right now (or all the states that it could theoretically be in), its behavior only depends on your input parameters. As a result, this makes programs (large parts of which are now pure functions) much easier to understand. In fact, I find that one of the hardest things about understanding programs is to keep track of state. This burden is hugely reduced in the pure part of your code.</p>
 <p>Purity makes testing a breeze. Most of the time the hard part about writing tests is to construct the state where the tests should run, verify it was changed in the intended ways, and clean up afterwards. Worse, the code you want to test could depend on a global state that you can’t modify easily, such as the system time or the random number generator. If you have pure functions, you just pass in the arguments and check the result. Testing becomes much easier.</p>
@@ -1186,10 +1566,10 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 <p>You can, of course, try to reap most of those benefits by discipline, e.g. by trying to minimize state whenever possible and to make as many functions pure as possible. In fact, doing that is probably the way in which Haskell has most changed how I write code in other languages. I now strive to minimize the amount of code that causes side effects wherever possible. Alas, I find that the type system really makes a difference here: when you have to inspect each and every function to find out (or recall) if it is pure or not, the benefit of writing pure functions is significantly reduced. I also find that other languages are lacking the <em>cultural</em> aspect of seeing state as bad and striving for purity. So you have ‘time()’, ‘random()’ and calls to the outside world all over the place. It might seem easier at first, but more often than not, it will come back to bite you. Purity has had such a profound impact on me that I cannot imagine that I will ever call a language that does not have control over effects in the type system my favorite programming language.</p>
 <h2 id="terse-syntax">Terse syntax</h2>
 <p>Haskell is a pretty terse language. When you compare the amount of code you have to write to get typical tasks done it is usually right up there with Python, Ruby, Clojure and the likes. And this is the case even though Haskell has a strong static type system which in mainstream languages is often associated with verbosity. I do not consider syntax to be all that important, but not having to read or write huge amounts of boilerplate is definitely a plus.</p>
-<h2 id="believe-the-typeproudly-stolen-from-learn-you-a-haskell.">Believe the Type!<sup><a href="#fn3" class="footnoteRef" id="fnref3">3</a></sup></h2>
+<h2 id="believe-the-type">Believe the Type!<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a></h2>
 <p>Haskell is often lauded for its strong type system and rightly so. But what does having a strong type system mean? Why is Haskell’s type system <em>stronger</em> than Java’s, C++’s or that of other languages that are considered to have a strong static type system?</p>
 <h3 id="more-precision">More precision</h3>
-<p>Haskell’s type system is stronger than that of many other languages because it is more precise: you can distinguish more things based on their type. A prime example of this is the null reference or pointer present in many languages. A null pointer is fundamentally type-unsafe: If the pointer is null most operations that you could usually do with the pointer will be invalid, and <em>the compiler is going to do zilch about you doing it in error</em>. Many people, including its inventor,<sup><a href="#fn4" class="footnoteRef" id="fnref4">4</a></sup> consider null references a mistake, yet they persist in all mainstream languages.</p>
+<p>Haskell’s type system is stronger than that of many other languages because it is more precise: you can distinguish more things based on their type. A prime example of this is the null reference or pointer present in many languages. A null pointer is fundamentally type-unsafe: If the pointer is null most operations that you could usually do with the pointer will be invalid, and <em>the compiler is going to do zilch about you doing it in error</em>. Many people, including its inventor,<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> consider null references a mistake, yet they persist in all mainstream languages.</p>
 <p>This is an example where more type safety actively eliminates a class of errors which are hard to get rid off in other languages. In general, the more things that can be expressed and checked at compile time, the more errors you will be able to rule out before ever running your program.</p>
 <h3 id="sum-types">Sum types</h3>
 <p>The previous example with null pointers is actually part of a bigger concept which is usually referred to as <em>sum types</em> or <em>tagged unions</em>. The idea is that values of a certain type can have several forms, based on what state they are in. Most languages don’t have support for sum types, yet they are a very powerful concept. They allow you to rule out many things that should be impossible at the type level, giving you more precise types.</p>
@@ -1224,7 +1604,7 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
                            ,<span class="ot"> authCode ::</span> <span class="dt">String</span> }</code></pre>
 <p>The Haskell representation of the transaction can have one of three states each of which carries the data relevant for this state (the example also reveals one of Haskell’s weak points, namely that the accessors of a record cannot have the same name). This clearly communicates to any reader of the code what state must be present in each case and what is not going to be present. What is more, in a function using this data type, the compiler will check that you handled all the cases and you can’t even write a program that accesses data that is not available in a case. If you later have to add a case, the compiler will inform you of all the places where this case is not handled yet. This hugely helps you avoiding bugs.</p>
 <h3 id="compiler-checked-documentation">Compiler checked documentation</h3>
-<p>More precise types also communicate more to other programmers. Have you ever worked with code where you and your cocoders had the mutual understanding that a certain pointer or reference can never be null? That certain keys must be present in a map or that some string field in a struct will always be null if conditions X and Y hold? The problem with this knowledge is that it is implicit. Implicit knowledge is not enforced in interfaces, at best a comment will document it. Unfortunately comments are notorious for not being kept up to date with the code. Since it is not verified and does not affect the resulting program, it is all too easy to let comments and code diverge. Then the comments become actively misleading and therefore many have argued to use comments as sparingly as possible.<sup><a href="#fn5" class="footnoteRef" id="fnref5">5</a></sup></p>
+<p>More precise types also communicate more to other programmers. Have you ever worked with code where you and your cocoders had the mutual understanding that a certain pointer or reference can never be null? That certain keys must be present in a map or that some string field in a struct will always be null if conditions X and Y hold? The problem with this knowledge is that it is implicit. Implicit knowledge is not enforced in interfaces, at best a comment will document it. Unfortunately comments are notorious for not being kept up to date with the code. Since it is not verified and does not affect the resulting program, it is all too easy to let comments and code diverge. Then the comments become actively misleading and therefore many have argued to use comments as sparingly as possible.<a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a></p>
 <p>Yet conveying this kind of information is critically important when programming in teams. If certain invariants should hold then it is important that everyone understands this and thus it should be documented somewhere and checked somehow. What better place to do this than in the types? It clearly conveys the required information to the programmers and ’ye old compiler assures you that these invariants actually hold. If they are not, your code won’t compile and there are few incentives that work better on programmers.</p>
 <h3 id="encode-your-invariants-in-the-type-system">Encode your invariants in the type system</h3>
 <p>All the above points really harp on the same idea: it is better to <strong>encode your invariants in the type system</strong>. Doing so will move more knowledge into an area of the code that is easily seen and the compiler will be your alley in maintaining those invariants. A more powerful type system will allow you to do more of this, which is, all other things being equal, good.</p>
@@ -1269,48 +1649,6 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 ]]></description>
     <pubDate>Fri, 19 Jul 2013 00:00:00 UT</pubDate>
     <guid>http://paulkoerbitz.de/posts/Why-I-love-Haskell.html</guid>
-</item>
-<item>
-    <title>Sun / Oracle Grid Engine - Exclusive Host Access</title>
-    <link>http://paulkoerbitz.de/posts/2012-01-13-Sun-Oracle-Grind-Engine-Exclusive-Host-Access.html</link>
-    <description><![CDATA[<h1 class="title">Sun / Oracle Grid Engine - Exclusive Host Access</h1>
-
-<p class="date">written on January 13, 2012</p>
-
-<p>I am running a cluster on EC2 (with starcluster) and wanted my jobs to have exclusive access to nodes (i.e. only one job should run on one node at the time). I had to piece this together from different sources and now almost forgot about it again, so here it goes: First create a new parallel environment</p>
-<pre><code>$ qconf -ap your_pe_name</code></pre>
-<p>The ‘-ap’ stands for add parallel environment, see ‘qconf -help’ for a list of options. The following config file comes up, change slots to something big:</p>
-<pre><code>pe_name            your_pe_name
-slots              1024
-user_lists         NONE
-xuser_lists        NONE
-start_proc_args    /bin/true
-stop_proc_args     /bin/true
-allocation_rule    $pe_slots
-control_slaves     FALSE
-job_is_first_task  TRUE
-urgency_slots      min
-accounting_summary FALSE</code></pre>
-<p>Ok, so now you have created a new parallel environment. Let’s add it to a queue. Call</p>
-<pre><code>$ qconf -mq all.q</code></pre>
-<p>and add the name of your parallel environment (’your_pe_name’ above) to the section parallel environments. To submit a job using this parallel environment do</p>
-<pre><code>$ qsub -pe your_pe_name 4 ./your_job_file.sh</code></pre>
-<p>The newly submitted job will occupy 4 slots. Adjust so that it occupies all cores on the machine (if you have 8 cores use 8 instead of 4) and it should be the only job that gets run on a machine.</p>
-<hr />
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-]]></description>
-    <pubDate>Fri, 13 Jan 2012 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/2012-01-13-Sun-Oracle-Grind-Engine-Exclusive-Host-Access.html</guid>
 </item>
 
     </channel> 
