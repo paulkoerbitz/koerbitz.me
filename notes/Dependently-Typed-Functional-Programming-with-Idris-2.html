@@ -46,7 +46,7 @@ interpTy (<span class="dt">TyFun</span> s t) <span class="fu">=</span> interpTy 
 <h3 id="represent-variables-bound-by-lambdas-with-de-bruijn-indices">Represent variables bound by lambdas with <a href="https://en.wikipedia.org/wiki/De_Bruijn_index">de Bruijn indices</a></h3>
 <p>Names of variables are represented by how many binders ago they were defined:</p>
 <p>Example:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>λ</mi><mi>x</mi><mi>y</mi><mo>.</mo><mi>x</mi><mo>+</mo><mi>y</mi><mo>⇒</mo><mi>λ</mi><mi>x</mi><mi>y</mi><mo>.</mo><mn>1</mn><mo>+</mo><mn>0</mn></mrow></math></p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>λ</mi><mi>x</mi><mi>y</mi><mo>.</mo><mi>x</mi><mo>+</mo><mi>y</mi><mo accent="false">⇒</mo><mi>λ</mi><mi>x</mi><mi>y</mi><mo>.</mo><mn>1</mn><mo>+</mo><mn>0</mn></mrow></math></p>
 <p>Use a vector of type <code>Vect Ty n</code> to do this.</p>
 <pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="co">-- G contains the types of the local variables available in the context</span>
 using (<span class="dt">G</span> <span class="fu">:</span> <span class="dt">Vect</span> <span class="dt">Ty</span> n)  
@@ -66,7 +66,7 @@ using (<span class="dt">G</span> <span class="fu">:</span> <span class="dt">Vect
   ctxt <span class="fu">:</span> [<span class="dt">TyInt</span>, <span class="dt">TyBool</span>]
 
   env <span class="fu">:</span> <span class="dt">Env</span> ctxt
-  env <span class="fu">=</span> [<span class="dv">42</span>, <span class="kw">True</span>]
+  env <span class="fu">=</span> [<span class="dv">42</span>, <span class="dt">True</span>]
 
   isBool <span class="fu">:</span> <span class="dt">HasType</span> (fS fO) ctxt <span class="dt">TyBool</span>
   isBool <span class="fu">=</span> pop stop</code></pre>
@@ -127,11 +127,11 @@ interpFTy <span class="dt">FUnit</span>    <span class="fu">=</span> ()
 mkForeign <span class="fu">:</span> <span class="dt">Foreign</span> x <span class="ot">-&gt;</span> x
 
 <span class="co">-- Examples</span>
-<span class="fu">putStr</span> <span class="fu">:</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
-<span class="fu">putStr</span> x <span class="fu">=</span> mkForeign (<span class="dt">FFun</span> <span class="st">&quot;putStr&quot;</span> [<span class="dt">FString</span>] <span class="dt">FUnit</span>) x
+putStr <span class="fu">:</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
+putStr x <span class="fu">=</span> mkForeign (<span class="dt">FFun</span> <span class="st">&quot;putStr&quot;</span> [<span class="dt">FString</span>] <span class="dt">FUnit</span>) x
 
-<span class="fu">getChar</span> <span class="fu">:</span> <span class="dt">IO</span> <span class="dt">Char</span>
-<span class="fu">getChar</span> <span class="fu">=</span> mkForeign (<span class="dt">FFun</span> <span class="st">&quot;getChar&quot;</span> [] <span class="dt">FChar</span>)
+getChar <span class="fu">:</span> <span class="dt">IO</span> <span class="dt">Char</span>
+getChar <span class="fu">=</span> mkForeign (<span class="dt">FFun</span> <span class="st">&quot;getChar&quot;</span> [] <span class="dt">FChar</span>)
 
 <span class="kw">data</span> <span class="dt">File</span> <span class="fu">=</span> <span class="dt">FHandler</span> <span class="dt">Ptr</span>
 
@@ -140,7 +140,7 @@ do_fopen f m <span class="fu">=</span> mkForeign (<span class="dt">FFun</span> <
 
 openFile <span class="fu">:</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Mode</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> <span class="dt">File</span>
 openFile f m <span class="fu">=</span> fopen f (modeStr m) <span class="kw">where</span>
-  modeStr <span class="kw">Read</span>      <span class="fu">=</span> <span class="st">&quot;r&quot;</span>
+  modeStr <span class="dt">Read</span>      <span class="fu">=</span> <span class="st">&quot;r&quot;</span>
   modeStr <span class="dt">Write</span>     <span class="fu">=</span> <span class="st">&quot;w&quot;</span>
   modeStr <span class="dt">ReadWrite</span> <span class="fu">=</span> <span class="st">&quot;r+&quot;</span></code></pre>
 <hr />

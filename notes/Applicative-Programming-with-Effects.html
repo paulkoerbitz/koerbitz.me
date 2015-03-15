@@ -30,37 +30,37 @@
 
 <h2 id="examples">Examples</h2>
 <h3 id="sequencing-commands">Sequencing commands</h3>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="fu">sequence</span><span class="ot"> ::</span> [<span class="dt">IO</span> a] <span class="ot">-&gt;</span> <span class="dt">IO</span> [a]
-<span class="fu">sequence</span> []     <span class="fu">=</span> <span class="fu">return</span> []
-<span class="fu">sequence</span> (c<span class="fu">:</span>cs) <span class="fu">=</span> <span class="kw">do</span>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">sequence<span class="ot"> ::</span> [<span class="dt">IO</span> a] <span class="ot">-&gt;</span> <span class="dt">IO</span> [a]
+sequence []     <span class="fu">=</span> return []
+sequence (c<span class="fu">:</span>cs) <span class="fu">=</span> <span class="kw">do</span>
   x <span class="ot">&lt;-</span> c
-  xs <span class="ot">&lt;-</span> <span class="fu">sequence</span> cs
-  <span class="fu">return</span> (x<span class="fu">:</span>xs)</code></pre>
+  xs <span class="ot">&lt;-</span> sequence cs
+  return (x<span class="fu">:</span>xs)</code></pre>
 <p>The results of some effectful computations are collected and the <code>(:)</code> function is then applied to these results. The <strong>Monad</strong> type class provides such an affectful application: <code>ap</code>. With it we can define <code>sequence</code> more succinctly:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">ap ::</span> <span class="kw">Monad</span> m <span class="ot">=&gt;</span> m (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> m a <span class="ot">-&gt;</span> m b
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">ap ::</span> <span class="dt">Monad</span> m <span class="ot">=&gt;</span> m (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> m a <span class="ot">-&gt;</span> m b
 ap mf mx <span class="fu">=</span> <span class="kw">do</span>
   f <span class="ot">&lt;-</span> mf
   x <span class="ot">&lt;-</span> mx
-  <span class="fu">return</span> (f x)
+  return (f x)
 
-<span class="fu">sequence</span><span class="ot"> ::</span> [<span class="dt">IO</span> a] <span class="ot">-&gt;</span> <span class="dt">IO</span> [a]
-<span class="fu">sequence</span> []     <span class="fu">=</span> <span class="fu">return</span> []
-<span class="fu">sequence</span> (c<span class="fu">:</span>cs) <span class="fu">=</span> <span class="fu">return</span> (<span class="fu">:</span>) <span class="ot">`ap`</span> c <span class="ot">`ap`</span> <span class="fu">sequence</span> cs</code></pre>
+sequence<span class="ot"> ::</span> [<span class="dt">IO</span> a] <span class="ot">-&gt;</span> <span class="dt">IO</span> [a]
+sequence []     <span class="fu">=</span> return []
+sequence (c<span class="fu">:</span>cs) <span class="fu">=</span> return (<span class="fu">:</span>) <span class="ot">`ap`</span> c <span class="ot">`ap`</span> sequence cs</code></pre>
 <p>Except for the noise of the <code>return</code> and <code>ap</code> this looks similar to function application (even though effects are present). The authors call this <strong>applicative style</strong>.</p>
 <h3 id="zipwith">zipWith</h3>
 <p>The Haskell prelude <a href="http://hackage.haskell.org/packages/archive/base/latest/doc/html/Prelude.html#v:zipWith">provides the functions zipWith and zipWith3</a>. More generally, this can be defined as follows:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="fu">repeat</span><span class="ot"> ::</span> a <span class="ot">-&gt;</span> [a]
-<span class="fu">repeat</span> x <span class="fu">=</span> x <span class="fu">:</span> <span class="fu">repeat</span> x
+<pre class="sourceCode haskell"><code class="sourceCode haskell">repeat<span class="ot"> ::</span> a <span class="ot">-&gt;</span> [a]
+repeat x <span class="fu">=</span> x <span class="fu">:</span> repeat x
 
 <span class="ot">zapp ::</span> [a <span class="ot">-&gt;</span> b] <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [b]
 zapp (f<span class="fu">:</span>fs) (x<span class="fu">:</span>xs) <span class="fu">=</span> f x <span class="fu">:</span> zapp fs xs
 zapp _      _      <span class="fu">=</span> []
 
-<span class="fu">zipWith</span><span class="ot"> ::</span> (a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> c) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [b] <span class="ot">-&gt;</span> [c]
-<span class="fu">zipWith</span> f xs ys <span class="fu">=</span> <span class="fu">repeat</span> f <span class="ot">`zapp`</span> xs <span class="ot">`zapp`</span> ys
+zipWith<span class="ot"> ::</span> (a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> c) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [b] <span class="ot">-&gt;</span> [c]
+zipWith f xs ys <span class="fu">=</span> repeat f <span class="ot">`zapp`</span> xs <span class="ot">`zapp`</span> ys
 
-<span class="fu">zipWith3</span><span class="ot"> ::</span> (a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> c <span class="ot">-&gt;</span> d) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [b] <span class="ot">-&gt;</span> [c] <span class="ot">-&gt;</span> [d]
-<span class="fu">zipWith3</span> f xs ys zs <span class="fu">=</span> <span class="fu">repeat</span> f <span class="ot">`zapp`</span> xs <span class="ot">`zapp`</span> ys <span class="ot">`zapp`</span> zs</code></pre>
+zipWith3<span class="ot"> ::</span> (a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> c <span class="ot">-&gt;</span> d) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [b] <span class="ot">-&gt;</span> [c] <span class="ot">-&gt;</span> [d]
+zipWith3 f xs ys zs <span class="fu">=</span> repeat f <span class="ot">`zapp`</span> xs <span class="ot">`zapp`</span> ys <span class="ot">`zapp`</span> zs</code></pre>
 <p>Again, <code>repeat</code> and <code>zapp</code> add some noise, but otherwise this looks similar to function application, even though one is working with lists.</p>
 <h3 id="evaluating-expressions">Evaluating expressions</h3>
 <pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Exp</span> v <span class="fu">=</span> <span class="dt">Var</span> v
@@ -71,7 +71,7 @@ zapp _      _      <span class="fu">=</span> []
 eval (<span class="dt">Var</span> x)   env <span class="fu">=</span> fetch x env
 eval (<span class="dt">Val</span> i)   env <span class="fu">=</span> i
 eval (<span class="dt">Add</span> p q) env <span class="fu">=</span> eval env p <span class="fu">+</span> eval env q</code></pre>
-<p>Using the <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕂</mtext></mrow></math> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕊</mtext></mrow></math> combinators,<sup><a href="#fn1" class="footnoteRef" id="fnref1">1</a></sup> one can again obtain a form that looks similar to function application:</p>
+<p>Using the <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mstyle mathvariant="double-struck"><mi>𝕂</mi></mstyle></math> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mstyle mathvariant="double-struck"><mi>𝕊</mi></mstyle></math> combinators,<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> one can again obtain a form that looks similar to function application:</p>
 <pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">k ::</span> a <span class="ot">-&gt;</span> e <span class="ot">-&gt;</span> a
 k x env <span class="fu">=</span> x
 
@@ -86,12 +86,12 @@ eval (<span class="dt">Add</span> p q) <span class="fu">=</span> k (<span class=
 <p>The <strong>Applicative</strong> class abstracts what these examples of <em>pure function applied to funny arguments</em> have in common:</p>
 <pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">infixl</span> <span class="dv">4</span> <span class="fu">&lt;*&gt;</span>
 
-<span class="kw">class</span> <span class="kw">Applicative</span> f <span class="kw">where</span>
+<span class="kw">class</span> <span class="dt">Applicative</span> f <span class="kw">where</span>
 <span class="ot">  pure  ::</span> a <span class="ot">-&gt;</span> f a
 <span class="ot">  (&lt;*&gt;) ::</span> f (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> f a <span class="ot">-&gt;</span> f b</code></pre>
-<p>It generalizes the <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕂</mtext></mrow></math> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕊</mtext></mrow></math> combinators from threading an environment to threading an effect.</p>
+<p>It generalizes the <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mstyle mathvariant="double-struck"><mi>𝕂</mi></mstyle></math> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mstyle mathvariant="double-struck"><mi>𝕊</mi></mstyle></math> combinators from threading an environment to threading an effect.</p>
 <h3 id="applicative-laws">Applicative laws</h3>
-<pre class="sourceCode haskell"><code class="sourceCode haskell">             pure <span class="fu">id</span> <span class="fu">&lt;*&gt;</span> u <span class="fu">=</span> u                       <span class="co">-- identity</span>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">             pure id <span class="fu">&lt;*&gt;</span> u <span class="fu">=</span> u                       <span class="co">-- identity</span>
 pure (<span class="fu">.</span>) <span class="fu">&lt;*&gt;</span> u <span class="fu">&lt;*&gt;</span> v <span class="fu">&lt;*&gt;</span> w <span class="fu">=</span> u <span class="fu">&lt;*&gt;</span> (v <span class="fu">&lt;*&gt;</span> w)         <span class="co">-- composition</span>
          pure f <span class="fu">&lt;*&gt;</span> pure x <span class="fu">=</span> pure (f x)              <span class="co">-- homomorphism</span>
               u <span class="fu">&lt;*&gt;</span> pure x <span class="fu">=</span> pure (\f <span class="ot">-&gt;</span> f x) <span class="fu">&lt;*&gt;</span> u  <span class="co">-- interchange</span></code></pre>
@@ -104,7 +104,7 @@ pure (<span class="fu">.</span>) <span class="fu">&lt;*&gt;</span> u <span class
 <div class="footnotes">
 <hr />
 <ol>
-<li id="fn1"><p>For monads <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕂</mtext></mrow></math> is <em>return</em> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mtext mathvariant="double-struck">𝕊</mtext></mrow></math> is <em>ap</em>.<a href="#fnref1">↩</a></p></li>
+<li id="fn1"><p>For monads <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mstyle mathvariant="double-struck"><mi>𝕂</mi></mstyle></math> is <em>return</em> and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><mstyle mathvariant="double-struck"><mi>𝕊</mi></mstyle></math> is <em>ap</em>.<a href="#fnref1">↩</a></p></li>
 </ol>
 </div>
 <hr />

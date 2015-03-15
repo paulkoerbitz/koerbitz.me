@@ -39,7 +39,7 @@
   | <span class="dt">RbRed</span>
   | RbBlack<span class="kw">.</span>
 
-<span class="dt">Definition</span> flipColor (c:RbColor) : <span class="dt">RbColor</span> :=
+<span class="dt">Definition</span> flipColor (c:<span class="dt">RbColor</span>) : <span class="dt">RbColor</span> :=
   <span class="kw">match</span> c <span class="kw">with</span>
     | <span class="dt">RbRed</span> =&gt; <span class="dt">RbBlack</span>
     | <span class="dt">RbBlack</span> =&gt; <span class="dt">RbRed</span>
@@ -49,7 +49,7 @@
   | tip : <span class="dt">RbTree</span>
   | node : <span class="dt">RbColor</span> -&gt; nat -&gt; <span class="dt">RbTree</span> -&gt; <span class="dt">RbTree</span> -&gt; RbTree<span class="kw">.</span>
 
-<span class="dt">Fixpoint</span> rotLeft (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Fixpoint</span> rotLeft (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | tip =&gt; tip
     | node c n l r =&gt;
@@ -59,7 +59,7 @@
       end
   end.
 
-<span class="dt">Fixpoint</span> rotRight (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Fixpoint</span> rotRight (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | tip =&gt; tip
     | node c n l r =&gt;
@@ -69,32 +69,32 @@
       end
   end.
 
-<span class="dt">Definition</span> rightIsRed (t:RbTree) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> rightIsRed (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | node _ _ _ (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
     | _ =&gt; <span class="kw">false</span>
   end.
 
-<span class="dt">Definition</span> twoRedsOnLeft (t:RbTree) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> twoRedsOnLeft (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | node _ _ (node <span class="dt">RbRed</span> _ (node <span class="dt">RbRed</span> _ _ _) _) _ =&gt; <span class="kw">true</span>
     | _ =&gt; <span class="kw">false</span>
   end.
 
-<span class="dt">Definition</span> balanceR (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Definition</span> balanceR (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">if</span> twoRedsOnLeft t <span class="kw">then</span> rotRight t <span class="kw">else</span> t.
 
-<span class="dt">Definition</span> balanceL (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Definition</span> balanceL (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">if</span> rightIsRed t <span class="kw">then</span> rotLeft t <span class="kw">else</span> t.
 
-<span class="dt">Definition</span> bothLeftAndRightAreRed (t:RbTree) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> bothLeftAndRightAreRed (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | node _ _ (node <span class="dt">RbRed</span> _ _ _) (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
     | _ =&gt; <span class="kw">false</span>
   end.
 
 <span class="co">(* these evidence carrying booleans would be nice here *)</span>
-<span class="dt">Definition</span> flipColors (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Definition</span> flipColors (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> ln ll lr) (node <span class="dt">RbRed</span> rn rl rr) =&gt; node <span class="dt">RbRed</span> n (node <span class="dt">RbBlack</span> ln ll lr) (node <span class="dt">RbBlack</span> rn rl rr)
     | _ =&gt; t
@@ -113,7 +113,7 @@
   <span class="kw">if</span> beq_nat n m <span class="kw">then</span> <span class="dt">EQ</span> <span class="kw">else</span>
     <span class="kw">if</span> ble_nat n m <span class="kw">then</span> <span class="dt">LT</span> <span class="kw">else</span> GT<span class="kw">.</span>
 
-<span class="dt">Fixpoint</span> insert (nn:nat) (t:RbTree) : <span class="dt">RbTree</span> :=
+<span class="dt">Fixpoint</span> insert (nn:nat) (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
   <span class="kw">match</span> t <span class="kw">with</span>
     | tip =&gt; node <span class="dt">RbBlack</span> nn tip tip
     | node c n l r =&gt;
@@ -142,18 +142,18 @@
     | node _ n l r =&gt; andb (andb (rbForall f l) (f n)) (rbForall f r)
   end.
 
-<span class="dt">Definition</span> gtTree (t:RbTree) (m:nat)  : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> gtTree (t:<span class="dt">RbTree</span>) (m:nat)  : <span class="dt">bool</span> :=
   rbForall (bgt_nat m) t.
 
-<span class="dt">Definition</span> ltTree (t:RbTree) (m:nat) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> ltTree (t:<span class="dt">RbTree</span>) (m:nat) : <span class="dt">bool</span> :=
   rbForall (blt_nat m) t.
 
 <span class="dt">Theorem</span> excluded_middle :
-  forall <span class="dt">P:Prop</span>, <span class="dt">P</span> \/ ~ P<span class="kw">.</span>
+  forall <span class="dt">P</span>:<span class="dt">Prop</span>, <span class="dt">P</span> \/ ~ P<span class="kw">.</span>
 Proof<span class="kw">.</span>
 Admitted<span class="kw">.</span>
 
-<span class="dt">Lemma</span> unflipable : forall (t:RbTree),
+<span class="dt">Lemma</span> unflipable : forall (t:<span class="dt">RbTree</span>),
   ~flipable t -&gt; flipColors t = t.
 Proof<span class="kw">.</span>
   intros.
@@ -170,7 +170,7 @@ Proof<span class="kw">.</span>
   simpl. reflexivity.
 Qed<span class="kw">.</span>
 
-<span class="dt">Lemma</span> rbForall_flipColors : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+<span class="dt">Lemma</span> rbForall_flipColors : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
   rbForall f t = <span class="kw">true</span> -&gt; rbForall f (flipColors t) = <span class="kw">true</span>.
 Proof<span class="kw">.</span>
   intros. induction t.
@@ -181,17 +181,17 @@ Proof<span class="kw">.</span>
     apply unflipable. apply H1<span class="kw">.</span> rewrite H2<span class="kw">.</span> apply H<span class="kw">.</span>
 Qed<span class="kw">.</span>
 
-<span class="dt">Lemma</span> rbForall_balanceR : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+<span class="dt">Lemma</span> rbForall_balanceR : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
   rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceR t) = <span class="kw">true</span>.
 Proof<span class="kw">.</span>
 Admitted<span class="kw">.</span>
 
-<span class="dt">Lemma</span> rbForall_balanceL : forall (f : nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+<span class="dt">Lemma</span> rbForall_balanceL : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
   rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceL t) = <span class="kw">true</span>.
 Proof<span class="kw">.</span>
 Admitted<span class="kw">.</span>
 
-<span class="dt">Lemma</span> rbForall_insert : forall (n m:nat) (f : nat -&gt; nat -&gt; <span class="dt">bool</span>) (t:RbTree),
+<span class="dt">Lemma</span> rbForall_insert : forall (n m:nat) (f : nat -&gt; nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
   rbForall (f n) t = <span class="kw">true</span> -&gt; f n m = <span class="kw">true</span> -&gt; rbForall (f n) (insert m t) = <span class="kw">true</span>.
 Proof<span class="kw">.</span>
   intros. induction t.
@@ -209,7 +209,7 @@ Qed<span class="kw">.</span>
                gtTree l n = <span class="kw">true</span> -&gt; ltTree r n = <span class="kw">true</span> -&gt;
                rbOrdered (node c n l r).
 
-<span class="dt">Lemma</span> flipColor_keeps_order : forall (n:nat) (c:RbColor) (l r : <span class="dt">RbTree</span>),
+<span class="dt">Lemma</span> flipColor_keeps_order : forall (n:nat) (c:<span class="dt">RbColor</span>) (l r : <span class="dt">RbTree</span>),
   rbOrdered (node c n l r) -&gt; rbOrdered (node (flipColor c) n l r).
 Proof<span class="kw">.</span>
   intros. inversion H<span class="kw">.</span> apply O_Cons<span class="kw">.</span> assumption. assumption. assumption. assumption.
@@ -259,7 +259,7 @@ Proof<span class="kw">.</span>
       apply rbForall_insert. apply H1<span class="kw">.</span>
       <span class="co">(* cmp n n0 = LT -&gt; bgt_nat n0 n = true *)</span> admit.
       assumption.
-    <span class="dt">SCase</span> <span class="st">&quot;n = n0&quot;</span>. simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span> apply <span class="dt">O_Cons;</span> assumption.
+    <span class="dt">SCase</span> <span class="st">&quot;n = n0&quot;</span>. simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span> apply <span class="dt">O_Cons</span>; assumption.
     <span class="dt">SCase</span> <span class="st">&quot;n &gt; n0&quot;</span>.
       simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span>
       apply flipColors_keeps_order. apply balanceL_keeps_order. apply O_Cons<span class="kw">.</span> assumption. assumption. assumption.

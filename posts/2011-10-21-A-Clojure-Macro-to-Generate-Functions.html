@@ -28,7 +28,7 @@
 
 <p class="date">written on October 21, 2011</p>
 
-<p>Prompted by <a href title="http://stackoverflow.com/q/7852351/346587">this question</a> on Stackoverflow I thought a little bit about macros that generate functions. Here is what I came up with:</p>
+<p>Prompted by <a href="&quot;http://stackoverflow.com/q/7852351/346587&quot;">this question</a> on Stackoverflow I thought a little bit about macros that generate functions. Here is what I came up with:</p>
 <pre class="sourceCode Clojure"><code class="sourceCode clojure">(<span class="kw">defmacro</span><span class="fu"> make-placeholders </span>[n]
   `(<span class="kw">map</span> <span class="kw">eval</span>
         '<span class="kw">~(for</span> [cntr (<span class="kw">range</span> <span class="dv">0</span> n)]

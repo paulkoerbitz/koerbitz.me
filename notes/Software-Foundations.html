@@ -31,16 +31,16 @@
 <h1 id="polymorphisim-and-higher-order-functions">Polymorphisim and Higher-Order Functions</h1>
 <h3 id="polymorphic-lists">Polymorphic Lists</h3>
 <p>Functions and types can be made (parametrically) polymorphic by passing the type as an argument. For example:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">list</span> (<span class="dt">X:Type</span>) : <span class="dt">Type</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">list</span> (<span class="dt">X</span>:<span class="dt">Type</span>) : <span class="dt">Type</span> :=
   | nil : <span class="dt">list</span> <span class="dt">X</span>
   | cons : <span class="dt">X</span> -&gt; <span class="dt">list</span> <span class="dt">X</span> -&gt; <span class="dt">list</span> X<span class="kw">.</span></code></pre>
 <p>However, it is of course quite cumbersome to do this manually all the time. Arguments can be declared implicit as follows:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Implicit</span> <span class="dt">Arguments</span> nil [[X]]<span class="kw">.</span>
-<span class="dt">Implicit</span> <span class="dt">Arguments</span> cons [[X]]<span class="kw">.</span></code></pre>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Implicit</span> <span class="dt">Arguments</span> nil [[<span class="dt">X</span>]].
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> cons [[<span class="dt">X</span>]].</code></pre>
 <p>Alternatively one can declare arguments as implicit when defining a function or type by surrounding them with curly braces:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> length {<span class="dt">X:Type</span>} (l:list <span class="dt">X</span>) : nat :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> length {<span class="dt">X</span>:<span class="dt">Type</span>} (l:<span class="dt">list</span> <span class="dt">X</span>) : nat :=
   <span class="kw">match</span> l <span class="kw">with</span>
-  | nil =&gt; 0
+  | nil =&gt; <span class="dv">0</span>
   | cons h t =&gt; <span class="dt">S</span> (length t)
   end.</code></pre>
 <p>When arguments are defined implicitly, sometimes the type needs to be specified when using them</p>
@@ -49,36 +49,36 @@
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> emptyList2 := @nil nat.</code></pre>
 <p>With these implicit arguments in place one can define more convenient syntax:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Notation</span> <span class="st">&quot;x :: y&quot;</span> := (cons x y)
-                     (at level 60, right associativity).
+                     (at level <span class="dv">60</span>, right associativity).
 <span class="dt">Notation</span> <span class="st">&quot;[ ]&quot;</span> := nil.
 <span class="dt">Notation</span> <span class="st">&quot;[x , .. , y ]&quot;</span> := (cons x .. (cons y []) ..).</code></pre>
 <p>allowing</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> myList := [1, 2, 3].</code></pre>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> myList := [<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>].</code></pre>
 <h3 id="polymorphic-pairs">Polymorphic Pairs</h3>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> prod (<span class="dt">X</span> <span class="dt">Y</span> : <span class="dt">Type</span>) : <span class="dt">Type</span> :=
   pair : <span class="dt">X</span> -&gt; <span class="dt">Y</span> -&gt; prod <span class="dt">X</span> Y<span class="kw">.</span>
-<span class="dt">Implicit</span> <span class="dt">Arguments</span> pair [[<span class="dt">X]</span> [Y]]<span class="kw">.</span></code></pre>
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> pair [[<span class="dt">X</span>] [<span class="dt">Y</span>]].</code></pre>
 <p>Again we can define notation to make this more convenient</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Notation</span> <span class="st">&quot;( x , y )&quot;</span> := (pair x y).
 <span class="dt">Notation</span> <span class="st">&quot;X * Y&quot;</span> := (prod <span class="dt">X</span> <span class="dt">Y</span>) : type_scope.</code></pre>
 <p><code>: type_scope</code> tells Coq that this notation should be applied when parsing types, not code.</p>
 <h3 id="polymorphic-options">Polymorphic Options</h3>
 <p>These can be defined much like expected</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">option</span> (<span class="dt">X:Type</span>) : <span class="dt">Type</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">option</span> (<span class="dt">X</span>:<span class="dt">Type</span>) : <span class="dt">Type</span> :=
   | <span class="dt">Some</span> : <span class="dt">X</span> -&gt; <span class="dt">option</span> <span class="dt">X</span>
   | <span class="dt">None</span> : <span class="dt">option</span> X<span class="kw">.</span>
 
-<span class="dt">Implicit</span> <span class="dt">Arguments</span> <span class="dt">Some</span> [[X]]<span class="kw">.</span>
-<span class="dt">Implicit</span> <span class="dt">Arguments</span> <span class="dt">None</span> [[X]]<span class="kw">.</span></code></pre>
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> <span class="dt">Some</span> [[<span class="dt">X</span>]].
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> <span class="dt">None</span> [[<span class="dt">X</span>]].</code></pre>
 <h3 id="functions-as-data">Functions as Data</h3>
 <p>Functions can be passed to other functions like so:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> thrice {<span class="dt">X:Type</span>} (f:X-&gt;X) (n:X) : <span class="dt">X</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> thrice {<span class="dt">X</span>:<span class="dt">Type</span>} (f:<span class="dt">X</span>-&gt;<span class="dt">X</span>) (n:<span class="dt">X</span>) : <span class="dt">X</span> :=
   f (f (f n)).</code></pre>
 <h3 id="partial-application">Partial application</h3>
 <p>Currying seems to work like in Haskell:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> plus3 := plus 3.</code></pre>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> plus3 := plus <span class="fl">3.</span></code></pre>
 <h3 id="anonymous-functions">Anonymous functions</h3>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> filter {<span class="dt">X:Type</span>} (f:X-&gt;bool) (l:list <span class="dt">X</span>) : <span class="dt">list</span> <span class="dt">X</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> filter {<span class="dt">X</span>:<span class="dt">Type</span>} (f:<span class="dt">X</span>-&gt;<span class="dt">bool</span>) (l:<span class="dt">list</span> <span class="dt">X</span>) : <span class="dt">list</span> <span class="dt">X</span> :=
   <span class="kw">match</span> l <span class="kw">with</span>
   | []    =&gt; []
   | x::xs =&gt; <span class="kw">if</span> (f x) <span class="kw">then</span> x :: (filter f xs)
@@ -86,7 +86,7 @@
   end.
 
 <span class="dt">Example</span> test_filter :
-  filter (<span class="kw">fun</span> x =&gt; evenb x) [1,2,3,4,5,6] = [2,4,6].
+  filter (<span class="kw">fun</span> x =&gt; evenb x) [<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">5</span>,<span class="dv">6</span>] = [<span class="dv">2</span>,<span class="dv">4</span>,<span class="dv">6</span>].
 Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code></pre>
 <p>This excercise gave me a hard time. I think mostly it was because I believed that induction on <em>snoc</em> would be hard and that I went about it the wrong way at first. The key was to define the extra lemma <em>map_snoc</em>, which was actually quite easy in the end.</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="co">(** Show that [map] and [rev] commute.  You may need to define an</span>
@@ -108,12 +108,12 @@ Proof<span class="kw">.</span>
 Qed<span class="kw">.</span></code></pre>
 <h3 id="non-uniform-inductive-families-gadts">Non-Uniform Inductive Families (GADTs)</h3>
 <p>Length-indexed lists.</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> llist (<span class="dt">X:Type</span>) : nat -&gt; <span class="dt">Type</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> llist (<span class="dt">X</span>:<span class="dt">Type</span>) : nat -&gt; <span class="dt">Type</span> :=
   lnil  : llist <span class="dt">X</span> <span class="dt">O</span>
 | lcons : forall n, <span class="dt">X</span> -&gt; llist <span class="dt">X</span> n -&gt; llist <span class="dt">X</span> (<span class="dt">S</span> n).
 
-<span class="dt">Implicit</span> <span class="dt">Arguments</span> lnil [[X]]<span class="kw">.</span>
-<span class="dt">Implicit</span> <span class="dt">Arguments</span> lcons [[<span class="dt">X]</span> [n]].</code></pre>
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> lnil [[<span class="dt">X</span>]].
+<span class="dt">Implicit</span> <span class="dt">Arguments</span> lcons [[<span class="dt">X</span>] [n]].</code></pre>
 <hr />
 <h1 id="more-about-coq">More about Coq</h1>
 <h2 id="the-rewrite-tactic">The rewrite tactic</h2>
@@ -148,7 +148,7 @@ H : true = beq_nat n 5
 <p>In contrast to <code>rewrite</code> <code>apply</code> works with whole equations (both lhs and rhs) and also works with facts that are implications (like eq2 in the example above). The fact that is <code>apply</code>ied must match the goal exactly. In situations where these two restrictions do not apply both tactics can be used. <code>apply</code> has <code>simpl</code> built in, so can save an additional call to <code>simpl</code> and also to <code>reflexivity</code>.</p>
 <h2 id="the-unfold-tactic">The unfold tactic</h2>
 <p>Sometimes Coq doesn’t expand a function call into its definition. This is a feature (if it always would, then the goals would become too big and cumbersome. <code>unfold functionname</code> expands the definition of the function in the proof goal.</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> override_neq : forall {<span class="dt">X:Type</span>} x1 x2 k1 k2 (f : nat-&gt;X),
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> override_neq : forall {<span class="dt">X</span>:<span class="dt">Type</span>} x1 x2 k1 k2 (f : nat-&gt;<span class="dt">X</span>),
   f k1 = x1 -&gt;
   beq_nat k2 k1 = <span class="kw">false</span> -&gt;
   (override f k2 x2) k1 = x1.
@@ -171,7 +171,7 @@ Qed<span class="kw">.</span></code></pre>
 <p>An example of a contradiction:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> silly6 : forall (n : nat),
      <span class="dt">S</span> n = <span class="dt">O</span> -&gt;
-     2 + 2 = 5.
+     <span class="dv">2</span> + <span class="dv">2</span> = <span class="fl">5.</span>
 Proof<span class="kw">.</span>
   intros n contra. inversion contra.
 Qed<span class="kw">.</span></code></pre>
@@ -189,90 +189,90 @@ Qed<span class="kw">.</span></code></pre>
 <p>A short overview over the tactics we’ve seen so far. The ones with * have a variante with <em>in</em> which works on hypothesis.</p>
 <dl>
 <dt>intros</dt>
-<dd><p>Moves hypothesis and variables from the goal into the proof context.</p>
+<dd>Moves hypothesis and variables from the goal into the proof context.
 </dd>
 <dt>reflexivity</dt>
-<dd><p>Finish a proof by recognizing equality.</p>
+<dd>Finish a proof by recognizing equality.
 </dd>
 <dt>simpl*</dt>
-<dd><p>Apply a function definition in the goal or hypothesis.</p>
+<dd>Apply a function definition in the goal or hypothesis.
 </dd>
 <dt>compute*</dt>
-<dd><p>Similar to simpl, but more powerful (how exactly?)</p>
+<dd>Similar to simpl, but more powerful (how exactly?)
 </dd>
 <dt>destruct</dt>
-<dd><p>Do case analysis for a simple or compound expression.</p>
+<dd>Do case analysis for a simple or compound expression.
 </dd>
 <dt>induction</dt>
-<dd><p>Do induction over an inductive datatype.</p>
+<dd>Do induction over an inductive datatype.
 </dd>
 <dt>rewrite*</dt>
-<dd><p>Uses an equality from a hypothesis or previously proven theorem to replace part of the goal (or hypothesis). <code>rewrite ... -&gt; ...</code> replaces the LHS of a theorem with its RHS, <code>rewrite ... &lt;- ...</code> works the other way around.</p>
+<dd>Uses an equality from a hypothesis or previously proven theorem to replace part of the goal (or hypothesis). <code>rewrite ... -&gt; ...</code> replaces the LHS of a theorem with its RHS, <code>rewrite ... &lt;- ...</code> works the other way around.
 </dd>
 <dt>apply*</dt>
-<dd><p>Prove a goal with an hypothesis, theorem or constructor.</p>
+<dd>Prove a goal with an hypothesis, theorem or constructor.
 </dd>
 <dt>apply … with …</dt>
-<dd><p>Similar to <em>apply</em> but specifies the variables that cannot be determined by pattern matching explicitly.</p>
+<dd>Similar to <em>apply</em> but specifies the variables that cannot be determined by pattern matching explicitly.
 </dd>
 <dt>symmetry*</dt>
-<dd><p>Flip LHS and RHS of an equality in the goal or an hypothesis.</p>
+<dd>Flip LHS and RHS of an equality in the goal or an hypothesis.
 </dd>
 <dt>remember (e) as x</dt>
-<dd><p>Give a term another name (moves this to the hypothesis).</p>
+<dd>Give a term another name (moves this to the hypothesis).
 </dd>
 <dt>unfold*</dt>
-<dd><p>Replace a defined constant by its right hand side (for example a function definition).</p>
+<dd>Replace a defined constant by its right hand side (for example a function definition).
 </dd>
 <dt>inversion</dt>
-<dd><p>Use the injectivity and disjointness of inductive datatypes. For <code>c a1 ... an = d b1 ... bm</code>, if <code>c</code> and <code>d</code> are equal it moves <code>a1 = b1</code>, …, <code>an = bm</code> to the hypothesis. If not then a contradiction is found (=&gt; anything could be proven) and the current goal is popped of the stack.</p>
+<dd>Use the injectivity and disjointness of inductive datatypes. For <code>c a1 ... an = d b1 ... bm</code>, if <code>c</code> and <code>d</code> are equal it moves <code>a1 = b1</code>, …, <code>an = bm</code> to the hypothesis. If not then a contradiction is found (=&gt; anything could be proven) and the current goal is popped of the stack.
 </dd>
 <dt>assert (e) as H</dt>
-<dd><p>introduce <em>e</em> as hypothesis <em>H</em> and adds it as additional goal.</p>
+<dd>introduce <em>e</em> as hypothesis <em>H</em> and adds it as additional goal.
 </dd>
 </dl>
 <h2 id="exercises">Exercises</h2>
 <ul>
 <li>If the type parameter is not marked as implicit, it must be provided to all constructors.</li>
 </ul>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> forallb {<span class="dt">X:Type</span>} (f:X-&gt;bool) (l:list <span class="dt">X</span>) : <span class="dt">bool</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> forallb {<span class="dt">X</span>:<span class="dt">Type</span>} (f:<span class="dt">X</span>-&gt;<span class="dt">bool</span>) (l:<span class="dt">list</span> <span class="dt">X</span>) : <span class="dt">bool</span> :=
   <span class="kw">match</span> l <span class="kw">with</span>
     | [] =&gt; <span class="kw">true</span>
     | h::t =&gt; andb (f h) (forallb f t)
   end.
 
-<span class="dt">Fixpoint</span> existsb {<span class="dt">X:Type</span>} (f:X-&gt;bool) (l:list <span class="dt">X</span>) : <span class="dt">bool</span> :=
+<span class="dt">Fixpoint</span> existsb {<span class="dt">X</span>:<span class="dt">Type</span>} (f:<span class="dt">X</span>-&gt;<span class="dt">bool</span>) (l:<span class="dt">list</span> <span class="dt">X</span>) : <span class="dt">bool</span> :=
   <span class="kw">match</span> l <span class="kw">with</span>
     | [] =&gt; <span class="kw">false</span>
     | h::t =&gt; orb (f h) (existsb f t)
   end.
 
-<span class="dt">Definition</span> existsb' {<span class="dt">X:Type</span>} (f:X-&gt;bool) (l:list <span class="dt">X</span>) : <span class="dt">bool</span> :=
+<span class="dt">Definition</span> existsb' {<span class="dt">X</span>:<span class="dt">Type</span>} (f:<span class="dt">X</span>-&gt;<span class="dt">bool</span>) (l:<span class="dt">list</span> <span class="dt">X</span>) : <span class="dt">bool</span> :=
   negb (forallb (<span class="kw">fun</span> x =&gt; negb (f x)) l).
 
-<span class="dt">Example</span> existb_alt_test : existsb' oddb [2,4,5] = <span class="kw">true</span>.
+<span class="dt">Example</span> existb_alt_test : existsb' oddb [<span class="dv">2</span>,<span class="dv">4</span>,<span class="dv">5</span>] = <span class="kw">true</span>.
 Proof<span class="kw">.</span> compute. reflexivity. Qed<span class="kw">.</span>
 
-<span class="dt">Example</span> existb_alt_test2 : existsb' oddb [2,4,6] = <span class="kw">false</span>.
+<span class="dt">Example</span> existb_alt_test2 : existsb' oddb [<span class="dv">2</span>,<span class="dv">4</span>,<span class="dv">6</span>] = <span class="kw">false</span>.
 Proof<span class="kw">.</span> compute. reflexivity. Qed<span class="kw">.</span>
 
 <span class="dt">Example</span> existb_alt_test3 : existsb' oddb [] = <span class="kw">false</span>.
 Proof<span class="kw">.</span> compute. reflexivity. Qed<span class="kw">.</span>
 
-<span class="dt">Theorem</span> andb_orb_negb: forall (x y:bool),
+<span class="dt">Theorem</span> andb_orb_negb: forall (x y:<span class="dt">bool</span>),
   orb x y = negb (andb (negb x) (negb y)).
 Proof<span class="kw">.</span>
   destruct x. destruct y. simpl. reflexivity. simpl. reflexivity.
   destruct y. simpl. reflexivity. simpl. reflexivity.
 Qed<span class="kw">.</span>
 
-<span class="dt">Theorem</span> negb_involutive: forall (x:bool),
+<span class="dt">Theorem</span> negb_involutive: forall (x:<span class="dt">bool</span>),
   negb (negb x) = x.
 Proof<span class="kw">.</span>
   destruct x. simpl. reflexivity. simpl. reflexivity.
 Qed<span class="kw">.</span>
 
-<span class="dt">Theorem</span> existsb_eq: forall (<span class="dt">X:Type</span>) (f:X-&gt;bool) (l:list <span class="dt">X</span>),
+<span class="dt">Theorem</span> existsb_eq: forall (<span class="dt">X</span>:<span class="dt">Type</span>) (f:<span class="dt">X</span>-&gt;<span class="dt">bool</span>) (l:<span class="dt">list</span> <span class="dt">X</span>),
   existsb' f l = existsb f l.
 Proof<span class="kw">.</span>
   intros <span class="dt">X</span> f l.
@@ -291,14 +291,14 @@ Qed<span class="kw">.</span></code></pre>
 <p>This is also described with inference rules. In these the <em>premises</em> are put above a line and the <em>conclusion</em> is put below a line.</p>
 <p>In Coq such properties can be defined as follows:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> beautiful : nat -&gt; <span class="dt">Prop</span> :=
-  b_0   : beautiful 0
-| b_3   : beautiful 3
-| b_5   : beautiful 5
+  b_0   : beautiful <span class="dv">0</span>
+| b_3   : beautiful <span class="dv">3</span>
+| b_5   : beautiful <span class="dv">5</span>
 | b_sum : forall n m, beautiful n -&gt; beautiful m -&gt; beautiful (n+m).</code></pre>
 <p>These rules can be <strong><em>applied</em></strong> to prove properties. The application of these rules is called <strong><em>evidence</em></strong>. For example:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> eight_is_beautiful: beautiful 8.
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> eight_is_beautiful: beautiful <span class="fl">8.</span>
 Proof<span class="kw">.</span>
-  apply b_sum <span class="kw">with</span> (n:=3) (m:=5).
+  apply b_sum <span class="kw">with</span> (n:=<span class="dv">3</span>) (m:=<span class="dv">5</span>).
   apply b_3.
   apply b_5.
 Qed<span class="kw">.</span></code></pre>
@@ -319,23 +319,23 @@ Qed<span class="kw">.</span></code></pre>
   ev (<span class="dt">S</span> (<span class="dt">S</span> n)) -&gt; ev n.
 Proof<span class="kw">.</span>
   intros n E<span class="kw">.</span>
-  inversion <span class="dt">E</span> <span class="kw">as</span> [| n' E']<span class="kw">.</span>
+  inversion <span class="dt">E</span> <span class="kw">as</span> [| n' <span class="dt">E'</span>].
   apply E'<span class="kw">.</span>
 Qed<span class="kw">.</span></code></pre>
 <p>I wrote my first inductive property and proved things about it ;)</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> pal {<span class="dt">X:Type</span>} : <span class="dt">list</span> <span class="dt">X</span> -&gt; <span class="dt">Prop</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> pal {<span class="dt">X</span>:<span class="dt">Type</span>} : <span class="dt">list</span> <span class="dt">X</span> -&gt; <span class="dt">Prop</span> :=
   | pal_nil : pal []
-  | pal_single : forall x:X, pal [x]
-  | pal_cons : forall (x:X) (l:list <span class="dt">X</span>) , pal l -&gt; pal (x :: snoc l x).
+  | pal_single : forall x:<span class="dt">X</span>, pal [x]
+  | pal_cons : forall (x:<span class="dt">X</span>) (l:<span class="dt">list</span> <span class="dt">X</span>) , pal l -&gt; pal (x :: snoc l x).
 
-<span class="dt">Theorem</span> pal_mirror : forall (<span class="dt">X:Type</span>) (l:list <span class="dt">X</span>),
+<span class="dt">Theorem</span> pal_mirror : forall (<span class="dt">X</span>:<span class="dt">Type</span>) (l:<span class="dt">list</span> <span class="dt">X</span>),
   pal (l ++ rev l).
 Proof<span class="kw">.</span>
   intros <span class="dt">X</span> l. induction l <span class="kw">as</span> [|h t]. simpl. apply pal_nil.
   simpl. rewrite &lt;- snoc_with_append. apply pal_cons. apply IHt<span class="kw">.</span>
 Qed<span class="kw">.</span>
 
-<span class="dt">Theorem</span> pal_rev : forall (<span class="dt">X:Type</span>) (l:list <span class="dt">X</span>),
+<span class="dt">Theorem</span> pal_rev : forall (<span class="dt">X</span>:<span class="dt">Type</span>) (l:<span class="dt">list</span> <span class="dt">X</span>),
   pal l -&gt; l = rev l.
 Proof<span class="kw">.</span>
   intros <span class="dt">X</span> l H<span class="kw">.</span> induction H<span class="kw">.</span> simpl. reflexivity. simpl. reflexivity.
@@ -360,7 +360,7 @@ Qed<span class="kw">.</span></code></pre>
 <h2 id="programming-with-propositions">Programming with Propositions</h2>
 <p><em>Propositions</em> are factual claims such as <em>2 + 2 = 4</em>. Propositions don’t necessarily need to be provable: Simply being a proposition is one thing; being provable is something else!</p>
 <p>So far we have seen propositions in theorems, but they can also appear elsewhere, for example in Definitions:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> plus_fact : <span class="dt">Prop</span> := 2 + 2 = 4.</code></pre>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> plus_fact : <span class="dt">Prop</span> := <span class="dv">2</span> + <span class="dv">2</span> = <span class="fl">4.</span></code></pre>
 <p>This proposition can be used later anywhere where a propostion is expected, for example:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> plus_fact_is_true :
   plus_fact.
@@ -377,20 +377,20 @@ Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code><
   andb (ble_nat n o) (ble_nat o m) = <span class="kw">true</span>.
 
 <span class="co">(* partially apply it *)</span>
-<span class="dt">Definition</span> teen : nat -&gt; <span class="dt">Prop</span> := between 13 19.
+<span class="dt">Definition</span> teen : nat -&gt; <span class="dt">Prop</span> := between <span class="dv">13</span> <span class="fl">19.</span>
 
 <span class="co">(* pass around *)</span>
-<span class="dt">Definition</span> true_for_zero (<span class="dt">P:nat</span>-&gt;Prop) : <span class="dt">Prop</span> :=
-  <span class="dt">P</span> 0.</code></pre>
+<span class="dt">Definition</span> true_for_zero (<span class="dt">P</span>:nat-&gt;<span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+  <span class="dt">P</span> <span class="fl">0.</span></code></pre>
 <p>Another example are propositions that describe induction on the natural numbers:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> true_for_all_numbers (<span class="dt">P:nat</span> -&gt; <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> true_for_all_numbers (<span class="dt">P</span>:nat -&gt; <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
   forall n, <span class="dt">P</span> n.
 
-<span class="dt">Definition</span> preserved_by_S (<span class="dt">P:nat</span> -&gt; <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+<span class="dt">Definition</span> preserved_by_S (<span class="dt">P</span>:nat -&gt; <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
   forall n', <span class="dt">P</span> n' -&gt; <span class="dt">P</span> (<span class="dt">S</span> n').
 
 <span class="dt">Definition</span> natural_number_induction_valid : <span class="dt">Prop</span> :=
-  forall (<span class="dt">P:nat</span> -&gt; <span class="dt">Prop</span>), true_for_zero <span class="dt">P</span> -&gt; preserved_by_S <span class="dt">P</span> -&gt; true_for_all_numbers P<span class="kw">.</span></code></pre>
+  forall (<span class="dt">P</span>:nat -&gt; <span class="dt">Prop</span>), true_for_zero <span class="dt">P</span> -&gt; preserved_by_S <span class="dt">P</span> -&gt; true_for_all_numbers P<span class="kw">.</span></code></pre>
 <hr />
 <h1 id="logic-in-coq">Logic in Coq</h1>
 <p>Coq’s built-in logic is small: Its only primitives are <code>Inductive</code> definitions, universal quantification (<code>forall</code>) and implication <code>-&gt;</code>. Everything else can be encoded with these.</p>
@@ -403,7 +403,7 @@ Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code><
 <h3 id="iff">Iff</h3>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> iff (<span class="dt">P</span> <span class="dt">Q</span> : <span class="dt">Prop</span>) := (<span class="dt">P</span> -&gt; <span class="dt">Q</span>) /\ (<span class="dt">Q</span> -&gt; <span class="dt">P</span>).
 
-<span class="dt">Notation</span> <span class="st">&quot;P &lt;-&gt; Q&quot;</span> := (iff <span class="dt">P</span> <span class="dt">Q</span>) (at level 95, no associativity) : type_scope.</code></pre>
+<span class="dt">Notation</span> <span class="st">&quot;P &lt;-&gt; Q&quot;</span> := (iff <span class="dt">P</span> <span class="dt">Q</span>) (at level <span class="dv">95</span>, no associativity) : type_scope.</code></pre>
 <h3 id="disjunction">Disjunction</h3>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="kw">or</span> (<span class="dt">P</span> <span class="dt">Q</span> : <span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
   | or_introl : <span class="dt">P</span> -&gt; <span class="kw">or</span> <span class="dt">P</span> <span class="dt">Q</span>
@@ -414,35 +414,35 @@ Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code><
 <p>Logical falsehood can be represented by an inductively defined proposition without constructors.</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">False</span> : <span class="dt">Prop</span> := .</code></pre>
 <p>A convenient theorem is that anything follows from falsehood:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> ex_falso_quodlibet : forall <span class="dt">P:Prop</span>, <span class="dt">False</span> -&gt; P<span class="kw">.</span></code></pre>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> ex_falso_quodlibet : forall <span class="dt">P</span>:<span class="dt">Prop</span>, <span class="dt">False</span> -&gt; P<span class="kw">.</span></code></pre>
 <p>Truth can be defined in a similar way, but is not very useful.</p>
 <h3 id="negation">Negation</h3>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> not (<span class="dt">P:Prop</span>) := <span class="dt">P</span> -&gt; False<span class="kw">.</span>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> not (<span class="dt">P</span>:<span class="dt">Prop</span>) := <span class="dt">P</span> -&gt; False<span class="kw">.</span>
 
 <span class="dt">Notation</span> <span class="st">&quot;~ x&quot;</span> := (not x) : type_scope.</code></pre>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Theorem</span> contrapositive : forall <span class="dt">P</span> <span class="dt">Q</span> : <span class="dt">Prop</span>, (<span class="dt">P</span> -&gt; <span class="dt">Q</span>) -&gt; (~<span class="dt">Q</span> -&gt; ~<span class="dt">P</span>).</code></pre>
 <p>Some theorems that are provable in classical logic or <em>not</em> provable in Coq’s <em>constructive</em> logic. One can however show the equivalence of the following definitions:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> peirce := forall <span class="dt">P</span> <span class="dt">Q:</span> <span class="dt">Prop</span>,
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> peirce := forall <span class="dt">P</span> <span class="dt">Q</span>: <span class="dt">Prop</span>,
   ((<span class="dt">P</span> -&gt; <span class="dt">Q</span>) -&gt; <span class="dt">P</span>) -&gt; P<span class="kw">.</span>
-<span class="dt">Definition</span> classic := forall <span class="dt">P:Prop</span>,
+<span class="dt">Definition</span> classic := forall <span class="dt">P</span>:<span class="dt">Prop</span>,
   ~~<span class="dt">P</span> -&gt; P<span class="kw">.</span>
-<span class="dt">Definition</span> excluded_middle := forall <span class="dt">P:Prop</span>,
+<span class="dt">Definition</span> excluded_middle := forall <span class="dt">P</span>:<span class="dt">Prop</span>,
   <span class="dt">P</span> \/ ~P<span class="kw">.</span>
-<span class="dt">Definition</span> de_morgan_not_and_not := forall <span class="dt">P</span> <span class="dt">Q:Prop</span>,
+<span class="dt">Definition</span> de_morgan_not_and_not := forall <span class="dt">P</span> <span class="dt">Q</span>:<span class="dt">Prop</span>,
   ~(~<span class="dt">P</span> /\ ~<span class="dt">Q</span>) -&gt; <span class="dt">P</span> \/ Q<span class="kw">.</span>
-<span class="dt">Definition</span> implies_to_or := forall <span class="dt">P</span> <span class="dt">Q:Prop</span>,
+<span class="dt">Definition</span> implies_to_or := forall <span class="dt">P</span> <span class="dt">Q</span>:<span class="dt">Prop</span>,
   (<span class="dt">P</span> -&gt; <span class="dt">Q</span>) -&gt; (~<span class="dt">P</span> \/ <span class="dt">Q</span>).</code></pre>
 <h3 id="inequality">Inequality</h3>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Notation</span> <span class="st">&quot;x &lt;&gt; y&quot;</span> := (~ (x = y)) : type_scope.</code></pre>
 <h3 id="existential-quantification">Existential Quantification</h3>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> ex (<span class="dt">X:Type</span>) (<span class="dt">P</span> : <span class="dt">X</span>-&gt;Prop) : <span class="dt">Prop</span> :=
-  ex_intro : forall (witness:X), <span class="dt">P</span> witness -&gt; ex <span class="dt">X</span> P<span class="kw">.</span></code></pre>
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> ex (<span class="dt">X</span>:<span class="dt">Type</span>) (<span class="dt">P</span> : <span class="dt">X</span>-&gt;<span class="dt">Prop</span>) : <span class="dt">Prop</span> :=
+  ex_intro : forall (witness:<span class="dt">X</span>), <span class="dt">P</span> witness -&gt; ex <span class="dt">X</span> P<span class="kw">.</span></code></pre>
 <h3 id="equality">Equality</h3>
 <p>Has roughly the following definition</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> eq {<span class="dt">X:Type</span>} : <span class="dt">X</span> -&gt; <span class="dt">X</span> -&gt; <span class="dt">Prop</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> eq {<span class="dt">X</span>:<span class="dt">Type</span>} : <span class="dt">X</span> -&gt; <span class="dt">X</span> -&gt; <span class="dt">Prop</span> :=
   refl_equal : forall x, eq x x.
 
-<span class="dt">Notation</span> <span class="st">&quot;x = y&quot;</span> := (eq x y) (at level 70, no associativity) : type_scope.</code></pre>
+<span class="dt">Notation</span> <span class="st">&quot;x = y&quot;</span> := (eq x y) (at level <span class="dv">70</span>, no associativity) : type_scope.</code></pre>
 <h3 id="evidence-carrying-booleans">Evidence-carrying booleans</h3>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> sumbool (<span class="dt">A</span> <span class="dt">B</span> : <span class="dt">Prop</span>) : <span class="dt">Set</span> :=
   | left : <span class="dt">A</span> -&gt; sumbool <span class="dt">A</span> <span class="dt">B</span>

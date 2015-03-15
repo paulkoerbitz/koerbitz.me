@@ -57,13 +57,13 @@
 <span class="dt">Check</span> bool_ind.
   bool_ind : forall <span class="dt">P</span> : <span class="dt">bool</span> -&gt; <span class="dt">Prop</span>, <span class="dt">P</span> <span class="kw">true</span> -&gt; <span class="dt">P</span> <span class="kw">false</span> -&gt; forall b : <span class="dt">bool</span>, <span class="dt">P</span> b</code></pre>
 <p>The discriminate tactic can be used to prove that two values of inductive type are not equal when the values are formed with different constructors.</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> negb : (b:bool) -&gt; <span class="dt">bool</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> negb : (b:<span class="dt">bool</span>) -&gt; <span class="dt">bool</span> :=
   <span class="kw">match</span> b <span class="kw">with</span>
     | <span class="kw">true</span> =&gt; <span class="kw">false</span>
     | <span class="kw">false</span> =&gt; <span class="kw">true</span>
   end.
 
-<span class="dt">Theorem</span> negb_ineq : forall (b:bool), negb &lt;&gt; b.
+<span class="dt">Theorem</span> negb_ineq : forall (b:<span class="dt">bool</span>), negb &lt;&gt; b.
   destruct b; discriminate.
 Qed<span class="kw">.</span></code></pre>
 <h2 id="simple-recursive-types">3.3 Simple Recursive Types</h2>
@@ -88,13 +88,13 @@ Qed<span class="kw">.</span></code></pre>
 </dl>
 <h2 id="parameterized-types">3.4 Parameterized Types</h2>
 <p>Polymorphic inductive types:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">list</span> (<span class="dt">T:Set</span>) : <span class="dt">Set</span> :=
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> <span class="dt">list</span> (<span class="dt">T</span>:<span class="dt">Set</span>) : <span class="dt">Set</span> :=
   | <span class="dt">Nil</span> : <span class="dt">list</span> <span class="dt">T</span>
   | <span class="dt">Cons</span> : <span class="dt">T</span> -&gt; <span class="dt">list</span> <span class="dt">T</span> -&gt; <span class="dt">list</span> T<span class="kw">.</span>
 
 <span class="dt">Check</span> list_ind.
-  list_ind : forall (<span class="dt">T:Set</span>) (<span class="dt">P:list</span> <span class="dt">T</span> -&gt; <span class="dt">Prop</span>),
-             <span class="dt">P</span> (<span class="dt">Nil</span> <span class="dt">T</span>) -&gt; (forall (t:T) (l:list <span class="dt">T</span>), <span class="dt">P</span> l -&gt; <span class="dt">P</span> (<span class="dt">Cons</span> t l)) -&gt; forall (l:list <span class="dt">T</span>), <span class="dt">P</span> l</code></pre>
+  list_ind : forall (<span class="dt">T</span>:<span class="dt">Set</span>) (<span class="dt">P</span>:<span class="dt">list</span> <span class="dt">T</span> -&gt; <span class="dt">Prop</span>),
+             <span class="dt">P</span> (<span class="dt">Nil</span> <span class="dt">T</span>) -&gt; (forall (t:<span class="dt">T</span>) (l:<span class="dt">list</span> <span class="dt">T</span>), <span class="dt">P</span> l -&gt; <span class="dt">P</span> (<span class="dt">Cons</span> t l)) -&gt; forall (l:<span class="dt">list</span> <span class="dt">T</span>), <span class="dt">P</span> l</code></pre>
 <h2 id="mutually-inductive-types">3.5 Mutually Inductive Types</h2>
 <p>Inductive types can refer to each other:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> even_list : <span class="dt">Set</span> :=
@@ -166,7 +166,7 @@ Qed<span class="kw">.</span></code></pre>
 | <span class="dt">App</span> : term -&gt; term -&gt; term
 | <span class="dt">Abs</span> : (term -&gt; term) -&gt; term
 
-<span class="dt">Error:</span> <span class="dt">Non</span> strictly positive occurrence <span class="kw">of</span> <span class="st">&quot;term&quot;</span> <span class="kw">in</span> <span class="st">&quot;(term -&gt; term) -&gt; term&quot;</span></code></pre>
+<span class="dt">Error</span>: <span class="dt">Non</span> strictly positive occurrence <span class="kw">of</span> <span class="st">&quot;term&quot;</span> <span class="kw">in</span> <span class="st">&quot;(term -&gt; term) -&gt; term&quot;</span></code></pre>
 <p>The strict positivity requirement states that <em>the type being defined may not occur to the left of an arrow in the type of an constructor argument</em>.</p>
 <p>Why must this condition be enforced? If it weren’t the following function would not terminate:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Definition</span> uhoh (t : term) : term :=
@@ -179,7 +179,7 @@ Qed<span class="kw">.</span></code></pre>
 uhoh (<span class="dt">Abs</span> uhoh)</code></pre>
 <p>The soundness of Coq’s logic depends on the language being total. Thus the positivity condition is critical.</p>
 <h2 id="an-interlude-on-induction-principles">3.7 An Interlude on Induction Principles</h2>
-<p>A closer look at induction principles reveals that they are defined in terms of ‘_rect’, more general recursion principles:</p>
+<p>A closer look at induction principles reveals that they are defined in terms of ’_rect’, more general recursion principles:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Print</span> nat_ind.
   nat_ind =
     <span class="kw">fun</span> <span class="dt">P</span> : nat -&gt; <span class="dt">Prop</span> =&gt; nat_rect <span class="dt">P</span>
@@ -218,7 +218,7 @@ Qed<span class="kw">.</span></code></pre>
   fix <span class="dt">F</span> (n : nat) : <span class="dt">P</span> n :=
     <span class="kw">match</span> n <span class="kw">as</span> n0 return (<span class="dt">P</span> n0) <span class="kw">with</span>
     | <span class="dt">O</span> =&gt; f
-    | <span class="dt">S</span> n0 =&gt; f 0 n0 (<span class="dt">F</span> n0)
+    | <span class="dt">S</span> n0 =&gt; f <span class="dv">0</span> n0 (<span class="dt">F</span> n0)
     end
       : forall <span class="dt">P</span> : nat -&gt; <span class="dt">Type</span>,
         <span class="dt">P</span> <span class="dt">O</span> -&gt; (forall n : nat, <span class="dt">P</span> n -&gt; <span class="dt">P</span> (<span class="dt">S</span> n)) -&gt; forall n : nat, <span class="dt">P</span> n</code></pre>
@@ -364,12 +364,12 @@ Qed<span class="kw">.</span></code></pre>
 <p>The <code>forall</code> quantifier always has the larges possible scope. The type of <code>ex_intro</code> could also be written as <code>forall x : A, (P x -&gt; ex P).</code></p>
 <dl>
 <dt><code>firstorder</code></dt>
-<dd>is a tactic similar to <code>intuition</code> but for first-order logic. However, since first-order logic is much more complicated (and undecidable in general), <code>firstorder</code> is much more likely to get stuck than <code>intuition</code>.
+<dd><p>is a tactic similar to <code>intuition</code> but for first-order logic. However, since first-order logic is much more complicated (and undecidable in general), <code>firstorder</code> is much more likely to get stuck than <code>intuition</code>.</p>
 </dd>
 </dl>
 <h2 id="predicates-with-implicit-equality">4.4 Predicates with Implicit Equality</h2>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> isZero : nat -&gt; <span class="dt">Prop</span> :=
-| <span class="dt">IsZero</span> : isZero 0.</code></pre>
+| <span class="dt">IsZero</span> : isZero <span class="fl">0.</span></code></pre>
 <p><code>isZero</code> can be called a <em>judgement</em> in the sense used in the semantics of programming languages. These judgements are often defined in the style of <em>natural deduction</em>, where <em>inference rules</em> are written with a number of <em>premises</em> above the line and <em>conclusion</em> below the line.</p>
 <p>In this sense the sole constructor of <code>isZero</code> is <code>IsZero</code> and it can be thought of as a single inference rule for deducing <code>isZero</code>, which has no premises above the line and the conclusion <code>isZero 0</code> below it.</p>
 <p>There is one important differences between this inductive data type and the ones seen so far. The type of <code>isZero</code> is <code>nat -&gt; Prop</code>, with the <code>nat</code> following after the colon. In parameterized types like <code>list</code> the parameters appeared <em>before</em> the colon. Every constructor of a parameterized type must have a range type that uses the same parameter, but here every constructor allows us to choose different arguments to the type of constructors.</p>
@@ -378,16 +378,16 @@ Qed<span class="kw">.</span></code></pre>
 <p>We see that <code>eq</code> has both an argument <code>x</code>, which is fixed and another argument of the same type. This argument is implicitly required to be the same as <code>x</code> in the constructor <code>eq_refl</code>. Thus we can only prove equality when the two arguments are syntactically equal.</p>
 <h2 id="recursive-predicates">4.5 Recursive Predicates</h2>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> even : nat -&gt; <span class="dt">Prop</span> :=
-| <span class="dt">Even_O</span> : even 0
+| <span class="dt">Even_O</span> : even <span class="dv">0</span>
 | <span class="dt">Even_SS</span> : forall n : nat, even n -&gt; even (<span class="dt">S</span> (<span class="dt">S</span> n)).</code></pre>
 <p>To prove theorems about these inductive predicates it is often helpful to perform induction <em>on the predicate</em>.</p>
 <p>One other thing that we need to watch out for when performing inductive proofs is that the inductive hypothesis needs to have enough <code>forall</code> quantifiers on the variables that we are not performing induction on. This can usually be achieved by reordering the variables / quantifiers in the hypothesis.</p>
 <p>A few more proving and automation tricks shown when trying to prove that <code>forall n, even (S (n+n)) -&gt; False</code>:</p>
 <pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Lemma</span> even_contra' : forall n', even n' -&gt; forall n, n' = <span class="dt">S</span> (n+n) -&gt; <span class="dt">False</span>
 <span class="dt">Hint</span> <span class="dt">Rewrite</span> &lt;- plus_n_Sm.
-induction 1; crush;
+induction <span class="dv">1</span>; crush;
   <span class="kw">match</span> goal <span class="kw">with</span>
-    | [ <span class="dt">H</span> : <span class="dt">S</span> ?N = ?N0 + ?N0 |- _ ] =&gt; destruct <span class="dt">N;</span> destruct <span class="dt">N0</span>
+    | [ <span class="dt">H</span> : <span class="dt">S</span> ?<span class="dt">N</span> = ?<span class="dt">N0</span> + ?<span class="dt">N0</span> |- _ ] =&gt; destruct <span class="dt">N</span>; destruct <span class="dt">N0</span>
   end; crush.
 Qed<span class="kw">.</span>
 
@@ -406,7 +406,7 @@ Qed<span class="kw">.</span></code></pre>
   | <span class="dt">Cons</span> : <span class="dt">A</span> -&gt; stream -&gt; stream.
 <span class="dt">End</span> stream.
 
-<span class="dt">CoFixpoint</span> zeroes : stream nat := <span class="dt">Cons</span> 0 zeros.
+<span class="dt">CoFixpoint</span> zeroes : stream nat := <span class="dt">Cons</span> <span class="dv">0</span> zeros.
 
 <span class="dt">CoFixpoint</span> trues_falses : stream <span class="dt">bool</span> := <span class="dt">Cons</span> <span class="kw">true</span> falses_trues
 <span class="kw">with</span> falses_trues : stream <span class="dt">bool</span> := <span class="dt">Cons</span> <span class="kw">false</span> trues_falses.</code></pre>
@@ -450,7 +450,7 @@ Qed<span class="kw">.</span></code></pre>
 <p>The guardedness condition is a syntactic check for <em>productivity</em> of co-recursive definitions. A <em>productive</em> co-recursive definition is one whose outputs can be forced in finite time to any finite approximation level.</p>
 <h2 id="infinite-proofs">5.2 Infinite Proofs</h2>
 <p>Running example:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">CoFixpoint</span> ones : stream nat := <span class="dt">Cons</span> 1 ones.
+<pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">CoFixpoint</span> ones : stream nat := <span class="dt">Cons</span> <span class="dv">1</span> ones.
 <span class="dt">Definition</span> ones' := map <span class="dt">S</span> zeros.
 
 <span class="dt">Section</span> stream_eq.
