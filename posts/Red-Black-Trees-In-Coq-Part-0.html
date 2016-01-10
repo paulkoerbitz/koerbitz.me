@@ -31,7 +31,7 @@
 <p>Now that I’ve learned about Coq <a href="../notes/Software-Foundations.html">for a while</a>, I’ve wondered if I could actually used it to prove something useful yet. One thing I thought would be interesting but not to hard was to prove that insert and delete operations on red-black trees are sound.</p>
 <p>Alas, I’ve discovered that comming up with structures and proves myself was a lot harder than just doing the exercises in software foundations. But I’ve kept at it and I now sort-a kind-a proved that the insert operations maintains the order of a red-black tree, one of its three defining properties (the others are perfect black balance, and non-consequitive left-leaning red nodes).</p>
 <p>The proofs are still full of holes, but they are holes that I am confident I can fix given a little more time (they should not be complicated). It ain’t pretty, but I am glad I got this far:</p>
-<pre class="sourceCode ocaml"><code class="sourceCode ocaml">
+<div class="sourceCode"><pre class="sourceCode ocaml"><code class="sourceCode ocaml">
 <span class="dt">Require</span> <span class="dt">Export</span> SfLib<span class="kw">.</span>
 <span class="dt">Module</span> RbTrees<span class="kw">.</span>
 
@@ -265,7 +265,7 @@ Proof<span class="kw">.</span>
       apply flipColors_keeps_order. apply balanceL_keeps_order. apply O_Cons<span class="kw">.</span> assumption. assumption. assumption.
       unfold ltTree. apply rbForall_insert. apply H2<span class="kw">.</span>
       <span class="co">(* cmp n n0 = GT -&gt; blt_nat n0 n = true *)</span> admit.
-Qed<span class="kw">.</span></code></pre>
+Qed<span class="kw">.</span></code></pre></div>
 <p>This is all quite rough of course, I think I can learn a lot but iterating upon it until I have a nice solution. Dependent types are not easy!</p>
 <hr />
 <div id="disqus_thread"></div>
@@ -282,7 +282,7 @@ Qed<span class="kw">.</span></code></pre>
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -297,6 +297,7 @@ Qed<span class="kw">.</span></code></pre>
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';

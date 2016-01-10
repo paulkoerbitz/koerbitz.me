@@ -32,18 +32,18 @@
 <p>To set the stage, both pattern matching and the visitor pattern solve one side of the <a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">expression problem</a>, which is the problem of adding both variants of a data type and functions that act on those variants without changing or recompiling old code and without loosing type safety.</p>
 <p>To make this a bit more concrete, consider a very simple expression languages consisting of numbers and addition as an example (no post on this topic can do without one!). We have two variants of expressions, (1) numbers and (2) addition. Let’s assume that we want to compute the values represented by an expression as a first operation.</p>
 <p>In Haskell a straightforward way of solving this problem is as follows</p>
-<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Expr</span> <span class="fu">=</span> <span class="dt">Val</span> <span class="dt">Int</span> <span class="fu">|</span> <span class="dt">Add</span> <span class="dt">Expr</span> <span class="dt">Expr</span>
+<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Expr</span> <span class="fu">=</span> <span class="dt">Val</span> <span class="dt">Int</span> <span class="fu">|</span> <span class="dt">Add</span> <span class="dt">Expr</span> <span class="dt">Expr</span>
 
 <span class="ot">eval ::</span> <span class="dt">Expr</span> <span class="ot">-&gt;</span> <span class="dt">Int</span>
 eval (<span class="dt">Val</span> i)     <span class="fu">=</span> i
-eval (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> eval e1 <span class="fu">+</span> eval e2</code></pre>
+eval (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> eval e1 <span class="fu">+</span> eval e2</code></pre></div>
 <p>If you’re not familiar with Haskell, the first line defines a data type with two variants, it can either be a <code>Val</code>, which holds an <code>Int</code>, or it is an <code>Add</code> which holds two expressions. <code>Val</code> and <code>Add</code> are called constructors of <code>Expr</code>. The <code>eval</code> function pattern-matches and handles each case.</p>
 <p>Now imagine that we do not only want to evaluate expressions but also pretty-print them. Adding operations is easy in Haskell, we just write a new function:</p>
-<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">pprint ::</span> <span class="dt">Expr</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
+<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">pprint ::</span> <span class="dt">Expr</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
 pprint (<span class="dt">Val</span> i)     <span class="fu">=</span> show i
-pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <span class="fu">++</span> <span class="st">&quot; + &quot;</span> <span class="fu">++</span> pprint e2</code></pre>
+pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <span class="fu">++</span> <span class="st">&quot; + &quot;</span> <span class="fu">++</span> pprint e2</code></pre></div>
 <p>In Java we might achieve something similar by introducing an <code>Expr</code> class:</p>
-<pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> Expr {
+<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> Expr {
     <span class="kw">public</span> <span class="dt">int</span> <span class="fu">eval</span>();
 }
 
@@ -58,9 +58,9 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
     <span class="kw">private</span> <span class="dt">final</span> Expr r;
     <span class="kw">public</span> <span class="fu">Add</span>(Expr l, Expr r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
     <span class="kw">public</span> <span class="dt">int</span> eval { <span class="kw">return</span> l.<span class="fu">eval</span>() + r.<span class="fu">eval</span>(); }
-}</code></pre>
+}</code></pre></div>
 <p>But now, if we want to add the <code>pprint</code> operation, we have to touch every class. This is the side of the expression problem that functional languages tend to solve better than object oriented languages. However, the object oriented programming community has devised the visitor pattern as a way to solve this problem:</p>
-<pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> ExprVisitor {
+<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> ExprVisitor {
     <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Val v);
     <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Add a);
 }
@@ -95,9 +95,9 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
         add.<span class="fu">r</span>().<span class="fu">accept</span>(<span class="kw">this</span>);
         result += result_l;
     }
-}</code></pre>
+}</code></pre></div>
 <p>Ok, this is not exactly pretty, but let’s not forget that this is the side of the problem where OO languages are not good at. At least we can pull something of. And now we are in a situation where we can add new operations pretty easily:</p>
-<pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">class</span> PprintVisitor <span class="kw">extends</span> ExprVisitor {
+<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">class</span> PprintVisitor <span class="kw">extends</span> ExprVisitor {
     <span class="kw">private</span> String result = <span class="st">&quot;&quot;</span>;
     <span class="kw">public</span> String <span class="fu">result</span>() { <span class="kw">return</span> result; }
     <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Val val) override { result += val.<span class="fu">val</span>(); }
@@ -106,7 +106,7 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
         result += <span class="st">&quot; + &quot;</span>;
         add.<span class="fu">r</span>().<span class="fu">visit</span>(<span class="kw">this</span>);
     }
-}</code></pre>
+}</code></pre></div>
 <p>This works, but the Haskell solution is clearly more elegant. Does the visitor pattern have any additional advantages? Well, neither approach solves the expression problem: if we want to add a new variant, say a <code>Mult</code>, then we have to change existing code in both cases.</p>
 <p>I can’t really think of an advantage for the visitor pattern. I’ve thought of two possibilities, <em>default implementations</em> and <em>almost-but-not-quite-solving-the-expression-problem</em>. But then I realized that the first problem is also similarly solvable in the pattern matching approach and that the second problem doesn’t work without loosing type safety or duplicating code:<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
 <ol style="list-style-type: decimal">
@@ -138,7 +138,7 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -153,6 +153,7 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';

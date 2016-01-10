@@ -48,7 +48,7 @@
 <h3 id="sum-types">Sum types</h3>
 <p>The previous example with null pointers is actually part of a bigger concept which is usually referred to as <em>sum types</em> or <em>tagged unions</em>. The idea is that values of a certain type can have several forms, based on what state they are in. Most languages don’t have support for sum types, yet they are a very powerful concept. They allow you to rule out many things that should be impossible at the type level, giving you more precise types.</p>
 <p>As an example, imagine you want to keep track of the state of a financial transaction. If the transaction has been initialized you have the init time, the amount, and a currency. If the transaction has succeeded we furthermore have a succeeded time stamp, and an authorization code. If it has failed it has a failed time stamp, and a failure reason, but no auth code. In a language without sum types this might be represented like this:</p>
-<pre class="sourceCode Cpp"><code class="sourceCode cpp"><span class="kw">struct</span> Amount
+<div class="sourceCode"><pre class="sourceCode Cpp"><code class="sourceCode cpp"><span class="kw">struct</span> Amount
 {
   <span class="dt">int</span> amount;
   string currency;
@@ -63,9 +63,9 @@
   string failedReason;
   Timestamp succeededTime;
   string authCode;
-};</code></pre>
+};</code></pre></div>
 <p>It is of course possible to infer from the field names, to some degree, which field should be used when, but it is nonetheless not entirely clear. Does a failed transaction have an amount? Or an auth code? Instead consider the following definition in Haskell:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Amount</span> <span class="fu">=</span> <span class="dt">Amount</span> {<span class="ot"> amount ::</span> <span class="dt">Int</span>,<span class="ot"> currency ::</span> <span class="dt">String</span> }
+<div class="sourceCode"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Amount</span> <span class="fu">=</span> <span class="dt">Amount</span> {<span class="ot"> amount ::</span> <span class="dt">Int</span>,<span class="ot"> currency ::</span> <span class="dt">String</span> }
 
 <span class="kw">data</span> <span class="dt">Transaction</span> <span class="fu">=</span>
      <span class="dt">InitialTransaction</span>    {<span class="ot"> itInitTime ::</span> <span class="dt">Timestamp</span>
@@ -75,7 +75,7 @@
                            ,<span class="ot"> failedReason ::</span> <span class="dt">String</span> }
    <span class="fu">|</span> <span class="dt">SuccessfulTransaction</span> {<span class="ot"> stInitTime ::</span> <span class="dt">Timestamp</span>
                            ,<span class="ot"> stAmount ::</span> <span class="dt">Amount</span>
-                           ,<span class="ot"> authCode ::</span> <span class="dt">String</span> }</code></pre>
+                           ,<span class="ot"> authCode ::</span> <span class="dt">String</span> }</code></pre></div>
 <p>The Haskell representation of the transaction can have one of three states each of which carries the data relevant for this state (the example also reveals one of Haskell’s weak points, namely that the accessors of a record cannot have the same name). This clearly communicates to any reader of the code what state must be present in each case and what is not going to be present. What is more, in a function using this data type, the compiler will check that you handled all the cases and you can’t even write a program that accesses data that is not available in a case. If you later have to add a case, the compiler will inform you of all the places where this case is not handled yet. This hugely helps you avoiding bugs.</p>
 <h3 id="compiler-checked-documentation">Compiler checked documentation</h3>
 <p>More precise types also communicate more to other programmers. Have you ever worked with code where you and your cocoders had the mutual understanding that a certain pointer or reference can never be null? That certain keys must be present in a map or that some string field in a struct will always be null if conditions X and Y hold? The problem with this knowledge is that it is implicit. Implicit knowledge is not enforced in interfaces, at best a comment will document it. Unfortunately comments are notorious for not being kept up to date with the code. Since it is not verified and does not affect the resulting program, it is all too easy to let comments and code diverge. Then the comments become actively misleading and therefore many have argued to use comments as sparingly as possible.<a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a></p>
@@ -123,7 +123,7 @@
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -138,6 +138,7 @@
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';

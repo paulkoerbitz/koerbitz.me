@@ -29,9 +29,9 @@
 <p class="date">written on September  9, 2013</p>
 
 <p>The Haskell wiki gives as one of the examples of the elegance of Haskell the following as a quicksort implementation in Haskell:</p>
-<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">qsort ::</span> <span class="dt">Ord</span> a <span class="ot">=&gt;</span> [a] <span class="ot">-&gt;</span> [a]
+<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">qsort ::</span> <span class="dt">Ord</span> a <span class="ot">=&gt;</span> [a] <span class="ot">-&gt;</span> [a]
 qsort []    <span class="fu">=</span> []
-qsort (h<span class="fu">:</span>t) <span class="fu">=</span> qsort (filter (<span class="fu">&lt;=</span> h) t) <span class="fu">++</span> [h] <span class="fu">++</span> qsort (filter (<span class="fu">&gt;</span> h) t)</code></pre>
+qsort (h<span class="fu">:</span>t) <span class="fu">=</span> qsort (filter (<span class="fu">&lt;=</span> h) t) <span class="fu">++</span> [h] <span class="fu">++</span> qsort (filter (<span class="fu">&gt;</span> h) t)</code></pre></div>
 <p>In terms of elegance, this solution is indeed hard to beat. It is as close to Wikipedia’s description of the essence of quicksort as code can get:<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a></p>
 <blockquote>
 <p>Quicksort first divides a large list into two smaller sub-lists: the low elements and the high elements. Quicksort can then recursively sort the sub-lists.</p>
@@ -39,7 +39,7 @@ qsort (h<span class="fu">:</span>t) <span class="fu">=</span> qsort (filter (<sp
 <p>However, <a href="http://augustss.blogspot.de/2007/08/quicksort-in-haskell-quicksort-is.html">you can argue</a> that this is not the <em>real</em> quicksort, because the beauty of quicksort is that it works in-place and does not require O(n) extra space as the version given above does. Therefore, the question is sometimes raised how the <em>real quicksort</em> would look in Haskell, given that it generally eschews mutuability and in-place update. There are of course various implementations floating around on the interwebs, but I wanted to see how an implementation using unboxed vectors looks like and how that compares in performance to a version in C++’s.</p>
 <h2 id="a-haskell-implementation">A Haskell Implementation</h2>
 <p>An efficient Quicksort implementation consists of two parts, the <em>partition</em> function, which rearranges the elements of an array so that the left part is less-or-equal to the pivot and the right part is greater and the main function which does the recursive calls on the sub-parts. Here is my Haskell version:</p>
-<pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}</span>
+<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}</span>
 <span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span>
 <span class="kw">import           </span><span class="dt">Control.Monad.Primitive</span>
 <span class="kw">import           </span><span class="dt">Control.Applicative</span> ((&lt;$&gt;))
@@ -96,9 +96,9 @@ main <span class="fu">=</span> <span class="kw">do</span>
     loop <span class="dv">0</span> _ <span class="fu">=</span> return ()
     loop n a <span class="fu">=</span> a <span class="fu">&gt;&gt;</span> loop (n<span class="fu">-</span><span class="dv">1</span>) a
 
-    isWs <span class="fu">!</span>c <span class="fu">=</span> c <span class="fu">==</span> <span class="dv">10</span> <span class="fu">||</span> c <span class="fu">==</span> <span class="dv">20</span> <span class="fu">||</span> c <span class="fu">==</span> <span class="dv">9</span></code></pre>
+    isWs <span class="fu">!</span>c <span class="fu">=</span> c <span class="fu">==</span> <span class="dv">10</span> <span class="fu">||</span> c <span class="fu">==</span> <span class="dv">20</span> <span class="fu">||</span> c <span class="fu">==</span> <span class="dv">9</span></code></pre></div>
 <p>All in all I’d say this is a pretty direct translation from the imperative version. For comparison, here is an implementation in C++:</p>
-<pre class="sourceCode Cpp"><code class="sourceCode cpp"><span class="ot">#include &lt;iostream&gt;</span>
+<div class="sourceCode"><pre class="sourceCode Cpp"><code class="sourceCode cpp"><span class="ot">#include &lt;iostream&gt;</span>
 <span class="ot">#include &lt;sstream&gt;</span>
 <span class="ot">#include &lt;vector&gt;</span>
 <span class="ot">#include &lt;cstdlib&gt;</span>
@@ -171,7 +171,7 @@ size_t partition(std::vector&lt;T&gt;&amp; arr, size_t lo, size_t hi, size_t pi)
     printf(<span class="st">&quot;</span><span class="ch">%11.9f\n</span><span class="st">&quot;</span>, ((<span class="dt">double</span>) (end-start)) / CLOCKS_PER_SEC);
   }
   <span class="kw">return</span> <span class="dv">0</span>;
-}</code></pre>
+}</code></pre></div>
 <p>Let’s see how the two versions compare in terms of performance. For the comparison I generated 10.000.000 random integers, and measured the time it takes to sort them 50 times. The C++ version averages about 0.87 seconds while the Haskell version takes about 1.3 seconds. Not a bad result, but of course I would like the Haskell version to be just as fast. However, with my limited optimization skills I wasn’t able to eek out any more performance of the Haskell version.</p>
 <div class="footnotes">
 <hr />
@@ -194,7 +194,7 @@ size_t partition(std::vector&lt;T&gt;&amp; arr, size_t lo, size_t hi, size_t pi)
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -209,6 +209,7 @@ size_t partition(std::vector&lt;T&gt;&amp; arr, size_t lo, size_t hi, size_t pi)
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';

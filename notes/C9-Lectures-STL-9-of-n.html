@@ -32,7 +32,7 @@
 <li><p>lvalues are expressions that have a persistent location in memory. You can take their address (<code>&amp;</code>).</p></li>
 <li><p>rvalues are temporaries without a persistent location in memory. (STL: They (usually) die at the semicolon.)</p></li>
 <li><p>move constructors and move assignment operators</p>
-<pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">class</span> RI <span class="co">// remote integer</span>
+<div class="sourceCode"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">class</span> RI <span class="co">// remote integer</span>
 {
   <span class="dt">int</span>* _p;
 <span class="kw">public</span>:
@@ -71,17 +71,17 @@
     RI(std::move(other)).swap(*<span class="kw">this</span>);
     <span class="kw">return</span> *<span class="kw">this</span>;
   }
-};</code></pre></li>
+};</code></pre></div></li>
 <li><p>The differentiation of lvalue and rvalue applies to <strong>expressions</strong>, <strong>not</strong> objects.</p></li>
 <li><p>std::move is the logical equivalent of a cast. It <em>casts</em> an lvalue reference to an rvalue reference.</p></li>
 <li><p>universal assignment operator:</p>
-<pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">class</span> A
+<div class="sourceCode"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">class</span> A
 {
   A&amp; <span class="kw">operator</span>=(A other) {
     A.swap(*<span class="kw">this</span>);
     <span class="kw">return</span> *<span class="kw">this</span>;
   }
-}</code></pre></li>
+}</code></pre></div></li>
 </ul>
 <hr />
 <div id="disqus_thread"></div>
@@ -98,7 +98,7 @@
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -113,6 +113,7 @@
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';

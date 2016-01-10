@@ -35,7 +35,7 @@
 <li><p>Three flavors of class member functions: static, nonstatic, and virtual</p></li>
 </ul>
 <p>How is the following class represented on the machine?</p>
-<pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">class</span> Point
+<div class="sourceCode"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span class="kw">class</span> Point
 {
 <span class="kw">public</span>:
   Point(<span class="dt">float</span> xval);
@@ -48,7 +48,7 @@
   <span class="kw">virtual</span> ostream&amp; print(ostream &amp;os) <span class="dt">const</span>;
   <span class="dt">float</span> _x;
   <span class="dt">static</span> <span class="dt">int</span> _point_count;
-};</code></pre>
+};</code></pre></div>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
@@ -64,7 +64,7 @@
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -79,6 +79,7 @@
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';

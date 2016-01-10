@@ -28,12 +28,12 @@
 
 <p class="date">written on October 21, 2011</p>
 
-<p>Prompted by <a href="&quot;http://stackoverflow.com/q/7852351/346587&quot;">this question</a> on Stackoverflow I thought a little bit about macros that generate functions. Here is what I came up with:</p>
-<pre class="sourceCode Clojure"><code class="sourceCode clojure">(<span class="kw">defmacro</span><span class="fu"> make-placeholders </span>[n]
+<p>Prompted by <a href="%22http://stackoverflow.com/q/7852351/346587%22">this question</a> on Stackoverflow I thought a little bit about macros that generate functions. Here is what I came up with:</p>
+<div class="sourceCode"><pre class="sourceCode Clojure"><code class="sourceCode clojure">(<span class="kw">defmacro</span><span class="fu"> make-placeholders </span>[n]
   `(<span class="kw">map</span> <span class="kw">eval</span>
         '<span class="kw">~(for</span> [cntr (<span class="kw">range</span> <span class="dv">0</span> n)]
            `(<span class="kw">defn</span><span class="fu"> </span><span class="kw">~(symbol</span> (<span class="kw">str</span> <span class="st">&quot;_&quot;</span> cntr))
-               {<span class="kw">:placeholder</span> true} [&amp; args] (<span class="kw">nth</span> args <span class="kw">~cntr)))))</span></code></pre>
+               {<span class="kw">:placeholder</span> true} [&amp; args] (<span class="kw">nth</span> args <span class="kw">~cntr)))))</span></code></pre></div>
 <p>This is macro generates functions <code>_0 .. _n-1</code> that calls nth on the list of the arguments following it, so <code>(_2 1 2 3 4)</code> returns 3. I have not made up my mind if it is really a good idea to do this, but for now it’s a clever hack - maybe I’ll use it until I discover why it’s a bad idea…</p>
 <hr />
 <div id="disqus_thread"></div>
@@ -50,7 +50,7 @@
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -65,6 +65,7 @@
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';

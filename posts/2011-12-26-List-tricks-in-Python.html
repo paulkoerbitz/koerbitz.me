@@ -29,11 +29,11 @@
 <p class="date">written on December 26, 2011</p>
 
 <p>Flattening a list of lists</p>
-<pre class="sourceCode python" new_class="brush: Python;"><code class="sourceCode python">&gt;&gt;&gt; <span class="dt">sum</span>([[<span class="dv">1</span>],[<span class="dv">2</span>],[<span class="dv">3</span>],[<span class="dv">4</span>]], [])
-[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">4</span>]</code></pre>
+<div class="sourceCode" new_class="brush: Python;"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="bu">sum</span>([[<span class="dv">1</span>],[<span class="dv">2</span>],[<span class="dv">3</span>],[<span class="dv">4</span>]], [])
+[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">4</span>]</code></pre></div>
 <p>Transposing a list of lists</p>
-<pre class="sourceCode python" new_class="brush: Python;"><code class="sourceCode python">&gt;&gt;&gt; <span class="dt">zip</span>(*[[<span class="dv">1</span>,<span class="dv">2</span>],[<span class="dv">3</span>,<span class="dv">4</span>]])
-[(<span class="dv">1</span>,<span class="dv">3</span>),(<span class="dv">2</span>,<span class="dv">4</span>)]</code></pre>
+<div class="sourceCode" new_class="brush: Python;"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="bu">zip</span>(<span class="op">*</span>[[<span class="dv">1</span>,<span class="dv">2</span>],[<span class="dv">3</span>,<span class="dv">4</span>]])
+[(<span class="dv">1</span>,<span class="dv">3</span>),(<span class="dv">2</span>,<span class="dv">4</span>)]</code></pre></div>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
@@ -49,7 +49,7 @@
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -64,6 +64,7 @@
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';

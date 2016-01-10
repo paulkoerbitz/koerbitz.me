@@ -38,7 +38,7 @@
 <dd><p>Since one of the objectives is to have the business logic in one place, the representation of it should be as small as possible. Boilerplate and verboseness should be avoided.</p>
 </dd>
 <dt>Unambiguous</dt>
-<dd><p>Each instance of a representation should have only one meaning. This may seem obvious, but as far as I understand this is not necessarily true for <a href="http://www.bpmn.org/" title="Business Process Model and Notation">BPMN</a>. This means that a <em>rountrip translation</em> (representation <span class="math"> → </span> program <span class="math"> → </span> representation) should at least be theoretically possible and lead to equivalent results.</p>
+<dd><p>Each instance of a representation should have only one meaning. This may seem obvious, but as far as I understand this is not necessarily true for <a href="http://www.bpmn.org/" title="Business Process Model and Notation">BPMN</a>. This means that a <em>rountrip translation</em> (representation <span class="math inline">→</span> program <span class="math inline">→</span> representation) should at least be theoretically possible and lead to equivalent results.</p>
 </dd>
 <dt>Easy to understand</dt>
 <dd><p>The representation of the business logic should convey the logic to a reasonably intelligent reader. The reader should not have to have intimate knowledge with how this representation is translated to a program in order to understand what will happen.</p>
@@ -61,9 +61,9 @@
 <p>Overall, I am a little disappointed with the quality of the introductory information that I have found so far. The most promising document seems to be the review paper by ter Hofstede and the YAWL language.</p>
 <h3 id="a-process-dsl">A Process DSL</h3>
 <p>What we have done at work is that we have basically defined an expression language that is a C++ DSL. With this language you can write expressions such as</p>
-<pre class="sourceCode cpp"><code class="sourceCode cpp">if_(customerHasValidEmailAddress())
+<div class="sourceCode"><pre class="sourceCode cpp"><code class="sourceCode cpp">if_(customerHasValidEmailAddress())
 .then_(completeLogin())
-.else_(sendVerificationEmail() <span class="kw">and</span> showEmailVerificationPage())</code></pre>
+.else_(sendVerificationEmail() <span class="kw">and</span> showEmailVerificationPage())</code></pre></div>
 <p>and so on. Each of the mentioned steps has to be implemented in the host language to perform the desired action. This means of course that the implementation burden is still there, but at least steps that are already defined can be reused in a different context.</p>
 <p>One problem I see with this approach is that there is no way to store state inside the process description, in essence this is a language that has boolean expressions and stores everything else in global state. This also means that for every new piece of state, however temporary, requires a new <em>thing</em> that can contain it. I have found that this can limit reuse and sometimes make these processes confusing. But this DSL seems essentially like an implementation of the previously described workflow languages.</p>
 <h3 id="a-more-powerful-dsl">A More Powerful DSL</h3>
@@ -98,7 +98,7 @@
 
       </div>
       <div class="footer">
-        <p>© Copyright 2013 by Paul Körbitz.</p>
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
         <p>
           Contact me via
           <a href="http://twitter.com/paulkoer">twitter</a> or
@@ -113,6 +113,7 @@
       _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
       _gaq.push(['_setAllowLinker', true]);
       _gaq.push(['_trackPageview']);
+      _gap.push(['anonymizeIp']);
       (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
