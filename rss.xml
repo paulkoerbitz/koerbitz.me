@@ -3,17 +3,117 @@
     xmlns:dc="http://purl.org/dc/elements/1.1/">
     <channel>
         <title>Types and Tailcalls: Yet Another Programmer's Blog by Paul Koerbitz</title>
-        <link>http://paulkoerbitz.de</link>
+        <link>http://koerbitz.me</link>
         <description><![CDATA[Thoughts and ideas about programming, with an eye towards functional programming techniques]]></description>
-        <atom:link href="http://paulkoerbitz.de/rss.xml" rel="self"
+        <atom:link href="http://koerbitz.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Sun, 10 Jan 2016 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Sun, 17 Jan 2016 00:00:00 UT</lastBuildDate>
         <item>
+    <title>A Look at the Idris Internals, Part II: Taking the Parser for a Spin</title>
+    <link>http://koerbitz.me/posts/A-Look-at-the-Idris-Internals-Part-II-Taking-the-Parser-for-a-Spin.html</link>
+    <description><![CDATA[<h1 class="title">A Look at the Idris Internals, Part II: Taking the Parser for a Spin</h1>
+
+<p class="date">published on January 17, 2016</p>
+
+<p>After we’ve looked at how the parser ends up being called in the <a href="/posts/A-look-at-the-Idris-Internals-Part-I-Overview-and-Parsing.html">last post</a>, I thought it would be a fun little exercise to spin up the Idris parser on the GHCi REPL to see if we can get some expressions parsed and what kind of AST they produce.</p>
+<p>To spin up ghci, we need to go throught the usual <code>cabal configure &amp;&amp; cabal install</code> dance and then run <code>cabal repl</code>. Calling <code>ghci</code> with the desired target file directly (e.g. <code>Parser.hs</code>) won’t work, as Idris generates some files during build time which won’t be available in this case.</p>
+<p>As briefly mentioned in the previous post, we can use the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ParseHelpers.hs#L77"><code>runparser</code></a> function to actually run a specific parser, but how do we call it? The type signature looks a bit hairy at first:</p>
+<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">runparser ::</span> <span class="dt">StateT</span> st <span class="dt">IdrisInnerParser</span> res <span class="ot">-&gt;</span> st <span class="ot">-&gt;</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Result</span> res</code></pre></div>
+<p>but it’s actually quite simple: The <code>StateT st IdrisInnerParser res</code> is the type in which the different building blocks for the parser are defined. In fact, most of the parser building blocks have a type of <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ParseHelpers.hs#L46"><code>IdrisParser</code></a> and this is just defined by <code>type IdrisParser = StateT IState IdrisInnerParser</code>, so <code>st</code> is specialized to <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L178"><code>IState</code></a>, the big state record in Idris. There is an <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L343"><code>idrisInit</code></a> binding, which defines an empty IState, and we’ll just use that for our experiments at the REPL. All that is left is to pick an appropriate parser for us to start the experiments. Looking at the different building blocks of the parsers, we notice that many take an argument of type <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1443"><code>SyntaxInfo</code></a>. Idris parses some parts of its syntax things differently depending on the context (for example if a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1325"><code>DSL</code></a> binding has been defined). We will not burden ourselves with such details right now and use the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1463"><code>defaultSyntax</code></a> defined in <code>AbsSyntaxTree.hs</code> to keep things simple.</p>
+<p>Let’s start with a powerful parser which allows us to parse a siginficant part of the source code. The <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L153"><code>prog</code></a> is easily missed, but it actually allows us to parse full Idris programs. Here is a very simple one:</p>
+<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell">ghci<span class="fu">&gt;</span> <span class="kw">import </span><span class="dt">Idris.Parser</span>
+ghci<span class="fu">&gt;</span> <span class="kw">import </span><span class="dt">Idris.AbsSyntaxTree</span>
+ghci<span class="fu">&gt;</span> <span class="kw">let</span> myProgram <span class="fu">=</span> <span class="st">&quot;id : a -&gt; a\nid x = x&quot;</span>;
+ghci<span class="fu">&gt;</span> putStrLn myProgram
+id <span class="fu">:</span> a <span class="ot">-&gt;</span> a
+id x <span class="fu">=</span> x
+ghci<span class="fu">&gt;</span> <span class="fu">:</span>t runparser (prog defaultSyntax) idrisInit <span class="st">&quot;(test)&quot;</span> myProgram
+runparser (prog defaultSyntax) idrisInit <span class="st">&quot;(test)&quot;</span> myProgram
+<span class="ot">  ::</span> <span class="dt">Text.Trifecta.Result.Result</span> [<span class="dt">PDecl</span>]
+ghci<span class="fu">&gt;</span> runparser (prog defaultSyntax) idrisInit <span class="st">&quot;(test)&quot;</span> myProgram
+<span class="dt">Success</span> [tydecl id <span class="fu">:</span> a <span class="ot">-&gt;</span> a,pat {_2}       id x  <span class="fu">=</span> x <span class="kw">where</span> []]</code></pre></div>
+<p>So we see that the result from the parse is wrapped in a <a href="http://hackage.haskell.org/package/trifecta-1.5.2/docs/Text-Trifecta-Result.html"><code>Result</code></a> datatype from the Trifecta library (this can basically be a <code>Success</code> with the result or a <code>Failure</code> with some information on where the parse went wrong and why) and returns a list of <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L637"><code>PDecl</code></a>, which is the datastructure that represents top-level declarations of the idris language. These are defined in <code>AbsSyntaxTree.hs</code>.</p>
+<p>We can see that the actual <code>PDecl</code>s are pretty printed, which is too bad, since we wanted to figure out how the parsing result was exactly represented in the datastructure. My standard hacky way to work around this<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> is to simply comment out the existing show instance for these datatypes and derive them instead. To do this we have to comment out the <code>Show</code> instances on lines 1582 to 1592 in <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1582"><code>AbsSyntaxTree.hs</code></a> and add <code>deriving Show</code> clauses to <code>PDecl'</code>, <code>Directive</code>, <code>PClause</code>, <code>PData'</code>, <code>PTerm</code>, <code>PAltTerm</code>, <code>PDo'</code> and <code>PTactic'</code> in the same file. Doing so and running the above commands at the REPL again gives us (slightly reformatted)</p>
+<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell">ghci<span class="fu">&gt;</span> runparser (prog defaultSyntax) idrisInit <span class="st">&quot;(test)&quot;</span> myProgram
+<span class="dt">Success</span> [
+    <span class="dt">PTy</span> (<span class="dt">DocString</span> (<span class="dt">Options</span> { sanitize <span class="fu">=</span> <span class="dt">True</span>, allowRawHtml <span class="fu">=</span> <span class="dt">False</span>
+                            , preserveHardBreaks <span class="fu">=</span> <span class="dt">True</span>, debug <span class="fu">=</span> <span class="dt">False</span>})
+                   (fromList []))
+        []
+        (<span class="dt">Syn</span> { using <span class="fu">=</span> [], syn_params <span class="fu">=</span> [], syn_namespace <span class="fu">=</span> [], no_imp <span class="fu">=</span> [], imp_methods <span class="fu">=</span> []
+             , decoration <span class="fu">=</span> <span class="fu">&lt;&lt;</span>fn<span class="fu">&gt;&gt;</span>, inPattern <span class="fu">=</span> <span class="dt">False</span>, implicitAllowed <span class="fu">=</span> <span class="dt">False</span>
+             , maxline <span class="fu">=</span> <span class="dt">Nothing</span>, mut_nesting <span class="fu">=</span> <span class="dv">0</span>
+             , dsl_info <span class="fu">=</span> <span class="dt">DSL</span> { dsl_bind <span class="fu">=</span> <span class="dt">PRef</span> (builtin) [] <span class="fu">&gt;&gt;=</span>
+                              , dsl_return <span class="fu">=</span> <span class="dt">PRef</span> (builtin) [] return
+                              , dsl_apply <span class="fu">=</span> <span class="dt">PRef</span> (builtin) [] <span class="fu">&lt;*&gt;</span>
+                              , dsl_pure <span class="fu">=</span> <span class="dt">PRef</span> (builtin) [] pure
+                              , dsl_var <span class="fu">=</span> <span class="dt">Nothing</span>
+                              , index_first <span class="fu">=</span> <span class="dt">Nothing</span>
+                              , index_next <span class="fu">=</span> <span class="dt">Nothing</span>
+                              , dsl_lambda <span class="fu">=</span> <span class="dt">Nothing</span>
+                              , dsl_let <span class="fu">=</span> <span class="dt">Nothing</span>
+                              , dsl_pi <span class="fu">=</span> <span class="dt">Nothing</span>
+                              }
+             , syn_in_quasiquote <span class="fu">=</span> <span class="dv">0</span>
+             })
+        (test)<span class="fu">:</span><span class="dv">1</span><span class="fu">:</span><span class="dv">4</span>
+        []
+        id
+        (test)<span class="fu">:</span><span class="dv">1</span><span class="fu">:</span><span class="dv">1</span><span class="fu">-</span><span class="dv">3</span>
+        (<span class="dt">PPi</span> (<span class="dt">Exp</span> {pargopts <span class="fu">=</span> [], pstatic <span class="fu">=</span> <span class="dt">Dynamic</span>, pparam <span class="fu">=</span> <span class="dt">False</span>})
+             __pi_arg
+             <span class="dt">No</span> location
+             (<span class="dt">PRef</span> (test)<span class="fu">:</span><span class="dv">1</span><span class="fu">:</span><span class="dv">6</span><span class="fu">-</span><span class="dv">7</span> [(test)<span class="fu">:</span><span class="dv">1</span><span class="fu">:</span><span class="dv">6</span><span class="fu">-</span><span class="dv">7</span>] a)
+             (<span class="dt">PRef</span> (test)<span class="fu">:</span><span class="dv">1</span><span class="fu">:</span><span class="dv">11</span><span class="fu">-</span><span class="dv">12</span> [(test)<span class="fu">:</span><span class="dv">1</span><span class="fu">:</span><span class="dv">11</span><span class="fu">-</span><span class="dv">12</span>] a))
+  , <span class="dt">PClauses</span> (test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">1</span>
+             []
+             {_2}
+             [ <span class="dt">PClause</span> (test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">4</span>
+                       id
+                       (<span class="dt">PApp</span> (test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">4</span> (<span class="dt">PRef</span> (test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">1</span><span class="fu">-</span><span class="dv">3</span> [(test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">1</span><span class="fu">-</span><span class="dv">3</span>] id)
+                                              [<span class="dt">PExp</span> { priority <span class="fu">=</span> <span class="dv">1</span>, argopts <span class="fu">=</span> []
+                                                    , pname <span class="fu">=</span> {arg0}
+                                                    , getTm <span class="fu">=</span> <span class="dt">PRef</span> (test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">4</span><span class="fu">-</span><span class="dv">5</span>
+                                                                   [(test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">4</span><span class="fu">-</span><span class="dv">5</span>]
+                                                                   x
+                                                    }])
+                       []
+                       (<span class="dt">PRef</span> (test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">8</span><span class="fu">-</span><span class="dv">9</span> [(test)<span class="fu">:</span><span class="dv">2</span><span class="fu">:</span><span class="dv">8</span><span class="fu">-</span><span class="dv">9</span>] x)
+                       []
+             ]
+]</code></pre></div>
+<p>This is a bit long, but going through it bit by bit and ignoring some parts, we can hopefully make sense of it. First, there are two top-level declarations <code>PTy</code> and <code>PClauses</code>, which are constructors of the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L637"><code>PDecl'</code></a> datatype. The <code>PTy</code> is a type declaration which consists of a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Docstrings.hs#L48"><code>Docstring</code></a>, a list of <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Core/TT.hs#L452"><code>Name</code></a>-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Docstrings.hs#L48"><code>Docstring</code></a> tuples (presumably for the parameters), a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1443"><code>SyntaxInfo</code></a> (briefly touched on before), a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Core/TT.hs#L83"><code>FC</code></a> (which is a source location and here pretty-printed to <code>(test):1:4</code>, I think this is the position of the <code>:</code>), a list of <code>FnOpt</code> (extra info such as if a function is inlinable, total, etc.), a <code>Name</code>, another <code>FC</code> (source location, this is the position of the name) and finally a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L945"><code>PTerm</code></a>, which is here a <code>PPi</code>, a dependently-typed function type.</p>
+<p>The <code>PClauses</code> is a pattern clause, so really the list of pattern matching definitions. It features a source location (<code>FC</code>), a list of function options (<code>FnOpts</code>), a name (this seems to be the <code>{_2}</code> here, indicating that this name was implicitly generated) and a list of <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L751"><code>PClause' PTerm</code></a>, which are the actual clause definitions.</p>
+<p>We could drill down further on each of these, and of course there is a ton of details which I blissfully ignore, but I feel like that going this far has given me a fairly good superficial understanding of how parsing works in Idris in the sense that if I needed to find out how something works in detail, I would know where to look and find it fairly quickly. The next post will take a brief look at how the initial parse result is processed further.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>If there is a better way, please let me know<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Sun, 17 Jan 2016 00:00:00 UT</pubDate>
+    <guid>http://koerbitz.me/posts/A-Look-at-the-Idris-Internals-Part-II-Taking-the-Parser-for-a-Spin.html</guid>
+    <dc:creator>Paul Koerbitz</dc:creator>
+</item>
+<item>
     <title>A Look at the Idris Internals, Part I: Overview and Parsing</title>
-    <link>http://paulkoerbitz.de/posts/A-Look-at-the-Idris-Internals-Part-I-Overview-and-Parsing.html</link>
+    <link>http://koerbitz.me/posts/A-Look-at-the-Idris-Internals-Part-I-Overview-and-Parsing.html</link>
     <description><![CDATA[<h1 class="title">A Look at the Idris Internals, Part I: Overview and Parsing</h1>
 
-<p class="date">written on January 10, 2016</p>
+<p class="date">published on January 10, 2016</p>
 
 <p><a href="http://idris-lang.org">Idris</a> is a purely functional programming language with full dependent types that I have been interested in for some time. Idris makes some choices that I find very appealing, and so I have been following it and poking around with it every so often. Unfortunately, this interest has so far only resulted in very minor contributions, but that’s not a reason to give up and not try again ;). I have been interested in compilers and code generation in general, and in the Idris backend in particular, so I’m using this new year as an excuse to take another look at the Idris internals. My intention is to write a few posts exploring the Idris compilation process in general and its backend in particular to gain a better understanding of it and hopefully to find a good place to contribute to it.</p>
 <p>The goal of this post is to get a fairly high-level overview over how the compilation process works in general and how parsing works in a bit more detail. Future posts will explore the other parts a little deeper. There is a <a href="http://eb.host.cs.st-andrews.ac.uk/drafts/compile-idris.pdf" title="Edwin Brady: Cross-platform compilers for functional languages (PDF)">recent paper</a> by Edwin Brady, the creator of Idris, that explains some aspects of the Idris compilation process. This <a href="http://www.cs.st-andrews.ac.uk/~eb/drafts/impldtp.pdf" title="Edwin Brady: Idris, a General Purpose Dependently Typed Programming Language: Design and Implementation (PDF)">earlier paper</a> focuses more on TT and the type theory, but is of course also very interesting. In comparison to these papers, my goal is to give a more detailed look at the code and possibly also dive a bit deeper into some details that are left out of these papers as they are fairly standard from a research perspective and not that interesting to academics well versed in this topic.</p>
@@ -40,15 +140,15 @@
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Sun, 10 Jan 2016 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/A-Look-at-the-Idris-Internals-Part-I-Overview-and-Parsing.html</guid>
+    <guid>http://koerbitz.me/posts/A-Look-at-the-Idris-Internals-Part-I-Overview-and-Parsing.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 <item>
     <title>Release It - Summary and Review</title>
-    <link>http://paulkoerbitz.de/posts/Release-It-Summary-And-Review.html</link>
+    <link>http://koerbitz.me/posts/Release-It-Summary-And-Review.html</link>
     <description><![CDATA[<h1 class="title">Release It - Summary and Review</h1>
 
-<p class="date">written on January 13, 2015</p>
+<p class="date">published on January 13, 2015</p>
 
 <p>So I have finally finished reading Michael Nygard’s terribly named but quite interesting book <em>Release It</em>. It covers stability patterns and anti-patterns and offers some interesting ideas and concepts for improving stability.</p>
 <h2 id="part-i-stability">Part I: Stability</h2>
@@ -417,15 +517,15 @@
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Tue, 13 Jan 2015 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Release-It-Summary-And-Review.html</guid>
+    <guid>http://koerbitz.me/posts/Release-It-Summary-And-Review.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 <item>
     <title>Solving the Expression Problem in Haskell and Java</title>
-    <link>http://paulkoerbitz.de/posts/Solving-the-Expression-Problem-in-Haskell-and-Java.html</link>
+    <link>http://koerbitz.me/posts/Solving-the-Expression-Problem-in-Haskell-and-Java.html</link>
     <description><![CDATA[<h1 class="title">Solving the Expression Problem in Haskell and Java</h1>
 
-<p class="date">written on June 14, 2014</p>
+<p class="date">published on June 14, 2014</p>
 
 <p>After my <a href="/posts/Sum-Types-Visitors-and-the-Expression-Problem.html">last post</a> on the expression problem, I thought that I would explore ways to solve it in the next post and that I would write that post shortly after. I knew how the solution worked in Haskell and that solutions existed for OO languages, so that post should not have been terribly hard to write. Well, here we are five months later and I am finally getting around to writing the post ;).</p>
 <h2 id="expression-problem-recap">Expression Problem Recap</h2>
@@ -619,15 +719,15 @@ main <span class="fu">=</span> <span class="kw">do</span>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Sat, 14 Jun 2014 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Solving-the-Expression-Problem-in-Haskell-and-Java.html</guid>
+    <guid>http://koerbitz.me/posts/Solving-the-Expression-Problem-in-Haskell-and-Java.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 <item>
     <title>Sum Types, Visitors, and the Expression Problem</title>
-    <link>http://paulkoerbitz.de/posts/Sum-Types-Visitors-and-the-Expression-Problem.html</link>
+    <link>http://koerbitz.me/posts/Sum-Types-Visitors-and-the-Expression-Problem.html</link>
     <description><![CDATA[<h1 class="title">Sum Types, Visitors, and the Expression Problem</h1>
 
-<p class="date">written on January 10, 2014</p>
+<p class="date">published on January 10, 2014</p>
 
 <p>I’ve heard that <em>the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> is just a poor way of getting the benefit of sum types</em><a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> in functional programming circles several times. I must admit that I never had completely thought this through, but I was nevertheless a bit surprised when I saw that walking the AST in Rust was implemented by what looks like a use of the visitor pattern. Languages with sum types usually use pattern matching to achieve the same effect and I had always considered this a superior approach. In this blog post I try to understand the differences and similarities of the two approaches a little better.</p>
 <p>To set the stage, both pattern matching and the visitor pattern solve one side of the <a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">expression problem</a>, which is the problem of adding both variants of a data type and functions that act on those variants without changing or recompiling old code and without loosing type safety.</p>
@@ -738,15 +838,15 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Fri, 10 Jan 2014 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Sum-Types-Visitors-and-the-Expression-Problem.html</guid>
+    <guid>http://koerbitz.me/posts/Sum-Types-Visitors-and-the-Expression-Problem.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 <item>
     <title>Understanding Pointers, Ownership, and Lifetimes in Rust</title>
-    <link>http://paulkoerbitz.de/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</link>
+    <link>http://koerbitz.me/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</link>
     <description><![CDATA[<h1 class="title">Understanding Pointers, Ownership, and Lifetimes in Rust</h1>
 
-<p class="date">written on December 21, 2013</p>
+<p class="date">published on December 21, 2013</p>
 
 <hr />
 <h2 id="update-2015-03-15">Update 2015-03-15</h2>
@@ -987,15 +1087,15 @@ freeze.rs:4         let mut y = &amp;x;
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Sat, 21 Dec 2013 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</guid>
+    <guid>http://koerbitz.me/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 <item>
     <title>Certified Red-Black Trees in Coq -- Part 0</title>
-    <link>http://paulkoerbitz.de/posts/Red-Black-Trees-In-Coq-Part-0.html</link>
+    <link>http://koerbitz.me/posts/Red-Black-Trees-In-Coq-Part-0.html</link>
     <description><![CDATA[<h1 class="title">Certified Red-Black Trees in Coq -- Part 0</h1>
 
-<p class="date">written on October 24, 2013</p>
+<p class="date">published on October 24, 2013</p>
 
 <p>Now that I’ve learned about Coq <a href="/notes/Software-Foundations.html">for a while</a>, I’ve wondered if I could actually used it to prove something useful yet. One thing I thought would be interesting but not to hard was to prove that insert and delete operations on red-black trees are sound.</p>
 <p>Alas, I’ve discovered that comming up with structures and proves myself was a lot harder than just doing the exercises in software foundations. But I’ve kept at it and I now sort-a kind-a proved that the insert operations maintains the order of a red-black tree, one of its three defining properties (the others are perfect black balance, and non-consequitive left-leaning red nodes).</p>
@@ -1250,15 +1350,15 @@ Qed<span class="kw">.</span></code></pre></div>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Thu, 24 Oct 2013 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Red-Black-Trees-In-Coq-Part-0.html</guid>
+    <guid>http://koerbitz.me/posts/Red-Black-Trees-In-Coq-Part-0.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 <item>
     <title>Efficient Quicksort in Haskell</title>
-    <link>http://paulkoerbitz.de/posts/Efficient-Quicksort-in-Haskell.html</link>
+    <link>http://koerbitz.me/posts/Efficient-Quicksort-in-Haskell.html</link>
     <description><![CDATA[<h1 class="title">Efficient Quicksort in Haskell</h1>
 
-<p class="date">written on September  9, 2013</p>
+<p class="date">published on September  9, 2013</p>
 
 <p>The Haskell wiki gives as one of the examples of the elegance of Haskell the following as a quicksort implementation in Haskell:</p>
 <div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">qsort ::</span> <span class="dt">Ord</span> a <span class="ot">=&gt;</span> [a] <span class="ot">-&gt;</span> [a]
@@ -1425,15 +1525,15 @@ size_t partition(std::vector&lt;T&gt;&amp; arr, size_t lo, size_t hi, size_t pi)
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Mon, 09 Sep 2013 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Efficient-Quicksort-in-Haskell.html</guid>
+    <guid>http://koerbitz.me/posts/Efficient-Quicksort-in-Haskell.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 <item>
     <title>Let Your Prompt Tell You When To Pull</title>
-    <link>http://paulkoerbitz.de/posts/Let-Your-Prompt-Tell-You-When-To-Pull.html</link>
+    <link>http://koerbitz.me/posts/Let-Your-Prompt-Tell-You-When-To-Pull.html</link>
     <description><![CDATA[<h1 class="title">Let Your Prompt Tell You When To Pull</h1>
 
-<p class="date">written on August 20, 2013</p>
+<p class="date">published on August 20, 2013</p>
 
 <p>During the last weeks, I have on numerous occasions simply forgotten to check repositories for updates. I have then often re-implemented functionality (after swearing that whoever was responsible for it hadn’t done it yet) that was in fact already implemented in the remote repository.</p>
 <p>This is of course quite terrible, mostly because it makes me feel like an absolute idiot (rightly so?) and because it makes me waste time (admittedly the functionality had been quite small, otherwise I probably would have pulled, but still). So I set out to modify my <a href="http://www.yawl.org/" title="Yet Another Workflow Language">zsh</a> prompt so that it will inform me when the remote repository is ahead of my local repository. The solution turned out to be quite simple, I just had to add</p>
@@ -1460,15 +1560,15 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Tue, 20 Aug 2013 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Let-Your-Prompt-Tell-You-When-To-Pull.html</guid>
+    <guid>http://koerbitz.me/posts/Let-Your-Prompt-Tell-You-When-To-Pull.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 <item>
     <title>Stripping out the Business Logic</title>
-    <link>http://paulkoerbitz.de/posts/Stripping-out-the-Business-Logic.html</link>
+    <link>http://koerbitz.me/posts/Stripping-out-the-Business-Logic.html</link>
     <description><![CDATA[<h1 class="title">Stripping out the Business Logic</h1>
 
-<p class="date">written on August  7, 2013</p>
+<p class="date">published on August  7, 2013</p>
 
 <p>What I am writing day-in and day-out can probably best be described as <em>business programs</em>. To me <em>business programs</em> are programs whose essential purpose it is to keep track of some state, control processes, make decisions, and communicate with external services. One question that intrigues me is how one can seperate out the <em>business logic</em> from the rest of the program.</p>
 <p>Business logic is, as the name implies, about business first and logic second, and since business needs can change on a whim, the business logic needs to change too, usually much more often than the rest of the application. Furthermore, the business logic is the raison d’être of the whole application, so it makes sense to have this logic in one place instead of intermingling it with implementation specific logic. Finally, when I write such programs it always seems I have to do way too much work to achieve what I want. To me, seperating out the business logic into a seperate domain specific language (DSL), module, workflow pattern, or whatever, holds the promise that to create additional functionality I only need to implement that functionality in the business logic DSL or module, reducing the amount of work needed and thus speeding up development considerably.</p>
@@ -1539,72 +1639,7 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 ]]></description>
     <pubDate>Wed, 07 Aug 2013 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Stripping-out-the-Business-Logic.html</guid>
-    <dc:creator>Paul Koerbitz</dc:creator>
-</item>
-<item>
-    <title>Getting Started With Dependent Types</title>
-    <link>http://paulkoerbitz.de/posts/Getting-Started-With-Dependent-Types.html</link>
-    <description><![CDATA[<h1 class="title">Getting Started With Dependent Types</h1>
-
-<p class="date">written on July 31, 2013</p>
-
-<p>Dependent types, that is type systems where types may depend on values, are the hot new thing. Dependent types seem like a logical succession to <a href="/posts/Why-I-love-Haskell.html">Haskell</a>, which <a href="http://stackoverflow.com/questions/12961651/why-not-be-dependently-typed/#answer-13241158">people much smarter than me argue</a> is becoming a dependently typed language itself. I am interested in learning more about dependent types and want to list some resources here that I have used or am planing on using.</p>
-<h2 id="why-dependent-types">Why dependent types?</h2>
-<p>Why bother learning languages with dependent types? Given that <a href="/posts/Why-I-love-Haskell.html#encode-your-invariants-in-the-type-system">I’ve argued</a> that it is beneficial to encode a program’s invariants in the type system, it is only natural to want a type system that allows you to do more of this. Dependent types give you this possibilitye, however there is a trade off: writing programs in dependently typed languages is more complex (you may have to write some proofs!) and we don’t have that much experience with it.</p>
-<p>I can’t really answer the question if the more powerful type system is worth the additional difficulties, but it seems like things are in motion and that now is an interesting time to find out:</p>
-<ul>
-<li><p>New dependently typed languages that are more or less intended to be used as real programming languages have started to appear in recent years. These languages include <a href="http://wiki.portal.chalmers.se/agda/">Agda</a>, <a href="http://idris-lang.org">Idris</a> and <a href="http://www.ats-lang.org">ATS</a>. At least the latter two are clearly intended to be used as <em>real programming languages</em> (as opposed to theorem provers) and they do appear to be quite usuable to the casual observer.</p></li>
-<li><p>New books have come out which make heavy use of the theorem prover <a href="http://coq.inria.fr">Coq</a> and are intended to teach the use of dependently typed languages. These books make the use of Coq accessible to a much larger audience (including me ;).</p></li>
-<li><p>Domain specific languages (DSLs) and specifically embedded domain specific languages (EDSLs) are becomming more and more important. Dependent types allow you to typecheck these languages with the build-in type checker.</p></li>
-<li><p>Haskell is moving towards dependent types and so the smart people behind Haskell seem to think this is a good idea. Who am I to disagree?</p></li>
-</ul>
-<p>It is of course quite possible that these indications mean nothing or that it simply looks like a trend to me since I have only recently started to look at this topic. However, if Haskell has taught me one thing then it is that great ideas, however different, may eventually become successful when pursued with the necessary tenacity and that things that look like huge inconveniences (purity!) may actually turn out to be great advantages once we get accustomed to them. Non-total functions have always felt like a wart in Haskell, and that is why I am willing to bet on dependently typed languages now. I think there will be a lot of exploring and a lot of learning before these languages will be anything near mainstream (like where Haskell is now), but now seems like an exciting time to be part of this development.</p>
-<h2 id="resources">Resources</h2>
-<h3 id="programming-languages">Programming languages</h3>
-<p>There are now a number of interesting languages with dependent types. This list makes no attempt to be exhaustive and is slanted towards the things that interest me.</p>
-<ul>
-<li><p><a href="http://coq.inria.fr">Coq</a> is the 800-pound Gorilla in dependent type land. Coq is first and foremost a theorem prover, but at its heart sits a dependently typed language called Gallina, which itself is an extensions of the <em>calculus of indicutive constructions</em>.</p></li>
-<li><p><a href="http://wiki.portal.chalmers.se/agda/">Agda</a> is also a theorem prover based on the <em>intuitionistic type theory</em> develop by Martin-Löf. The syntax is heavily influenced by Haskell (as opposed to Coq whose syntax closer to ML). A major difference between Agda and Coq is that Agda has no tactics language for proving theorems.</p></li>
-<li><p><a href="http://idris-lang.org/">Idris</a> is the new kid on the block, having appeared only in 2011. It is also heavily influenced by Haskell (the <a href="http://www.cs.st-andrews.ac.uk/~eb/drafts/impldtp.pdf">introducing paper</a> asked the question <em>“What if Haskell had full dependent types?”</em> ). It differs from Coq and Agda in that it is not described as a theorem prover but as a general programming language. Indeed, functions must be annotated if one wants them to be checked for totality. This is a kind of escape hatch that will make developing regular programs easier in Idris. While it has (appart from dependent types) a lot in common with Haskell, it defaults to eager evaluation (with optional lazy evaluation available with special annotations).</p></li>
-<li><p><a href="http://www.ats-lang.org/">ATS</a> (which stands for <em>applied type system</em>) looks like a fusion of C and ML with dependent types thrown in for good measure. I am not really sure what to think of this language but at first sight it feels very different from the other ones listed here. What makes this language really interesting is that it is intended for systems programming, i.e. for the domain where one would usually use C or C++. I think this is great because those two have very little competition in their fields.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> Furthermore, when programming in C it is so easy to make mistakes that the dependent types and linear types that ATS has could be a real boon. That said, from my very limited impression the language seems a bit messy and therefore I think it is not the best place to start learning about dependent types.</p></li>
-</ul>
-<h3 id="books-and-papers">Books and Papers</h3>
-<p>There are also a few books that have come out recently-ish that make dependently typed languages (primarily Coq) much more accessible. This is of course of huge importance to an autodidact like me.</p>
-<ul>
-<li><p><a href="http://www.cis.upenn.edu/~bcpierce/sf/">Software foundations</a> by Benjamin Pierce teaches Coq, functional programming, basic typing theory and the universe. There are basically no prerequisites (except for being able to install Emacs ;)) and lots and lots of little excercises. It seems a bit slow at the start but working through all of the excercises will probably give a lot of familiarity with Coq, so that may be worth it.</p></li>
-<li><p><a href="http://adam.chlipala.net/cpdt/">Certified programming with dependent types</a> by Adam Chlipala. This book seems much more advanced than software foundations. It states in the introduction that it wants to initiate a discussion on best practices for developing certified programs in dependently typed languages. The author argues that every proof should be automated so that no manual steps are required (once the right lemmata have been developed).</p></li>
-<li><p><a href="http://www.cis.upenn.edu/~bcpierce/tapl/">Types and programming languages</a> by Benjamin Pierce. This book is not really on dependent types but introduces the foundations for programming language theory such as the typing rules, operational semantics, the (simply typed) lambda calculus, subtyping and a few more. I’ve meant to read it completely but I am stuck half way. It is certainly a very accessible book and a fun read.</p></li>
-<li><p><a href="http://people.cs.uu.nl/andres/LambdaPi/LambdaPi.pdf">A tutorial implmentation of a dependently typed lambda calculus</a> by Andres Löh et al. I am not sure if I can give you a better summary than the title. Doesn’t it just make you want to read the paper?</p></li>
-<li><p><a href="https://en.wikipedia.org/wiki/Intuitionistic_type_theory">Martin Löf’s type theory</a> is the foundation for Agda. I think learning the theory might not acutally be necessary for a working understanding of dependent types and to get an idea of what you can do with them, but it would sure be nice to know more about the foundations.</p></li>
-<li><p><a href="http://homotopytypetheory.org/">HoTT</a> or <em>Homotopy Type Theory</em> refers to a new interpretation of Martin-Löf’s system of intensional, constructive type theory into abstract homotopy theory. The book’s authors believe that univalent foundations will eventually become a viable alternative to set theory as the “implicit foundation” for the unformalized mathematics done by most mathematicians.<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> I am not sure I’ll ever make it this far, but it seems like a very interesting theory. Advanced Haskellers seem to get a lot out of category theory, maybe the same will be said for HoTT and dependent types.</p></li>
-</ul>
-<h3 id="videos">Videos</h3>
-<p>There are also a few videos and screencasts which revolve around dependent types or some programming language that features dependent types. First of all there is a four day course on Idris with <a href="http://www.idris-lang.org/dependently-typed-functional-programming-with-idris-course-videos-and-slides/">videos and excercises</a> held by the creator of Idris Edwin Brady. I have found the video and the excercises to be a good way to get started with Idris. There is also an introduction to Agda with <a href="https://www.youtube.com/playlist?list=PL44F162A8B8CB7C87">nine lectures</a> by Conner McBride.</p>
-<h2 id="my-plan">My plan</h2>
-<p>While I do appreciate some theoretical background, I am not sure that I have the stamina to work through a huge amount of theory without also seeing some applications. I have thus decided to try an approach that combines theory with practice. First of all, I would like to work through <em>Sofware Foundations</em>. While this is theoretically a book, there are so many exercises that it nicely combines theory and practice. Once I am done with that I would like to work my way through <em>Certified Programming with Dependent Types</em>. At the same time I am going to try to port some nice Haskell program to Idris and attempt to prove the totality of as many functions as possible. Since Wouter Swierstra has already ported <a href="http://www.staff.science.uu.nl/~swier004/Publications/XmonadInCoq.pdf">Xmonad to Coq</a>, this seems like an interesting candidate. Besides, I am running xmonad and like it a lot, so what could be a better opportunity to learn more about it?</p>
-<div class="footnotes">
-<hr />
-<ol>
-<li id="fn1"><p>The only other language that I am aware of that appeared during the last 10 years and does not require garbage collection is <a href="http://www.rust-lang.org">Rust</a>.<a href="#fnref1">↩</a></p></li>
-<li id="fn2"><p>I’ve lifted the last two sentences from the books website for obvious reasons. See <a href="http://homotopytypetheory.org/">here</a> and <a href="http://homotopytypetheory.org/book/">here</a>.<a href="#fnref2">↩</a></p></li>
-</ol>
-</div>
-<hr />
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-]]></description>
-    <pubDate>Wed, 31 Jul 2013 00:00:00 UT</pubDate>
-    <guid>http://paulkoerbitz.de/posts/Getting-Started-With-Dependent-Types.html</guid>
+    <guid>http://koerbitz.me/posts/Stripping-out-the-Business-Logic.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 
