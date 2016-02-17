@@ -14,8 +14,9 @@
       <div class="navigation">
         <ul>
           <li><a href="../">blog</a></li>
-          <li><a href="../about.html">about</a></li>
+          <li><a href="../til.html">til</a></li>
           <li><a href="../archive.html">archive</a></li>
+          <li><a href="../about.html">about</a></li>
           <li><a href="../rss.xml">rss</a></li>
           <!--
           <li><a href="/notes.html">notes</a></li>
@@ -465,18 +466,18 @@ Proof<span class="kw">.</span> reflexivity. Qed<span class="kw">.</span></code><
 <h1 id="imp---simple-imperative-programs">Imp - Simple Imperative Programs</h1>
 <h3 id="abstract-syntax">Abstract Syntax</h3>
 <div class="sourceCode"><pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Inductive</span> aexp : <span class="dt">Type</span> :=
-  | ANum : nat → aexp
-  | APlus : aexp → aexp → aexp
-  | AMinus : aexp → aexp → aexp
-  | AMult : aexp → aexp → aexp.
+  | <span class="dt">ANum</span> : nat → aexp
+  | <span class="dt">APlus</span> : aexp → aexp → aexp
+  | <span class="dt">AMinus</span> : aexp → aexp → aexp
+  | <span class="dt">AMult</span> : aexp → aexp → aexp.
 
 <span class="dt">Inductive</span> bexp : <span class="dt">Type</span> :=
   | <span class="dt">BTrue</span> : bexp
   | <span class="dt">BFalse</span> : bexp
-  | BEq : aexp → aexp → bexp
-  | BLe : aexp → aexp → bexp
-  | BNot : bexp → bexp
-  | BAnd : bexp → bexp → bexp.</code></pre></div>
+  | <span class="dt">BEq</span> : aexp → aexp → bexp
+  | <span class="dt">BLe</span> : aexp → aexp → bexp
+  | <span class="dt">BNot</span> : bexp → bexp
+  | <span class="dt">BAnd</span> : bexp → bexp → bexp.</code></pre></div>
 <h3 id="evaluation">Evaluation</h3>
 <div class="sourceCode"><pre class="sourceCode ocaml"><code class="sourceCode ocaml"><span class="dt">Fixpoint</span> aeval (a : aexp) : nat :=
   <span class="kw">match</span> a <span class="kw">with</span>

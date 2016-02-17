@@ -3,7 +3,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta charset="utf-8">
-    <title>Types and Tailcalls - Let Your Prompt Tell You When To Pull</title>
+    <title>Types and Tailcalls - How to specify dependencies for running python programs in NixOS</title>
     <link rel="stylesheet" href="../css/default.css" type="text/css">
   </head>
   <body>
@@ -25,21 +25,22 @@
         </ul>
       </div>
       <div class="body">
-        <h1 class="title">Let Your Prompt Tell You When To Pull</h1>
+        <h1 class="title">How to specify dependencies for running python programs in NixOS</h1>
 
-<p class="date">published on August 20, 2013</p>
+<p class="date">published on February 17, 2016</p>
 
-<p>During the last weeks, I have on numerous occasions simply forgotten to check repositories for updates. I have then often re-implemented functionality (after swearing that whoever was responsible for it hadn’t done it yet) that was in fact already implemented in the remote repository.</p>
-<p>This is of course quite terrible, mostly because it makes me feel like an absolute idiot (rightly so?) and because it makes me waste time (admittedly the functionality had been quite small, otherwise I probably would have pulled, but still). So I set out to modify my <a href="http://www.yawl.org/" title="Yet Another Workflow Language">zsh</a> prompt so that it will inform me when the remote repository is ahead of my local repository. The solution turned out to be quite simple, I just had to add</p>
-<pre><code>ZSH_THEME_GIT_PROMPT_BEHIND_REMOTE=&quot;%{$fg_bold[red]%}↓↓↓%{$reset_color%}&quot;
-ZSH_THEME_GIT_PROMPT_AHEAD_REMOTE=&quot;%{$fg_bold[red]%}↑↑↑%{$reset_color%}&quot;
-ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_color%}&quot;</code></pre>
-<p>to my current zsh scheme.</p>
-<p>Now, whenever a remote repository that I am tracking has new functionality my prompt informs me by showing me something along these lines:</p>
-<div class="figure">
-<img src="../images/zsh_screenshot.png" title="My zsh prompt" alt />
-
-</div>
+<p>If we install python libraries via pythonXYPackages in NixOS, the libraries will not automatically become visible to the core python interpreter.</p>
+<p>The best way of dealing with this is to specify the libraries as build inputs in a <code>default.nix</code> file and then run <code>nix-shell</code> to get the dependencies in the current shell. The <code>default.nix</code> file can look as follows:</p>
+<pre><code>with import &lt;nixpkgs&gt; {};
+let p27 = python27Packages;
+in
+{}:
+stdenv.mkDerivation {
+  name = &quot;python-nix&quot;;
+  version = &quot;0.1.0.0&quot;;
+  src = ./.;
+  buildInputs = [ python ansible p27.azure p27.psycopg2 p27.MySQL_python ];
+}</code></pre>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
