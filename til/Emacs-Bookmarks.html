@@ -3,7 +3,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta charset="utf-8">
-    <title>Types and Tailcalls - Let Your Prompt Tell You When To Pull</title>
+    <title>Types and Tailcalls - How to bookmark file locations in emacs</title>
     <link rel="stylesheet" href="../css/default.css" type="text/css">
   </head>
   <body>
@@ -25,21 +25,20 @@
         </ul>
       </div>
       <div class="body">
-        <h1 class="title">Let Your Prompt Tell You When To Pull</h1>
+        <h1 class="title">How to bookmark file locations in emacs</h1>
 
-<p class="date">published on August 20, 2013</p>
+<p class="date">published on February 17, 2016</p>
 
-<p>During the last weeks, I have on numerous occasions simply forgotten to check repositories for updates. I have then often re-implemented functionality (after swearing that whoever was responsible for it hadn’t done it yet) that was in fact already implemented in the remote repository.</p>
-<p>This is of course quite terrible, mostly because it makes me feel like an absolute idiot (rightly so?) and because it makes me waste time (admittedly the functionality had been quite small, otherwise I probably would have pulled, but still). So I set out to modify my <a href="http://www.yawl.org/" title="Yet Another Workflow Language">zsh</a> prompt so that it will inform me when the remote repository is ahead of my local repository. The solution turned out to be quite simple, I just had to add</p>
-<pre><code>ZSH_THEME_GIT_PROMPT_BEHIND_REMOTE=&quot;%{$fg_bold[red]%}↓↓↓%{$reset_color%}&quot;
-ZSH_THEME_GIT_PROMPT_AHEAD_REMOTE=&quot;%{$fg_bold[red]%}↑↑↑%{$reset_color%}&quot;
-ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_color%}&quot;</code></pre>
-<p>to my current zsh scheme.</p>
-<p>Now, whenever a remote repository that I am tracking has new functionality my prompt informs me by showing me something along these lines:</p>
-<div class="figure">
-<img src="../images/zsh_screenshot.png" title="My zsh prompt" />
-
-</div>
+<p>Emacs has a bookmarking feature which allows to record positions in files and easily jump back to them afterwards. This can be extremely handy when navigating a large codebase.</p>
+<ul>
+<li><p><code>C-x r m bookmarkname RET</code></p>
+<p>record a bookmark (mnemonic: <em>r</em>ecord-<em>m</em>ark)</p></li>
+<li><p><code>C-x r b bookmarkname RET</code></p>
+<p>jump to a bookmark</p></li>
+<li><p><code>C-x r l</code></p>
+<p>List all bookmarks (names and file locations), jump to them on enter.</p></li>
+</ul>
+<p>More details at the <a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Bookmarks.html">Emacs manual</a>.</p>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">

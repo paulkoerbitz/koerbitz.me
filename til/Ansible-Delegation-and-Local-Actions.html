@@ -3,7 +3,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta charset="utf-8">
-    <title>Types and Tailcalls - Let Your Prompt Tell You When To Pull</title>
+    <title>Types and Tailcalls - Ansible Delegation and Local Actions</title>
     <link rel="stylesheet" href="../css/default.css" type="text/css">
   </head>
   <body>
@@ -25,21 +25,33 @@
         </ul>
       </div>
       <div class="body">
-        <h1 class="title">Let Your Prompt Tell You When To Pull</h1>
+        <h1 class="title">Ansible Delegation and Local Actions</h1>
 
-<p class="date">published on August 20, 2013</p>
+<p class="date">published on February 17, 2016</p>
 
-<p>During the last weeks, I have on numerous occasions simply forgotten to check repositories for updates. I have then often re-implemented functionality (after swearing that whoever was responsible for it hadn’t done it yet) that was in fact already implemented in the remote repository.</p>
-<p>This is of course quite terrible, mostly because it makes me feel like an absolute idiot (rightly so?) and because it makes me waste time (admittedly the functionality had been quite small, otherwise I probably would have pulled, but still). So I set out to modify my <a href="http://www.yawl.org/" title="Yet Another Workflow Language">zsh</a> prompt so that it will inform me when the remote repository is ahead of my local repository. The solution turned out to be quite simple, I just had to add</p>
-<pre><code>ZSH_THEME_GIT_PROMPT_BEHIND_REMOTE=&quot;%{$fg_bold[red]%}↓↓↓%{$reset_color%}&quot;
-ZSH_THEME_GIT_PROMPT_AHEAD_REMOTE=&quot;%{$fg_bold[red]%}↑↑↑%{$reset_color%}&quot;
-ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_color%}&quot;</code></pre>
-<p>to my current zsh scheme.</p>
-<p>Now, whenever a remote repository that I am tracking has new functionality my prompt informs me by showing me something along these lines:</p>
-<div class="figure">
-<img src="../images/zsh_screenshot.png" title="My zsh prompt" />
-
-</div>
+<h2 id="delegation">Delegation</h2>
+<p>Use the <code>delegate_to</code> keyword to perform a task on one host with reference to other hosts. Example:</p>
+<pre class="yml"><code>---
+- hosts: webservers
+  tasks:
+  - name: run echo 'Hello world' on localhost
+    command: /bin/echo 'Hello, world!'
+    delegate_to: 127.0.0.1</code></pre>
+<p>This runs on the machine running ansible.</p>
+<h3 id="local_action">local_action</h3>
+<p>Is just a shortcut for <code>delegate_to: 127.0.0.1</code>. The example above could be changed to</p>
+<pre class="yml"><code>---
+- hosts: webservers
+  tasks:
+  - name: run echo 'Hello world' on localhost
+    local_action: command /bin/echo 'Hello, world!'</code></pre>
+<p>Personally, I find this latter syntax a bit confusing.</p>
+<h2 id="local-playbooks">Local Playbooks</h2>
+<p>it is also possible to run an entire playbook locally. Not sure if this is useful in the setup of cloud vms.</p>
+<p>This is achieved by either passing the <code>--connection=local</code> flag on the command line when calling <code>ansible-playbook</code> or by setting</p>
+<pre><code>- hosts: 127.0.0.1
+  connection: local</code></pre>
+<p>in the playbook.</p>
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">

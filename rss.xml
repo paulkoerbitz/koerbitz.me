@@ -7,8 +7,49 @@
         <description><![CDATA[Thoughts and ideas about programming, with an eye towards functional programming techniques]]></description>
         <atom:link href="http://koerbitz.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Sun, 17 Jan 2016 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Tue, 15 Mar 2016 00:00:00 UT</lastBuildDate>
         <item>
+    <title>A Look at the Idris Internals, Part III: From Parsing to Elaboration</title>
+    <link>http://koerbitz.me/posts/A-Look-at-the-Idris-Internals-Part-III-From-Parsing-to-Elaboration.html</link>
+    <description><![CDATA[<h1 class="title">A Look at the Idris Internals, Part III: From Parsing to Elaboration</h1>
+
+<p class="date">published on March 15, 2016</p>
+
+<p>So after looking at the parser in the <a href="/posts/A-Look-at-the-Idris-Internals-Part-II-Taking-the-Parser-for-a-Spin.html">last post</a>, this post will explore what happens after an Idris has been parsed, namely how it is desugared and elaborated to a TT program.</p>
+<p>Looking throught the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1635"><code>idrisMain</code></a> method in <code>REPL.hs</code>, it seems that code is actually loaded by either the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535"><code>loadInputs</code></a> function (also in <code>REPL.hs</code>) or the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583"><code>loadModule</code></a> from <code>Parser.hs</code>.</p>
+<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535"><code>loadInputs</code></a> <em>loads</em> a list of Idris files, meaning that it tries to completely process these files (reading, parsing, elaborating, saving the state in the <code>IState</code>) and all their dependencies. It uses the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Chaser.hs#L116"><code>buildTree</code></a> function from <code>Chaser.hs</code> to retrieve the actual files along with modification times and indicating if a file needs to be re-loaded. It uses the locally defined <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1599"><code>tryLoad</code></a> function, which uses <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1615"><code>loadFromIFile</code></a> from <code>Parser.hs</code> which either re-loads an existing IBC file or processes a file via the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> function. Similarly, the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583"><code>loadModule</code></a> function also checks if a module is already loaded, if not either loads it from an up-to-date IBC file or ends up loading it from source via <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a>. So either way <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> seems like an important part of processing and loading source files in Idris ;).</p>
+<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> does <em>a lot of things</em><a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>, such as loading all required IBC files for modules required by that file (which presumably must exist at this point), clears the current IBC cache, parses the file with the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1554"><code>parseProg</code></a> function and then (dam, dam, dam), goes on to elaborate and typecheck the loaded program by calling <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148"><code>elabDecls</code></a> on the parsed declarations.</p>
+<p>So looking at Idris as a compiler (as opposed to say the REPL functionality), the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148"><code>elabDecls</code></a> seems to be the most important entry point into the elaborator. The <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L815"><code>process</code></a> function which seems to be processing REPL commands is also an interesting entry point, as it is processing pieces of Idris code in smaller chunks. It ends up making a few calls to the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92"><code>elabVal</code></a> and <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L135"><code>elabREPL</code></a> (which is a wrapper with a catch around <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92"><code>elabVal</code></a>) functions.</p>
+<!--
+In keeping with the spirit of the [last post], let's try to run the
+elaborator on a small piece of Idris code to see what it
+does. Spinning up a `cabal repl` as in the last post,
+-->
+<p>All in all, we’ve basically looked a bit more at how the elaborator ends up being invoked, but not at how it really works. Unfortunately, the latter is really a bit beyond of the scope of these blog posts (at least for now), where I try to familiarize myself with the Idris code base bit by bit. The <a href="https://eb.host.cs.st-andrews.ac.uk/drafts/impldtp.pdf"><em>design and implementation paper</em> (PDF)</a> by Edwin Brady goes into some details of how elaboration works, I am not yet confident to explore this topic here.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>I must admit I am a bit unhappy with the plethora of 150+ line monadic functions in the Idris source code, but that’s just a newbie complaining….<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Tue, 15 Mar 2016 00:00:00 UT</pubDate>
+    <guid>http://koerbitz.me/posts/A-Look-at-the-Idris-Internals-Part-III-From-Parsing-to-Elaboration.html</guid>
+    <dc:creator>Paul Koerbitz</dc:creator>
+</item>
+<item>
     <title>A Look at the Idris Internals, Part II: Taking the Parser for a Spin</title>
     <link>http://koerbitz.me/posts/A-Look-at-the-Idris-Internals-Part-II-Taking-the-Parser-for-a-Spin.html</link>
     <description><![CDATA[<h1 class="title">A Look at the Idris Internals, Part II: Taking the Parser for a Spin</h1>
@@ -1543,7 +1584,7 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 <p>to my current zsh scheme.</p>
 <p>Now, whenever a remote repository that I am tracking has new functionality my prompt informs me by showing me something along these lines:</p>
 <div class="figure">
-<img src="/images/zsh_screenshot.png" title="My zsh prompt" alt="" />
+<img src="/images/zsh_screenshot.png" title="My zsh prompt" />
 
 </div>
 <hr />
@@ -1561,85 +1602,6 @@ ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_co
 ]]></description>
     <pubDate>Tue, 20 Aug 2013 00:00:00 UT</pubDate>
     <guid>http://koerbitz.me/posts/Let-Your-Prompt-Tell-You-When-To-Pull.html</guid>
-    <dc:creator>Paul Koerbitz</dc:creator>
-</item>
-<item>
-    <title>Stripping out the Business Logic</title>
-    <link>http://koerbitz.me/posts/Stripping-out-the-Business-Logic.html</link>
-    <description><![CDATA[<h1 class="title">Stripping out the Business Logic</h1>
-
-<p class="date">published on August  7, 2013</p>
-
-<p>What I am writing day-in and day-out can probably best be described as <em>business programs</em>. To me <em>business programs</em> are programs whose essential purpose it is to keep track of some state, control processes, make decisions, and communicate with external services. One question that intrigues me is how one can seperate out the <em>business logic</em> from the rest of the program.</p>
-<p>Business logic is, as the name implies, about business first and logic second, and since business needs can change on a whim, the business logic needs to change too, usually much more often than the rest of the application. Furthermore, the business logic is the raison d’être of the whole application, so it makes sense to have this logic in one place instead of intermingling it with implementation specific logic. Finally, when I write such programs it always seems I have to do way too much work to achieve what I want. To me, seperating out the business logic into a seperate domain specific language (DSL), module, workflow pattern, or whatever, holds the promise that to create additional functionality I only need to implement that functionality in the business logic DSL or module, reducing the amount of work needed and thus speeding up development considerably.</p>
-<p>However, while there is surely some interest in this topic, I have yet to find the best way to achieve this. As far as I can tell there may be a lot of activity, but this activity doesn’t result in well communicated solutions that are easy to comprehend. Maybe I just don’t get it, but I have yet to find somebody to tell me: this is how you do it. It seems that quite often business logic is simply mixed with the rest of the application. In this post I want to explore several possibilities of how business logic can be seperated from the rest of the application and described concisely.</p>
-<h2 id="goals">Goals</h2>
-<p>In an ideal world, the representation of the business logic should fulfill the following criteria:</p>
-<dl>
-<dt>Succinct</dt>
-<dd><p>Since one of the objectives is to have the business logic in one place, the representation of it should be as small as possible. Boilerplate and verboseness should be avoided.</p>
-</dd>
-<dt>Unambiguous</dt>
-<dd><p>Each instance of a representation should have only one meaning. This may seem obvious, but as far as I understand this is not necessarily true for <a href="http://www.bpmn.org/" title="Business Process Model and Notation">BPMN</a>. This means that a <em>rountrip translation</em> (representation <span class="math inline">→</span> program <span class="math inline">→</span> representation) should at least be theoretically possible and lead to equivalent results.</p>
-</dd>
-<dt>Easy to understand</dt>
-<dd><p>The representation of the business logic should convey the logic to a reasonably intelligent reader. The reader should not have to have intimate knowledge with how this representation is translated to a program in order to understand what will happen.</p>
-</dd>
-<dt>Testable</dt>
-<dd><p>Since the representation will contain the entire business logic, which will change often and might be complex, it is important that this logic is easily testable to make sure we got everything right.</p>
-</dd>
-<dt>Representable</dt>
-<dd><p>The representation should be easily representable in the language one is working with. If it is it becomes easier to serialize and deserialize a representation along with its state and to display it to a (support) user.</p>
-</dd>
-<dt>Complete</dt>
-<dd><p>We should be able to represent everything we want to represent in this representation, otherwise we’ll have to work around it at which point we would have probably better done without it.</p>
-</dd>
-</dl>
-<h2 id="some-possible-solutions">Some Possible Solutions</h2>
-<h3 id="finite-state-machines">Finite-State Machines</h3>
-<p><a href="http://en.wikipedia.org/wiki/Finite_state_machine" title="Wikipedia: Finite State Machines">Finite-state machines</a> are sometimes<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a><sup>,</sup><a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> suggested for this task. Finite-state machines are well understood, easy to draw and are able to model all processes which only have a, well, finite number of states. On a high level, this should include all sensible business processes. However, once we include storing and modifying arbitrary data in our application, we are clearly out of finite-state machine territory. Therefore, to describe <em>all</em> of the business logic we will clearly need some extension to finite state machines. If that extension is <em>ad-hoc</em> then we might lose the benefits that finite-state machines provide in the first place.</p>
-<h3 id="workflow-languages">Workflow Languages</h3>
-<p>There are also a large number of workflow languages, many of which are found in some enterprise software vendors packages.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a><sup>,</sup><a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> To me the most interesting are the <em>Business Process Modell and Notation</em><a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a> and the <em>Yet Another Workflow Language</em><a href="#fn6" class="footnoteRef" id="fnref6"><sup>6</sup></a> which was created by Arthur ter Hofstede, an academic how studies the field and has written an influential review paper.<a href="#fn7" class="footnoteRef" id="fnref7"><sup>7</sup></a> These languages seem interesting and have clearly some industry weight behind them, it seems fairly difficult to find good introductory material on them that is not (a) a 1000-page tome of a standard or (b) some software vendors sales pitch documents. Some of these languages also have problems, for example there seems to be no general unambiguous way to translate BPMN into a program.<a href="#fn8" class="footnoteRef" id="fnref8"><sup>8</sup></a></p>
-<p>Overall, I am a little disappointed with the quality of the introductory information that I have found so far. The most promising document seems to be the review paper by ter Hofstede and the YAWL language.</p>
-<h3 id="a-process-dsl">A Process DSL</h3>
-<p>What we have done at work is that we have basically defined an expression language that is a C++ DSL. With this language you can write expressions such as</p>
-<div class="sourceCode"><pre class="sourceCode cpp"><code class="sourceCode cpp">if_(customerHasValidEmailAddress())
-.then_(completeLogin())
-.else_(sendVerificationEmail() <span class="kw">and</span> showEmailVerificationPage())</code></pre></div>
-<p>and so on. Each of the mentioned steps has to be implemented in the host language to perform the desired action. This means of course that the implementation burden is still there, but at least steps that are already defined can be reused in a different context.</p>
-<p>One problem I see with this approach is that there is no way to store state inside the process description, in essence this is a language that has boolean expressions and stores everything else in global state. This also means that for every new piece of state, however temporary, requires a new <em>thing</em> that can contain it. I have found that this can limit reuse and sometimes make these processes confusing. But this DSL seems essentially like an implementation of the previously described workflow languages.</p>
-<h3 id="a-more-powerful-dsl">A More Powerful DSL</h3>
-<p>This is where I would like to go. A DSL that can hold some temporary state, where variables can be bound and reused at a later state. Ideally, this DSL would also permit a way to manage the data model directly, so that it would essentially be able to implement the entire business logic without having to fall back to implementations in the host language all the time. Alas, right now, this is only an idea and I am not sure how it will work.</p>
-<h2 id="outlook">Outlook</h2>
-<p>This post has barely scratched the surface of the task of abstracting out the business language into a seperate representation. I hope I have transmitted the idea of why this is desireable and outlined a few of the possible approaches that I have found during my inital research of the topic. In future posts I hope that I’ll be able to explore some of these approaches in more depth.</p>
-<div class="footnotes">
-<hr />
-<ol>
-<li id="fn1"><p><a href="http://stackoverflow.com/questions/11327564/web-development-complex-processes-are-state-machines-the-only-way-to-go">My question</a> on stackoverflow about a year ago on the same topic.<a href="#fnref1">↩</a></p></li>
-<li id="fn2"><p>Shopify technical blog: <a href="http://www.shopify.com/technology/3383012-why-developers-should-be-force-fed-state-machines">Why developers should be force-fed finite state machines</a>.<a href="#fnref2">↩</a></p></li>
-<li id="fn3"><p><a href="http://static.springsource.org/spring-webflow/docs/2.0.x/reference/html/index.html">Spring Web Flow Reference Guide</a>.<a href="#fnref3">↩</a></p></li>
-<li id="fn4"><p><a href="https://java.net/projects/osworkflow">OS Workflow</a>.<a href="#fnref4">↩</a></p></li>
-<li id="fn5"><p><a href="http://www.bpmn.org/" title="Business Process Model and Notation">Business Process Modell and Notation website</a>.<a href="#fnref5">↩</a></p></li>
-<li id="fn6"><p><a href="http://www.yawlfoundation.org">Yet Another Workflow Language website</a>.<a href="#fnref6">↩</a></p></li>
-<li id="fn7"><p><a href="http://eprints.qut.edu.au/9950/1/9950.pdf">Workflow Patterns</a> review paper by of workflow pattern systems by Arthur ter Hofstede.<a href="#fnref7">↩</a></p></li>
-<li id="fn8"><p><a href="http://www.infoq.com/articles/bpelbpm">Why BPEL is not the holy grail for BPM</a>.<a href="#fnref8">↩</a></p></li>
-</ol>
-</div>
-<hr />
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-]]></description>
-    <pubDate>Wed, 07 Aug 2013 00:00:00 UT</pubDate>
-    <guid>http://koerbitz.me/posts/Stripping-out-the-Business-Logic.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 
