@@ -47,7 +47,7 @@ interpTy (<span class="dt">TyFun</span> s t) <span class="fu">=</span> interpTy 
 <h3 id="represent-variables-bound-by-lambdas-with-de-bruijn-indices">Represent variables bound by lambdas with <a href="https://en.wikipedia.org/wiki/De_Bruijn_index">de Bruijn indices</a></h3>
 <p>Names of variables are represented by how many binders ago they were defined:</p>
 <p>Example:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>λ</mi><mi>x</mi><mi>y</mi><mo>.</mo><mi>x</mi><mo>+</mo><mi>y</mi><mo accent="false">⇒</mo><mi>λ</mi><mi>x</mi><mi>y</mi><mo>.</mo><mn>1</mn><mo>+</mo><mn>0</mn></mrow><annotation encoding="application/x-tex"> \lambda x y . x + y \Rightarrow \lambda x y . 1 + 0 </annotation></semantics></math></p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>λ</mi><mi>x</mi><mi>y</mi><mi>.</mi><mi>x</mi><mo>+</mo><mi>y</mi><mo accent="false">⇒</mo><mi>λ</mi><mi>x</mi><mi>y</mi><mi>.</mi><mn>1</mn><mo>+</mo><mn>0</mn></mrow><annotation encoding="application/x-tex"> \lambda x y . x + y \Rightarrow \lambda x y . 1 + 0 </annotation></semantics></math></p>
 <p>Use a vector of type <code>Vect Ty n</code> to do this.</p>
 <div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="co">-- G contains the types of the local variables available in the context</span>
 using (<span class="dt">G</span> <span class="fu">:</span> <span class="dt">Vect</span> <span class="dt">Ty</span> n)  
