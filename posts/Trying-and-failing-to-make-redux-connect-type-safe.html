@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Types and Tailcalls - Trying and failing to make a type safe react-redux connect wrapper</title>
+    <link rel="stylesheet" href="../css/default.css" type="text/css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <a href="../">Types and Tailcalls</a>
+      </div>
+      <div class="navigation">
+        <ul>
+          <li><a href="../">blog</a></li>
+          <li><a href="../til.html">til</a></li>
+          <li><a href="../archive.html">archive</a></li>
+          <li><a href="../about.html">about</a></li>
+          <li><a href="../rss.xml">rss</a></li>
+          <!--
+          <li><a href="/notes.html">notes</a></li>
+          <li><a href="/projects.html">projects</a></li>
+          -->
+        </ul>
+      </div>
+      <div class="body">
+        <h1 class="title">Trying and failing to make a type safe react-redux connect wrapper</h1>
+
+<p class="date">published on November 16, 2016</p>
+
+<p>One of the challenges when trying to use redux with TypeScript in a type safe way is to use the <a href="https://redux.js.org/docs/basics/UsageWithReact.html">react-redux</a> <code>connect</code> function in a type safe manner. At the time of writing, the type definition at <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/react-redux/react-redux.d.ts">DefinitelyTyped</a> does not ensure type safety. This blog post tries to develop a more limited<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> wrapper around this function which ensures type safety, but sadly fails to come up with a full solution.</p>
+<p>The <code>connect</code> function from react redux has a simple purpose: To turn a presentation focused component requiring properties A and to automatically generate a logic focused container<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> requiring properties B. It does this via two functions, <code>mapStateToProps</code> and <code>mapDispatchToProps</code> which take the current state from the store or its dispatch function, respectively and properties B. The <code>connect</code> function then returns a generated container requiring properties B to instantiate and uses the passed functions to convert this into property A and instantiate the initially passed component.</p>
+<h3 id="solving-the-first-problem-type-parameter-inference">Solving the first problem: type parameter inference</h3>
+<p>If we simplify things a bit more by munging <code>mapStateToProps</code> and <code>mapDispatchToProps</code> into a single function <code>convertProps</code><a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> and only handeling React StatelessFunctionalComponents for now<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> we need something like the following:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="co">// one.ts</span>
+<span class="kw">import * as _ from 'lodash';</span>
+<span class="kw">import * as React from 'react';</span>
+<span class="kw">import { render } from 'react-dom';</span>
+
+<span class="dt">const</span> { div } = React.<span class="fu">DOM</span>;
+
+<span class="co">// Goal: getting to a type safe connect function.</span>
+
+<span class="co">// The connect function takes an existing react comonent class with</span>
+<span class="co">// properties A, a function transforming properties B to properties A</span>
+<span class="co">// and returns a new react component expecting properties B.</span>
+
+<span class="co">// essentially, we need something like the following:</span>
+function connect&lt;NEW_PROPS, OLD_PROPS&gt;(convertProps: (p: NEW_PROPS) =&gt; OLD_PROPS,
+                                       componentClass: React.<span class="fu">SFC</span>&lt;OLD_PROPS&gt;{
+                                      ): React.<span class="fu">SFC</span>&lt;NEW_PROPS&gt; {
+    <span class="kw">return</span> props =&gt; React.<span class="fu">createElement</span>(componentClass, <span class="fu">convertProps</span>(props));
+}
+
+<span class="kw">interface</span> OldProps {
+    oldName: string;
+}
+
+<span class="dt">const</span> OldComp: React.<span class="fu">SFC</span>&lt;OldProps&gt; = props =&gt; {
+    <span class="kw">return</span> <span class="fu">div</span>(undefined, <span class="st">&quot;Hello, &quot;</span> + props.<span class="fu">oldName</span> + <span class="st">&quot;!&quot;</span>);
+};
+
+<span class="kw">interface</span> NewProps {
+    newName: string;
+}
+
+function <span class="fu">convertProps</span>(newProps: NewProps): OldProps {
+    <span class="kw">return</span> { oldName: newProps.<span class="fu">newName</span> };
+}
+
+<span class="dt">const</span> NewComp = <span class="fu">connect</span>(convertProps, OldComp);
+
+<span class="fu">NewComp</span>({ newName: <span class="st">&quot;connect&quot;</span> }); <span class="co">/* works */</span></code></pre></div>
+<p>This is a simple approach, unfortunately it is not very type safe. To see this we’ll change the <code>convertProps</code> function to not return the OldProps but something not containing these properties:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="co">// two.ts</span>
+function <span class="fu">convertProps</span>(newProps: NewProps): {} {
+    <span class="kw">return</span> {};
+}
+
+<span class="co">// no type error</span>
+<span class="dt">const</span> NewComp = <span class="fu">connect</span>(convertProps, OldComp);
+
+<span class="co">// runtime error, 'oldName' is not passed to</span>
+<span class="fu">NewComp</span>({ newName: <span class="st">&quot;connect&quot;</span> });</code></pre></div>
+<p>The problem here is that the inferred type for the <code>OLD_PROPS</code> type parameter is <code>{}</code>, the return type of the changed <code>convertProps</code> function and that <code>OldComp</code> of type <code>React.SFC&lt;OldProps&gt;</code> is accepted (type compatible) with as a parameter of type <code>React.SFC&lt;{}&gt;</code>. This is a known, by design unsoundness of the TypeScript type system as noted under <a href="https://github.com/Microsoft/TypeScript-Handbook/blob/master/pages/Type%20Compatibility.md">type compatibility</a> in the TypeScript wiki. The issue here is that <code>React.SFC&lt;OldProps&gt; extends React.SFC&lt;{}&gt;</code> holds, however, <code>SFC</code> should be contravariant in its type parameter.</p>
+<p>Can we work around this issue? It turns that we can fix the <code>OLD_PROPS</code> type parameter of the connect function if we pass the arguments <em>one by one</em> in reverse order:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="co">// three.ts</span>
+function connect&lt;NEW_PROPS, OLD_PROPS&gt;(
+     componentClass: React.<span class="fu">SFC</span>&lt;OLD_PROPS&gt;
+    ): (convertProps: (p: NEW_PROPS) =&gt; OLD_PROPS) =&gt; React.<span class="fu">SFC</span>&lt;NEW_PROPS&gt;
+{
+    <span class="kw">return</span> convertProps =&gt; props =&gt; React.<span class="fu">createElement</span>(componentClass, <span class="fu">convertProps</span>(props));
+}</code></pre></div>
+<p>This might look a little complicated at first, but all we’re doing is to pass the component class first, and then we’re passing the <code>convertProps</code> function. In functional programming terms, we’re <em>currying</em> the connect function. This is enough to make TypeScript infer the type arguments from the component. Thus the type of <code>connect(OldComp)</code> is <code>(convertProps: (p: NEW_PROPS) =&gt; OldProps) =&gt; React.SFC&lt;NEW_PROPS&gt;</code>, thus</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="co">// still in three.ts</span>
+function <span class="fu">convertProps</span>(newProps: NewProps): {} {
+    <span class="kw">return</span> {};
+}
+
+<span class="co">// now a type error, as it should be</span>
+<span class="dt">const</span> NewComp = <span class="fu">connect</span>(OldComp)(convertProps);</code></pre></div>
+<p>now gives a type error as it should. Since the type parameter <code>NEW_PROPS</code> will be inferred to be the type of the parameter passed to <code>convertProps</code>, this will not be a problem for type safety.</p>
+<h3 id="failing-to-solve-the-second-problem-constraining-a-type-intersection">Failing to solve the second problem: constraining a type intersection</h3>
+<p>Now the <em>real</em> react connect function is a bit more complicated, it takes two functions to create the new props and handles different react components, not just SFCs. At the time of writing, the <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/react-redux/react-redux.d.ts">DefinitelyTyped</a> definition available through npm via <code>@types/react-redux</code> gives the following type definitions:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="kw">interface</span> ComponentDecorator&lt;TOriginalProps, TOwnProps&gt; {
+    (component: ComponentClass&lt;TOriginalProps&gt; | StatelessComponent&lt;TOriginalProps&gt;):
+        ComponentClass&lt;TOwnProps&gt;;
+}
+
+type FuncOrSelf&lt;T&gt; = T | (() =&gt; T);
+
+<span class="kw">interface</span> MapStateToProps&lt;TStateProps, TOwnProps&gt; {
+    (state: any, ownProps?: TOwnProps): TStateProps;
+}
+
+<span class="kw">interface</span> MapDispatchToPropsFunction&lt;TDispatchProps, TOwnProps&gt; {
+    (dispatch: Dispatch&lt;any&gt;, ownProps?: TOwnProps): TDispatchProps;
+}
+
+export declare function connect&lt;TStateProps, TDispatchProps, TOwnProps&gt;(
+    mapStateToProps: FuncOrSelf&lt;MapStateToProps&lt;TStateProps, TOwnProps&gt;&gt;,
+    mapDispatchToProps?: FuncOrSelf&lt;MapDispatchToPropsFunction&lt;TDispatchProps, TOwnProps&gt;
+                                    | MapDispatchToPropsObject&gt;
+): ComponentDecorator&lt;TStateProps &amp; TDispatchProps, TOwnProps&gt;;</code></pre></div>
+<p>There is a lot of stuff here that I assume is there to handle all the flexible ways in which the connect function could be used (there is even a more complicated second signature, which I am completely ignoring here). Being a static typing enthusiast, I obviously think this is misguided, I just want one definition that checks as much as possible at compile time. I also have a few gripes with this definition, as it doesn’t do any type checking on the store or the dispatch function, but this is not really the place to get into that.</p>
+<p>The main practical difference between the simplified version illustrated in the first part of this post is that this version takes two functions, one from the current state (<code>mapStateToProps</code>) and one using the dispatch function (<code>mapDispatchToProps</code>) (the first is supposed to provide input properties, the second callbacks) and mixes their results to create the old properties for the input component.</p>
+<p>The problem which I haven’t been able to solve is that these two functions both provide some subset of the properties required by the input component which we want to wrap. In order to ensure type safety, we would like to guarantee that together, these properties cover all properties required for the original component (B). In terms of the type system, the intersection of both properties should extend the properties required by the original component, thus</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java">PropsFromMapStateToProps &amp; PropsFromMapDispatchToProps <span class="kw">extends</span> PropsForB</code></pre></div>
+<p>Unfortunately, I haven’t found a way to do this in the TypeScript type system. Given this limitation, I currently don’t see a way of creating a wrapper of this connect function which ensures type safety.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>In the sense that our function will not cover all the use cases that the <a href="https://redux.js.org/docs/basics/UsageWithReact.html">react-redux</a> <code>connect</code> function covers.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>The distinction between presentation focused <em>‘components’</em> and logic focused <em>‘containers’</em> is a widespread one and is for example explained in this <a href="https://medium.com/@dan_abramov/smart-and-dump-components-7ca2f9a7c7d0">blog post</a>.<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>The idea is that this function will only receive the properties of the new container and that the store is contained in these. React redux offers a way to pass the store as a context object, but I want to forgo this possibility, as it cannot be made type safe either.<a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p>We can easily use other React components here as well, this is only a simplification for presentation purposes.<a href="#fnref4">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+      </div>
+      <div class="footer">
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
+        <p>
+          Contact me via
+          <a href="http://twitter.com/paulkoer">twitter</a> or
+          <a href="http://github.com/paulkoerbitz">github</a>.
+        </p>
+        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
+        <p><a href="../impressum.html">Impressum</a></p>
+      </div>
+    </div>
+    <script type="text/javascript">
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-20755947-1']);
+      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+      _gaq.push(['_setAllowLinker', true]);
+      _gaq.push(['_trackPageview']);
+      _gaq.push(['anonymizeIp']);
+      (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+    </script>
+  </body>
+</html>

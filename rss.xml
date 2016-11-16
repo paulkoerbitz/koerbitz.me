@@ -7,8 +7,140 @@
         <description><![CDATA[Thoughts and ideas about programming, with an eye towards functional programming techniques]]></description>
         <atom:link href="http://koerbitz.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Mon, 07 Nov 2016 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Wed, 16 Nov 2016 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Trying and failing to make a type safe react-redux connect wrapper</title>
+    <link>http://koerbitz.me/posts/Trying-and-failing-to-make-redux-connect-type-safe.html</link>
+    <description><![CDATA[<h1 class="title">Trying and failing to make a type safe react-redux connect wrapper</h1>
+
+<p class="date">published on November 16, 2016</p>
+
+<p>One of the challenges when trying to use redux with TypeScript in a type safe way is to use the <a href="https://redux.js.org/docs/basics/UsageWithReact.html">react-redux</a> <code>connect</code> function in a type safe manner. At the time of writing, the type definition at <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/react-redux/react-redux.d.ts">DefinitelyTyped</a> does not ensure type safety. This blog post tries to develop a more limited<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> wrapper around this function which ensures type safety, but sadly fails to come up with a full solution.</p>
+<p>The <code>connect</code> function from react redux has a simple purpose: To turn a presentation focused component requiring properties A and to automatically generate a logic focused container<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> requiring properties B. It does this via two functions, <code>mapStateToProps</code> and <code>mapDispatchToProps</code> which take the current state from the store or its dispatch function, respectively and properties B. The <code>connect</code> function then returns a generated container requiring properties B to instantiate and uses the passed functions to convert this into property A and instantiate the initially passed component.</p>
+<h3 id="solving-the-first-problem-type-parameter-inference">Solving the first problem: type parameter inference</h3>
+<p>If we simplify things a bit more by munging <code>mapStateToProps</code> and <code>mapDispatchToProps</code> into a single function <code>convertProps</code><a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> and only handeling React StatelessFunctionalComponents for now<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> we need something like the following:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="co">// one.ts</span>
+<span class="kw">import * as _ from &#39;lodash&#39;;</span>
+<span class="kw">import * as React from &#39;react&#39;;</span>
+<span class="kw">import { render } from &#39;react-dom&#39;;</span>
+
+<span class="dt">const</span> { div } = React.<span class="fu">DOM</span>;
+
+<span class="co">// Goal: getting to a type safe connect function.</span>
+
+<span class="co">// The connect function takes an existing react comonent class with</span>
+<span class="co">// properties A, a function transforming properties B to properties A</span>
+<span class="co">// and returns a new react component expecting properties B.</span>
+
+<span class="co">// essentially, we need something like the following:</span>
+function connect&lt;NEW_PROPS, OLD_PROPS&gt;(convertProps: (p: NEW_PROPS) =&gt; OLD_PROPS,
+                                       componentClass: React.<span class="fu">SFC</span>&lt;OLD_PROPS&gt;{
+                                      ): React.<span class="fu">SFC</span>&lt;NEW_PROPS&gt; {
+    <span class="kw">return</span> props =&gt; React.<span class="fu">createElement</span>(componentClass, <span class="fu">convertProps</span>(props));
+}
+
+<span class="kw">interface</span> OldProps {
+    oldName: string;
+}
+
+<span class="dt">const</span> OldComp: React.<span class="fu">SFC</span>&lt;OldProps&gt; = props =&gt; {
+    <span class="kw">return</span> <span class="fu">div</span>(undefined, <span class="st">&quot;Hello, &quot;</span> + props.<span class="fu">oldName</span> + <span class="st">&quot;!&quot;</span>);
+};
+
+<span class="kw">interface</span> NewProps {
+    newName: string;
+}
+
+function <span class="fu">convertProps</span>(newProps: NewProps): OldProps {
+    <span class="kw">return</span> { oldName: newProps.<span class="fu">newName</span> };
+}
+
+<span class="dt">const</span> NewComp = <span class="fu">connect</span>(convertProps, OldComp);
+
+<span class="fu">NewComp</span>({ newName: <span class="st">&quot;connect&quot;</span> }); <span class="co">/* works */</span></code></pre></div>
+<p>This is a simple approach, unfortunately it is not very type safe. To see this we’ll change the <code>convertProps</code> function to not return the OldProps but something not containing these properties:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="co">// two.ts</span>
+function <span class="fu">convertProps</span>(newProps: NewProps): {} {
+    <span class="kw">return</span> {};
+}
+
+<span class="co">// no type error</span>
+<span class="dt">const</span> NewComp = <span class="fu">connect</span>(convertProps, OldComp);
+
+<span class="co">// runtime error, &#39;oldName&#39; is not passed to</span>
+<span class="fu">NewComp</span>({ newName: <span class="st">&quot;connect&quot;</span> });</code></pre></div>
+<p>The problem here is that the inferred type for the <code>OLD_PROPS</code> type parameter is <code>{}</code>, the return type of the changed <code>convertProps</code> function and that <code>OldComp</code> of type <code>React.SFC&lt;OldProps&gt;</code> is accepted (type compatible) with as a parameter of type <code>React.SFC&lt;{}&gt;</code>. This is a known, by design unsoundness of the TypeScript type system as noted under <a href="https://github.com/Microsoft/TypeScript-Handbook/blob/master/pages/Type%20Compatibility.md">type compatibility</a> in the TypeScript wiki. The issue here is that <code>React.SFC&lt;OldProps&gt; extends React.SFC&lt;{}&gt;</code> holds, however, <code>SFC</code> should be contravariant in its type parameter.</p>
+<p>Can we work around this issue? It turns that we can fix the <code>OLD_PROPS</code> type parameter of the connect function if we pass the arguments <em>one by one</em> in reverse order:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="co">// three.ts</span>
+function connect&lt;NEW_PROPS, OLD_PROPS&gt;(
+     componentClass: React.<span class="fu">SFC</span>&lt;OLD_PROPS&gt;
+    ): (convertProps: (p: NEW_PROPS) =&gt; OLD_PROPS) =&gt; React.<span class="fu">SFC</span>&lt;NEW_PROPS&gt;
+{
+    <span class="kw">return</span> convertProps =&gt; props =&gt; React.<span class="fu">createElement</span>(componentClass, <span class="fu">convertProps</span>(props));
+}</code></pre></div>
+<p>This might look a little complicated at first, but all we’re doing is to pass the component class first, and then we’re passing the <code>convertProps</code> function. In functional programming terms, we’re <em>currying</em> the connect function. This is enough to make TypeScript infer the type arguments from the component. Thus the type of <code>connect(OldComp)</code> is <code>(convertProps: (p: NEW_PROPS) =&gt; OldProps) =&gt; React.SFC&lt;NEW_PROPS&gt;</code>, thus</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="co">// still in three.ts</span>
+function <span class="fu">convertProps</span>(newProps: NewProps): {} {
+    <span class="kw">return</span> {};
+}
+
+<span class="co">// now a type error, as it should be</span>
+<span class="dt">const</span> NewComp = <span class="fu">connect</span>(OldComp)(convertProps);</code></pre></div>
+<p>now gives a type error as it should. Since the type parameter <code>NEW_PROPS</code> will be inferred to be the type of the parameter passed to <code>convertProps</code>, this will not be a problem for type safety.</p>
+<h3 id="failing-to-solve-the-second-problem-constraining-a-type-intersection">Failing to solve the second problem: constraining a type intersection</h3>
+<p>Now the <em>real</em> react connect function is a bit more complicated, it takes two functions to create the new props and handles different react components, not just SFCs. At the time of writing, the <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/react-redux/react-redux.d.ts">DefinitelyTyped</a> definition available through npm via <code>@types/react-redux</code> gives the following type definitions:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java"><span class="kw">interface</span> ComponentDecorator&lt;TOriginalProps, TOwnProps&gt; {
+    (component: ComponentClass&lt;TOriginalProps&gt; | StatelessComponent&lt;TOriginalProps&gt;):
+        ComponentClass&lt;TOwnProps&gt;;
+}
+
+type FuncOrSelf&lt;T&gt; = T | (() =&gt; T);
+
+<span class="kw">interface</span> MapStateToProps&lt;TStateProps, TOwnProps&gt; {
+    (state: any, ownProps?: TOwnProps): TStateProps;
+}
+
+<span class="kw">interface</span> MapDispatchToPropsFunction&lt;TDispatchProps, TOwnProps&gt; {
+    (dispatch: Dispatch&lt;any&gt;, ownProps?: TOwnProps): TDispatchProps;
+}
+
+export declare function connect&lt;TStateProps, TDispatchProps, TOwnProps&gt;(
+    mapStateToProps: FuncOrSelf&lt;MapStateToProps&lt;TStateProps, TOwnProps&gt;&gt;,
+    mapDispatchToProps?: FuncOrSelf&lt;MapDispatchToPropsFunction&lt;TDispatchProps, TOwnProps&gt;
+                                    | MapDispatchToPropsObject&gt;
+): ComponentDecorator&lt;TStateProps &amp; TDispatchProps, TOwnProps&gt;;</code></pre></div>
+<p>There is a lot of stuff here that I assume is there to handle all the flexible ways in which the connect function could be used (there is even a more complicated second signature, which I am completely ignoring here). Being a static typing enthusiast, I obviously think this is misguided, I just want one definition that checks as much as possible at compile time. I also have a few gripes with this definition, as it doesn’t do any type checking on the store or the dispatch function, but this is not really the place to get into that.</p>
+<p>The main practical difference between the simplified version illustrated in the first part of this post is that this version takes two functions, one from the current state (<code>mapStateToProps</code>) and one using the dispatch function (<code>mapDispatchToProps</code>) (the first is supposed to provide input properties, the second callbacks) and mixes their results to create the old properties for the input component.</p>
+<p>The problem which I haven’t been able to solve is that these two functions both provide some subset of the properties required by the input component which we want to wrap. In order to ensure type safety, we would like to guarantee that together, these properties cover all properties required for the original component (B). In terms of the type system, the intersection of both properties should extend the properties required by the original component, thus</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java">PropsFromMapStateToProps &amp; PropsFromMapDispatchToProps <span class="kw">extends</span> PropsForB</code></pre></div>
+<p>Unfortunately, I haven’t found a way to do this in the TypeScript type system. Given this limitation, I currently don’t see a way of creating a wrapper of this connect function which ensures type safety.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>In the sense that our function will not cover all the use cases that the <a href="https://redux.js.org/docs/basics/UsageWithReact.html">react-redux</a> <code>connect</code> function covers.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>The distinction between presentation focused <em>‘components’</em> and logic focused <em>‘containers’</em> is a widespread one and is for example explained in this <a href="https://medium.com/@dan_abramov/smart-and-dump-components-7ca2f9a7c7d0">blog post</a>.<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>The idea is that this function will only receive the properties of the new container and that the store is contained in these. React redux offers a way to pass the store as a context object, but I want to forgo this possibility, as it cannot be made type safe either.<a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p>We can easily use other React components here as well, this is only a simplification for presentation purposes.<a href="#fnref4">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Wed, 16 Nov 2016 00:00:00 UT</pubDate>
+    <guid>http://koerbitz.me/posts/Trying-and-failing-to-make-redux-connect-type-safe.html</guid>
+    <dc:creator>Paul Koerbitz</dc:creator>
+</item>
+<item>
     <title>Some Personal Rules for Effective and Efficient Meetings</title>
     <link>http://koerbitz.me/posts/Some-Personal-Rules-for-Effective-and-Efficient-Meetings.html</link>
     <description><![CDATA[<h1 class="title">Some Personal Rules for Effective and Efficient Meetings</h1>
@@ -1221,269 +1353,6 @@ freeze.rs:4         let mut y = &amp;x;
 ]]></description>
     <pubDate>Sat, 21 Dec 2013 00:00:00 UT</pubDate>
     <guid>http://koerbitz.me/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</guid>
-    <dc:creator>Paul Koerbitz</dc:creator>
-</item>
-<item>
-    <title>Certified Red-Black Trees in Coq -- Part 0</title>
-    <link>http://koerbitz.me/posts/Red-Black-Trees-In-Coq-Part-0.html</link>
-    <description><![CDATA[<h1 class="title">Certified Red-Black Trees in Coq -- Part 0</h1>
-
-<p class="date">published on October 24, 2013</p>
-
-<p>Now that I’ve learned about Coq <a href="/notes/Software-Foundations.html">for a while</a>, I’ve wondered if I could actually used it to prove something useful yet. One thing I thought would be interesting but not to hard was to prove that insert and delete operations on red-black trees are sound.</p>
-<p>Alas, I’ve discovered that comming up with structures and proves myself was a lot harder than just doing the exercises in software foundations. But I’ve kept at it and I now sort-a kind-a proved that the insert operations maintains the order of a red-black tree, one of its three defining properties (the others are perfect black balance, and non-consequitive left-leaning red nodes).</p>
-<p>The proofs are still full of holes, but they are holes that I am confident I can fix given a little more time (they should not be complicated). It ain’t pretty, but I am glad I got this far:</p>
-<div class="sourceCode"><pre class="sourceCode ocaml"><code class="sourceCode ocaml">
-<span class="dt">Require</span> <span class="dt">Export</span> SfLib<span class="kw">.</span>
-<span class="dt">Module</span> RbTrees<span class="kw">.</span>
-
-<span class="dt">Inductive</span> <span class="dt">RbColor</span> : <span class="dt">Type</span> :=
-  | <span class="dt">RbRed</span>
-  | RbBlack<span class="kw">.</span>
-
-<span class="dt">Definition</span> flipColor (c:<span class="dt">RbColor</span>) : <span class="dt">RbColor</span> :=
-  <span class="kw">match</span> c <span class="kw">with</span>
-    | <span class="dt">RbRed</span> =&gt; <span class="dt">RbBlack</span>
-    | <span class="dt">RbBlack</span> =&gt; <span class="dt">RbRed</span>
-  end.
-
-<span class="dt">Inductive</span> <span class="dt">RbTree</span> : <span class="dt">Type</span> :=
-  | tip : <span class="dt">RbTree</span>
-  | node : <span class="dt">RbColor</span> -&gt; nat -&gt; <span class="dt">RbTree</span> -&gt; <span class="dt">RbTree</span> -&gt; RbTree<span class="kw">.</span>
-
-<span class="dt">Fixpoint</span> rotLeft (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | tip =&gt; tip
-    | node c n l r =&gt;
-      <span class="kw">match</span> r <span class="kw">with</span>
-        | tip =&gt; node c n l r
-        | node rc rn rl rr =&gt; node rc rn (node <span class="dt">RbRed</span> n l rl) rr
-      end
-  end.
-
-<span class="dt">Fixpoint</span> rotRight (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | tip =&gt; tip
-    | node c n l r =&gt;
-      <span class="kw">match</span> l <span class="kw">with</span>
-        | tip =&gt; node c n l r
-        | node lc ln ll lr =&gt; node lc ln ll (node <span class="dt">RbRed</span> n lr r)
-      end
-  end.
-
-<span class="dt">Definition</span> rightIsRed (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | node _ _ _ (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
-    | _ =&gt; <span class="kw">false</span>
-  end.
-
-<span class="dt">Definition</span> twoRedsOnLeft (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | node _ _ (node <span class="dt">RbRed</span> _ (node <span class="dt">RbRed</span> _ _ _) _) _ =&gt; <span class="kw">true</span>
-    | _ =&gt; <span class="kw">false</span>
-  end.
-
-<span class="dt">Definition</span> balanceR (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">if</span> twoRedsOnLeft t <span class="kw">then</span> rotRight t <span class="kw">else</span> t.
-
-<span class="dt">Definition</span> balanceL (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">if</span> rightIsRed t <span class="kw">then</span> rotLeft t <span class="kw">else</span> t.
-
-<span class="dt">Definition</span> bothLeftAndRightAreRed (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | node _ _ (node <span class="dt">RbRed</span> _ _ _) (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
-    | _ =&gt; <span class="kw">false</span>
-  end.
-
-<span class="co">(* these evidence carrying booleans would be nice here *)</span>
-<span class="dt">Definition</span> flipColors (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> ln ll lr) (node <span class="dt">RbRed</span> rn rl rr) =&gt; node <span class="dt">RbRed</span> n (node <span class="dt">RbBlack</span> ln ll lr) (node <span class="dt">RbBlack</span> rn rl rr)
-    | _ =&gt; t
-  end.
-
-<span class="dt">Inductive</span> flipable : <span class="dt">RbTree</span> -&gt; <span class="dt">Prop</span> :=
-  | flip_intro : forall (n ln rn:nat) (ll lr rl rr : <span class="dt">RbTree</span>),
-                   flipable (node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> ln ll lr) (node <span class="dt">RbRed</span> rn rl rr)).
-
-<span class="dt">Inductive</span> <span class="dt">Cmp</span> : <span class="dt">Type</span> :=
-  | <span class="dt">LT</span>
-  | <span class="dt">EQ</span>
-  | GT<span class="kw">.</span>
-
-<span class="dt">Fixpoint</span> cmp (n m:nat) : <span class="dt">Cmp</span> :=
-  <span class="kw">if</span> beq_nat n m <span class="kw">then</span> <span class="dt">EQ</span> <span class="kw">else</span>
-    <span class="kw">if</span> ble_nat n m <span class="kw">then</span> <span class="dt">LT</span> <span class="kw">else</span> GT<span class="kw">.</span>
-
-<span class="dt">Fixpoint</span> insert (nn:nat) (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | tip =&gt; node <span class="dt">RbBlack</span> nn tip tip
-    | node c n l r =&gt;
-      <span class="kw">match</span> cmp nn n <span class="kw">with</span>
-        | <span class="dt">EQ</span> =&gt; t
-        | <span class="dt">LT</span> =&gt; flipColors (balanceR (node c n (insert nn l) r))
-        | <span class="dt">GT</span> =&gt; flipColors (balanceL (node c n l (insert nn r)))
-      end
-  end.
-
-<span class="dt">Fixpoint</span> blt_nat (n m:nat) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> n <span class="kw">with</span>
-    | <span class="dt">O</span>      =&gt; <span class="kw">match</span> m <span class="kw">with</span>
-                  | <span class="dt">O</span> =&gt; <span class="kw">false</span>
-                  | <span class="dt">S</span> m&#39; =&gt; <span class="kw">true</span>
-                end
-    | (<span class="dt">S</span> n&#39;) =&gt; ble_nat n&#39; m
-  end.
-
-<span class="dt">Definition</span> bgt_nat (n m:nat) : <span class="dt">bool</span> :=
-  blt_nat m n.
-
-<span class="dt">Fixpoint</span> rbForall (f : nat -&gt; <span class="dt">bool</span>) (t : <span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | tip =&gt; <span class="kw">true</span>
-    | node _ n l r =&gt; andb (andb (rbForall f l) (f n)) (rbForall f r)
-  end.
-
-<span class="dt">Definition</span> gtTree (t:<span class="dt">RbTree</span>) (m:nat)  : <span class="dt">bool</span> :=
-  rbForall (bgt_nat m) t.
-
-<span class="dt">Definition</span> ltTree (t:<span class="dt">RbTree</span>) (m:nat) : <span class="dt">bool</span> :=
-  rbForall (blt_nat m) t.
-
-<span class="dt">Theorem</span> excluded_middle :
-  forall <span class="dt">P</span>:<span class="dt">Prop</span>, <span class="dt">P</span> \/ ~ P<span class="kw">.</span>
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
-
-<span class="dt">Lemma</span> unflipable : forall (t:<span class="dt">RbTree</span>),
-  ~flipable t -&gt; flipColors t = t.
-Proof<span class="kw">.</span>
-  intros.
-  destruct t.
-  simpl. reflexivity.
-  destruct r. simpl. reflexivity.
-  destruct t1. simpl. reflexivity.
-  destruct r.
-  destruct t2. simpl. reflexivity.
-  destruct r. unfold not <span class="kw">in</span> H<span class="kw">.</span>
-  <span class="kw">assert</span> (flipable (node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> n0 t1_1 t1_2) (node <span class="dt">RbRed</span> n1 t2_1 t2_2))).
-  apply flip_intro. apply <span class="dt">H</span> <span class="kw">in</span> H0<span class="kw">.</span> inversion H0<span class="kw">.</span>
-  simpl. reflexivity.
-  simpl. reflexivity.
-Qed<span class="kw">.</span>
-
-<span class="dt">Lemma</span> rbForall_flipColors : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
-  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (flipColors t) = <span class="kw">true</span>.
-Proof<span class="kw">.</span>
-  intros. induction t.
-  <span class="dt">Case</span> <span class="st">&quot;t=tip&quot;</span>. simpl. assumption.
-  <span class="dt">Case</span> <span class="st">&quot;t=cons&quot;</span>.  remember (node r n t1 t2) <span class="kw">as</span> t.
-    <span class="kw">assert</span> (flipable t \/ ~ (flipable t)). apply excluded_middle.
-    inversion H0<span class="kw">.</span> destruct H1<span class="kw">.</span> simpl. simpl <span class="kw">in</span> H<span class="kw">.</span> apply H<span class="kw">.</span> <span class="kw">assert</span> (flipColors t = t).
-    apply unflipable. apply H1<span class="kw">.</span> rewrite H2<span class="kw">.</span> apply H<span class="kw">.</span>
-Qed<span class="kw">.</span>
-
-<span class="dt">Lemma</span> rbForall_balanceR : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
-  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceR t) = <span class="kw">true</span>.
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
-
-<span class="dt">Lemma</span> rbForall_balanceL : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
-  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceL t) = <span class="kw">true</span>.
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
-
-<span class="dt">Lemma</span> rbForall_insert : forall (n m:nat) (f : nat -&gt; nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
-  rbForall (f n) t = <span class="kw">true</span> -&gt; f n m = <span class="kw">true</span> -&gt; rbForall (f n) (insert m t) = <span class="kw">true</span>.
-Proof<span class="kw">.</span>
-  intros. induction t.
-  <span class="dt">Case</span> <span class="st">&quot;t=tip&quot;</span>. simpl. unfold rbForall. unfold rbfold. rewrite H0<span class="kw">.</span> simpl. reflexivity.
-  <span class="dt">Case</span> <span class="st">&quot;t=cons&quot;</span>. remember (cmp m n0) <span class="kw">as</span> cmpEq. destruct cmpEq.
-    <span class="dt">SCase</span> <span class="st">&quot;m &lt; n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> apply rbForall_flipColors. apply rbForall_balanceR. admit.
-    <span class="dt">SCase</span> <span class="st">&quot;m = n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> assumption.
-    <span class="dt">SCase</span> <span class="st">&quot;m &gt; n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> apply rbForall_flipColors. apply rbForall_balanceL. admit.
-Qed<span class="kw">.</span>
-
-<span class="dt">Inductive</span> rbOrdered : <span class="dt">RbTree</span> -&gt; <span class="dt">Prop</span> :=
-  | <span class="dt">O_Tip</span> : rbOrdered tip
-  | <span class="dt">O_Cons</span> : forall (n:nat) (c : <span class="dt">RbColor</span>) (l r : <span class="dt">RbTree</span>),
-               rbOrdered l -&gt; rbOrdered r -&gt;
-               gtTree l n = <span class="kw">true</span> -&gt; ltTree r n = <span class="kw">true</span> -&gt;
-               rbOrdered (node c n l r).
-
-<span class="dt">Lemma</span> flipColor_keeps_order : forall (n:nat) (c:<span class="dt">RbColor</span>) (l r : <span class="dt">RbTree</span>),
-  rbOrdered (node c n l r) -&gt; rbOrdered (node (flipColor c) n l r).
-Proof<span class="kw">.</span>
-  intros. inversion H<span class="kw">.</span> apply O_Cons<span class="kw">.</span> assumption. assumption. assumption. assumption.
-Qed<span class="kw">.</span>
-
-<span class="dt">Lemma</span> flipColors_keeps_order : forall (t : <span class="dt">RbTree</span>),
-  rbOrdered t -&gt; rbOrdered (flipColors t).
-Proof<span class="kw">.</span>
-  intros. remember t <span class="kw">as</span> tt. induction H<span class="kw">.</span>
-  <span class="dt">Case</span> <span class="st">&quot;t = tip&quot;</span>.
-    simpl. apply O_Tip<span class="kw">.</span>
-  <span class="dt">Case</span> <span class="st">&quot;t = node ...&quot;</span>.
-    <span class="kw">assert</span> (flipable t \/ ~ (flipable t)). apply excluded_middle.
-    inversion H3<span class="kw">.</span> rewrite &lt;- <span class="dt">Heqtt</span> <span class="kw">in</span> H4<span class="kw">.</span> inversion H4<span class="kw">.</span> simpl.
-    constructor.
-    rewrite &lt;- <span class="dt">H8</span> <span class="kw">in</span> H<span class="kw">.</span> apply flipColor_keeps_order <span class="kw">in</span> H<span class="kw">.</span> simpl <span class="kw">in</span> H<span class="kw">.</span> apply H<span class="kw">.</span>
-    rewrite &lt;- <span class="dt">H9</span> <span class="kw">in</span> H0<span class="kw">.</span> apply flipColor_keeps_order <span class="kw">in</span> H0<span class="kw">.</span> simpl <span class="kw">in</span> H0<span class="kw">.</span> apply H0<span class="kw">.</span>
-    rewrite &lt;- <span class="dt">H8</span> <span class="kw">in</span> H1<span class="kw">.</span> unfold gtTree <span class="kw">in</span> H1<span class="kw">.</span> simpl <span class="kw">in</span> H1<span class="kw">.</span> unfold gtTree. simpl. apply H1<span class="kw">.</span>
-    rewrite &lt;- <span class="dt">H9</span> <span class="kw">in</span> H2<span class="kw">.</span> unfold ltTree <span class="kw">in</span> H2<span class="kw">.</span> simpl <span class="kw">in</span> H2<span class="kw">.</span> unfold ltTree. simpl. apply H2<span class="kw">.</span>
-    <span class="kw">assert</span> (flipColors t = t). apply unflipable. apply H4<span class="kw">.</span>
-    rewrite Heqtt<span class="kw">.</span> rewrite H5<span class="kw">.</span> rewrite &lt;- Heqtt<span class="kw">.</span> constructor; assumption.
-Qed<span class="kw">.</span>
-
-<span class="dt">Lemma</span> balanceL_keeps_order : forall (t : <span class="dt">RbTree</span>),
-  rbOrdered t -&gt; rbOrdered (balanceL t).
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
-
-<span class="dt">Lemma</span> balanceR_keeps_order : forall (t : <span class="dt">RbTree</span>),
-  rbOrdered t -&gt; rbOrdered (balanceR t).
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
-
-<span class="dt">Theorem</span> insert_keeps_order : forall (n:nat) (t : <span class="dt">RbTree</span>),
-  rbOrdered t -&gt; rbOrdered (insert n t).
-Proof<span class="kw">.</span>
-  intros. induction H<span class="kw">.</span>
-  <span class="dt">Case</span> <span class="st">&quot;O_Tip&quot;</span>. simpl. repeat constructor.
-  <span class="dt">Case</span> <span class="st">&quot;O_Cons&quot;</span>.
-    remember (cmp n n0) <span class="kw">as</span> Hcmp<span class="kw">.</span>
-    destruct Hcmp<span class="kw">.</span>
-    <span class="dt">SCase</span> <span class="st">&quot;n &lt; n0&quot;</span>.
-      simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span>
-      apply flipColors_keeps_order. apply balanceR_keeps_order. constructor. assumption. assumption.
-      unfold gtTree.
-      <span class="co">(*   rbForall (f n) t = true -&gt; f n m = true -&gt; rbForall (f n) (insert m t) = true. *)</span>
-      apply rbForall_insert. apply H1<span class="kw">.</span>
-      <span class="co">(* cmp n n0 = LT -&gt; bgt_nat n0 n = true *)</span> admit.
-      assumption.
-    <span class="dt">SCase</span> <span class="st">&quot;n = n0&quot;</span>. simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span> apply <span class="dt">O_Cons</span>; assumption.
-    <span class="dt">SCase</span> <span class="st">&quot;n &gt; n0&quot;</span>.
-      simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span>
-      apply flipColors_keeps_order. apply balanceL_keeps_order. apply O_Cons<span class="kw">.</span> assumption. assumption. assumption.
-      unfold ltTree. apply rbForall_insert. apply H2<span class="kw">.</span>
-      <span class="co">(* cmp n n0 = GT -&gt; blt_nat n0 n = true *)</span> admit.
-Qed<span class="kw">.</span></code></pre></div>
-<p>This is all quite rough of course, I think I can learn a lot but iterating upon it until I have a nice solution. Dependent types are not easy!</p>
-<hr />
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-]]></description>
-    <pubDate>Thu, 24 Oct 2013 00:00:00 UT</pubDate>
-    <guid>http://koerbitz.me/posts/Red-Black-Trees-In-Coq-Part-0.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 
