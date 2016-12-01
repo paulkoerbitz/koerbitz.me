@@ -7,8 +7,443 @@
         <description><![CDATA[Thoughts and ideas about programming, with an eye towards functional programming techniques]]></description>
         <atom:link href="http://koerbitz.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Wed, 16 Nov 2016 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Thu, 01 Dec 2016 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Understanding the react-redux connection function</title>
+    <link>http://koerbitz.me/posts/Understanding-the-react-redux-connect-function.html</link>
+    <description><![CDATA[<h1 class="title">Understanding the react-redux connection function</h1>
+
+<p class="date">published on December  1, 2016</p>
+
+<p>As described in the <a href="http://koerbitz.me/posts/Trying-and-failing-to-make-redux-connect-type-safe.html">last post</a>, I tried and failed to write a type safe wrapper for the <a href="https://github.com/reactjs/react-redux/blob/master/src/components/connect.js">react-redux</a> connect function. In this post, I want to examine this function with a view towards writing a type safe replacement in the future. To do so I’m examining the <code>connect.js</code> module of react-redux version 4.4.32.</p>
+<p>The first 33 lines are prelude, defining some helper functions and objects, nothing too special. I’m not really sure how <code>nextVersion</code> helps with code reloading, we’ll hopefully figure this out as we’ll move along.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="im">import</span> <span class="op">{</span> Component<span class="op">,</span> createElement <span class="op">}</span> <span class="im">from</span> <span class="st">&#39;react&#39;</span>
+<span class="im">import</span> storeShape <span class="im">from</span> <span class="st">&#39;../utils/storeShape&#39;</span>
+<span class="im">import</span> shallowEqual <span class="im">from</span> <span class="st">&#39;../utils/shallowEqual&#39;</span>
+<span class="im">import</span> wrapActionCreators <span class="im">from</span> <span class="st">&#39;../utils/wrapActionCreators&#39;</span>
+<span class="im">import</span> warning <span class="im">from</span> <span class="st">&#39;../utils/warning&#39;</span>
+<span class="im">import</span> isPlainObject <span class="im">from</span> <span class="st">&#39;lodash/isPlainObject&#39;</span>
+<span class="im">import</span> hoistStatics <span class="im">from</span> <span class="st">&#39;hoist-non-react-statics&#39;</span>
+<span class="im">import</span> invariant <span class="im">from</span> <span class="st">&#39;invariant&#39;</span>
+
+<span class="kw">const</span> defaultMapStateToProps <span class="op">=</span> state <span class="op">=&gt;</span> (<span class="op">{}</span>) <span class="co">// eslint-disable-line no-unused-vars</span>
+<span class="kw">const</span> defaultMapDispatchToProps <span class="op">=</span> dispatch <span class="op">=&gt;</span> (<span class="op">{</span> dispatch <span class="op">}</span>)
+<span class="kw">const</span> defaultMergeProps <span class="op">=</span> (stateProps<span class="op">,</span> dispatchProps<span class="op">,</span> parentProps) <span class="op">=&gt;</span> (<span class="op">{</span>
+  ...<span class="at">parentProps</span><span class="op">,</span>
+  ...<span class="at">stateProps</span><span class="op">,</span>
+  ...<span class="at">dispatchProps</span>
+<span class="op">}</span>)
+
+<span class="kw">function</span> <span class="at">getDisplayName</span>(WrappedComponent) <span class="op">{</span>
+  <span class="cf">return</span> <span class="va">WrappedComponent</span>.<span class="at">displayName</span> <span class="op">||</span> <span class="va">WrappedComponent</span>.<span class="at">name</span> <span class="op">||</span> <span class="st">&#39;Component&#39;</span>
+<span class="op">}</span>
+
+<span class="kw">let</span> errorObject <span class="op">=</span> <span class="op">{</span> <span class="dt">value</span><span class="op">:</span> <span class="kw">null</span> <span class="op">}</span>
+<span class="kw">function</span> <span class="at">tryCatch</span>(fn<span class="op">,</span> ctx) <span class="op">{</span>
+  <span class="cf">try</span> <span class="op">{</span>
+    <span class="cf">return</span> <span class="va">fn</span>.<span class="at">apply</span>(ctx)
+  <span class="op">}</span> <span class="cf">catch</span> (e) <span class="op">{</span>
+    <span class="va">errorObject</span>.<span class="at">value</span> <span class="op">=</span> e
+    <span class="cf">return</span> errorObject
+  <span class="op">}</span>
+<span class="op">}</span>
+
+<span class="co">// Helps track hot reloading.</span>
+<span class="kw">let</span> nextVersion <span class="op">=</span> <span class="dv">0</span></code></pre></div>
+<p>Next, we’ll move on to define the <code>connect</code> function, which is obviously the heart of this module. The start of this function is again some prelude, where we figure out which parameters are passed and assign default values for the ones not present. One interesting part is maybe that the presence of <code>mapStateToProps</code> determines (via <code>shouldSubscribe</code>) if the new component subscribes to store changes or not.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="im">export</span> <span class="im">default</span> <span class="kw">function</span> <span class="at">connect</span>(mapStateToProps<span class="op">,</span> mapDispatchToProps<span class="op">,</span> mergeProps<span class="op">,</span> options <span class="op">=</span> <span class="op">{}</span>) <span class="op">{</span>
+  <span class="kw">const</span> shouldSubscribe <span class="op">=</span> <span class="at">Boolean</span>(mapStateToProps)
+  <span class="kw">const</span> mapState <span class="op">=</span> mapStateToProps <span class="op">||</span> defaultMapStateToProps
+
+  <span class="kw">let</span> mapDispatch
+  <span class="cf">if</span> (<span class="kw">typeof</span> mapDispatchToProps <span class="op">===</span> <span class="st">&#39;function&#39;</span>) <span class="op">{</span>
+    mapDispatch <span class="op">=</span> mapDispatchToProps
+  <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> (<span class="op">!</span>mapDispatchToProps) <span class="op">{</span>
+    mapDispatch <span class="op">=</span> defaultMapDispatchToProps
+  <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+    mapDispatch <span class="op">=</span> <span class="at">wrapActionCreators</span>(mapDispatchToProps)
+  <span class="op">}</span>
+
+  <span class="kw">const</span> finalMergeProps <span class="op">=</span> mergeProps <span class="op">||</span> defaultMergeProps
+  <span class="kw">const</span> <span class="op">{</span> pure <span class="op">=</span> <span class="kw">true</span><span class="op">,</span> withRef <span class="op">=</span> <span class="kw">false</span> <span class="op">}</span> <span class="op">=</span> options
+  <span class="kw">const</span> checkMergedEquals <span class="op">=</span> pure <span class="op">&amp;&amp;</span> finalMergeProps <span class="op">!==</span> defaultMergeProps
+
+  <span class="co">// Helps track hot reloading.</span>
+  <span class="kw">const</span> version <span class="op">=</span> nextVersion<span class="op">++</span></code></pre></div>
+<p>The way the <code>connect</code> function should be called is <code>connect(mapStateToProps, mapDispatchToProps)(Component)</code>, so it must return a function which receives the component which we want to wrap. This is what happens on line 55. <code>connectDisplayName</code> and <code>checkStateShape</code> are helper variables / functions for error messages.</p>
+<p>The <code>computeMergedProps</code> function is basically a wrapper around the mergeProps function which is the user defined merged props or a default version. The only difference is that it checks in non-production environments if the final props object has the right shape.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">  <span class="cf">return</span> <span class="kw">function</span> <span class="at">wrapWithConnect</span>(WrappedComponent) <span class="op">{</span>
+    <span class="kw">const</span> connectDisplayName <span class="op">=</span> <span class="vs">`Connect(</span><span class="sc">${</span><span class="at">getDisplayName</span>(WrappedComponent)<span class="sc">}</span><span class="vs">)`</span>
+
+    <span class="kw">function</span> <span class="at">checkStateShape</span>(props<span class="op">,</span> methodName) <span class="op">{</span>
+      <span class="cf">if</span> (<span class="op">!</span><span class="at">isPlainObject</span>(props)) <span class="op">{</span>
+        <span class="at">warning</span>(
+          <span class="vs">`</span><span class="sc">${</span>methodName<span class="sc">}</span><span class="vs">() in </span><span class="sc">${</span>connectDisplayName<span class="sc">}</span><span class="vs"> must return a plain object. `</span> <span class="op">+</span>
+          <span class="vs">`Instead received </span><span class="sc">${</span>props<span class="sc">}</span><span class="vs">.`</span>
+        )
+      <span class="op">}</span>
+    <span class="op">}</span>
+
+    <span class="kw">function</span> <span class="at">computeMergedProps</span>(stateProps<span class="op">,</span> dispatchProps<span class="op">,</span> parentProps) <span class="op">{</span>
+      <span class="kw">const</span> mergedProps <span class="op">=</span> <span class="at">finalMergeProps</span>(stateProps<span class="op">,</span> dispatchProps<span class="op">,</span> parentProps)
+      <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">&#39;production&#39;</span>) <span class="op">{</span>
+        <span class="at">checkStateShape</span>(mergedProps<span class="op">,</span> <span class="st">&#39;mergeProps&#39;</span>)
+      <span class="op">}</span>
+      <span class="cf">return</span> mergedProps
+    <span class="op">}</span></code></pre></div>
+<p>Now we get into the heart of the matter - creating the new react component which we’ll return from the <code>wrapWithConnect</code> function. The <code>shouldComponentUpdate</code> method already reveals some key information about the optimizations that this container performs - we’ll update if we’re either not pure, some of our properties have changed or if the store state has changed. Looks sensible ;)</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">    <span class="kw">class</span> Connect <span class="kw">extends</span> Component <span class="op">{</span>
+      <span class="at">shouldComponentUpdate</span>() <span class="op">{</span>
+        <span class="cf">return</span> <span class="op">!</span>pure <span class="op">||</span> <span class="kw">this</span>.<span class="at">haveOwnPropsChanged</span> <span class="op">||</span> <span class="kw">this</span>.<span class="at">hasStoreStateChanged</span>
+      <span class="op">}</span>
+
+      <span class="at">constructor</span>(props<span class="op">,</span> context) <span class="op">{</span>
+        <span class="kw">super</span>(props<span class="op">,</span> context)
+        <span class="kw">this</span>.<span class="at">version</span> <span class="op">=</span> version
+        <span class="kw">this</span>.<span class="at">store</span> <span class="op">=</span> <span class="va">props</span>.<span class="at">store</span> <span class="op">||</span> <span class="va">context</span>.<span class="at">store</span>
+
+        <span class="at">invariant</span>(<span class="kw">this</span>.<span class="at">store</span><span class="op">,</span>
+          <span class="vs">`Could not find &quot;store&quot; in either the context or `</span> <span class="op">+</span>
+          <span class="vs">`props of &quot;</span><span class="sc">${</span>connectDisplayName<span class="sc">}</span><span class="vs">&quot;. `</span> <span class="op">+</span>
+          <span class="vs">`Either wrap the root component in a &lt;Provider&gt;, `</span> <span class="op">+</span>
+          <span class="vs">`or explicitly pass &quot;store&quot; as a prop to &quot;</span><span class="sc">${</span>connectDisplayName<span class="sc">}</span><span class="vs">&quot;.`</span>
+        )
+
+        <span class="kw">const</span> storeState <span class="op">=</span> <span class="kw">this</span>.<span class="va">store</span>.<span class="at">getState</span>()
+        <span class="kw">this</span>.<span class="at">state</span> <span class="op">=</span> <span class="op">{</span> storeState <span class="op">}</span>
+        <span class="kw">this</span>.<span class="at">clearCache</span>()
+      <span class="op">}</span></code></pre></div>
+<p>This class contains a lot of methods which are concerned with figuring out how to compute the right state from the <code>mapStateToProps</code> and <code>mapDispatchToProps</code> methods. Let’s first take a look at <code>computeStateProps</code> and <code>configureFinalMapState</code> as there seems to be a lot going on here.</p>
+<p>The <code>configureFinalMapState</code> method is used to install the <code>finalMapStateToProps</code> method and is called from <code>computeStateProps</code> if it is not already present. It calls <code>mapState</code> on the state and the props, if this returns a function<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> that function is set as <code>finalMapStateToProps</code> and <code>computeStateProps</code> is called, otherwise <code>mapState</code> is used as the <code>finalMapStateToProps</code> and the result of the first call to <code>mapStateToProps</code> is returned. It helps that <code>configureFinalMapState</code> is only ever called from <code>computeStateProps</code>, so it is really an initialization method that should run at most once. I am not sure if the <em>optimization</em> of only installing the <code>finalMapStateToProps</code> property in the <code>computeStateProps</code> method, or the different magic cases are really needed, but that’s what we have.</p>
+<p>The only place where <code>computeStateProps</code> is called from is the <code>updateStatePropsIfNeeded</code> method, we will look at this functions purpose in a minute.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">computeStateProps</span>(store<span class="op">,</span> props) <span class="op">{</span>
+        <span class="cf">if</span> (<span class="op">!</span><span class="kw">this</span>.<span class="at">finalMapStateToProps</span>) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">this</span>.<span class="at">configureFinalMapState</span>(store<span class="op">,</span> props)
+        <span class="op">}</span>
+
+        <span class="kw">const</span> state <span class="op">=</span> <span class="va">store</span>.<span class="at">getState</span>()
+        <span class="kw">const</span> stateProps <span class="op">=</span> <span class="kw">this</span>.<span class="at">doStatePropsDependOnOwnProps</span> <span class="op">?</span>
+          <span class="kw">this</span>.<span class="at">finalMapStateToProps</span>(state<span class="op">,</span> props) :
+          <span class="kw">this</span>.<span class="at">finalMapStateToProps</span>(state)
+
+        <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">&#39;production&#39;</span>) <span class="op">{</span>
+          <span class="at">checkStateShape</span>(stateProps<span class="op">,</span> <span class="st">&#39;mapStateToProps&#39;</span>)
+        <span class="op">}</span>
+        <span class="cf">return</span> stateProps
+      <span class="op">}</span>
+
+      <span class="at">configureFinalMapState</span>(store<span class="op">,</span> props) <span class="op">{</span>
+        <span class="kw">const</span> mappedState <span class="op">=</span> <span class="at">mapState</span>(<span class="va">store</span>.<span class="at">getState</span>()<span class="op">,</span> props)
+        <span class="kw">const</span> isFactory <span class="op">=</span> <span class="kw">typeof</span> mappedState <span class="op">===</span> <span class="st">&#39;function&#39;</span>
+
+        <span class="kw">this</span>.<span class="at">finalMapStateToProps</span> <span class="op">=</span> isFactory <span class="op">?</span> mappedState : mapState
+        <span class="kw">this</span>.<span class="at">doStatePropsDependOnOwnProps</span> <span class="op">=</span> <span class="kw">this</span>.<span class="va">finalMapStateToProps</span>.<span class="at">length</span> <span class="op">!==</span> <span class="dv">1</span>
+
+        <span class="cf">if</span> (isFactory) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">this</span>.<span class="at">computeStateProps</span>(store<span class="op">,</span> props)
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">&#39;production&#39;</span>) <span class="op">{</span>
+          <span class="at">checkStateShape</span>(mappedState<span class="op">,</span> <span class="st">&#39;mapStateToProps&#39;</span>)
+        <span class="op">}</span>
+        <span class="cf">return</span> mappedState
+      <span class="op">}</span></code></pre></div>
+<p>The <code>computeDispatchProps</code> and <code>configureFinalMapDispatch</code> methods follow the same pattern as the <code>computeStateProps</code> and <code>configureFinalMapStat</code> methods above. In fact, they could almost be copied-and-pasted. <code>computeDispatchProps</code> first installs the <code>finalMapDispatchToProps</code> property by calling <code>configureFinalMapDispatch</code> method, if it is not already present. Analogously to the case above, the <code>configureFinalMapDispatch</code> method checks if <code>mapDispatch</code> returns a function and in this case installs that or <code>mapDispatch</code> as the <code>finalMapDispatchToProps</code> property. Again, <code>computeDispatchProps</code> is only ever called from the <code>updateDispatchPropsIfNeeded</code> method.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">computeDispatchProps</span>(store<span class="op">,</span> props) <span class="op">{</span>
+        <span class="cf">if</span> (<span class="op">!</span><span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span>) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">this</span>.<span class="at">configureFinalMapDispatch</span>(store<span class="op">,</span> props)
+        <span class="op">}</span>
+
+        <span class="kw">const</span> <span class="op">{</span> dispatch <span class="op">}</span> <span class="op">=</span> store
+        <span class="kw">const</span> dispatchProps <span class="op">=</span> <span class="kw">this</span>.<span class="at">doDispatchPropsDependOnOwnProps</span> <span class="op">?</span>
+          <span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span>(dispatch<span class="op">,</span> props) :
+          <span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span>(dispatch)
+
+        <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">&#39;production&#39;</span>) <span class="op">{</span>
+          <span class="at">checkStateShape</span>(dispatchProps<span class="op">,</span> <span class="st">&#39;mapDispatchToProps&#39;</span>)
+        <span class="op">}</span>
+        <span class="cf">return</span> dispatchProps
+      <span class="op">}</span>
+
+      <span class="at">configureFinalMapDispatch</span>(store<span class="op">,</span> props) <span class="op">{</span>
+        <span class="kw">const</span> mappedDispatch <span class="op">=</span> <span class="at">mapDispatch</span>(<span class="va">store</span>.<span class="at">dispatch</span><span class="op">,</span> props)
+        <span class="kw">const</span> isFactory <span class="op">=</span> <span class="kw">typeof</span> mappedDispatch <span class="op">===</span> <span class="st">&#39;function&#39;</span>
+
+        <span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span> <span class="op">=</span> isFactory <span class="op">?</span> mappedDispatch : mapDispatch
+        <span class="kw">this</span>.<span class="at">doDispatchPropsDependOnOwnProps</span> <span class="op">=</span> <span class="kw">this</span>.<span class="va">finalMapDispatchToProps</span>.<span class="at">length</span> <span class="op">!==</span> <span class="dv">1</span>
+
+        <span class="cf">if</span> (isFactory) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">this</span>.<span class="at">computeDispatchProps</span>(store<span class="op">,</span> props)
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">&#39;production&#39;</span>) <span class="op">{</span>
+          <span class="at">checkStateShape</span>(mappedDispatch<span class="op">,</span> <span class="st">&#39;mapDispatchToProps&#39;</span>)
+        <span class="op">}</span>
+        <span class="cf">return</span> mappedDispatch
+      <span class="op">}</span></code></pre></div>
+<p>Next up are three <code>updateXYZPropsIfNeeded</code> methods, where <code>XYZ</code> is either <code>State</code>, <code>Dispatch</code> or <code>Merge</code>. These always compute the new part of the properties, but only update the cached version on the object, if they are not <code>shallowEqual</code> to the currently cached version. If no update is performed, they return false, otherwise they return true.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">updateStatePropsIfNeeded</span>() <span class="op">{</span>
+        <span class="kw">const</span> nextStateProps <span class="op">=</span> <span class="kw">this</span>.<span class="at">computeStateProps</span>(<span class="kw">this</span>.<span class="at">store</span><span class="op">,</span> <span class="kw">this</span>.<span class="at">props</span>)
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">stateProps</span> <span class="op">&amp;&amp;</span> <span class="at">shallowEqual</span>(nextStateProps<span class="op">,</span> <span class="kw">this</span>.<span class="at">stateProps</span>)) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">false</span>
+        <span class="op">}</span>
+
+        <span class="kw">this</span>.<span class="at">stateProps</span> <span class="op">=</span> nextStateProps
+        <span class="cf">return</span> <span class="kw">true</span>
+      <span class="op">}</span>
+
+      <span class="at">updateDispatchPropsIfNeeded</span>() <span class="op">{</span>
+        <span class="kw">const</span> nextDispatchProps <span class="op">=</span> <span class="kw">this</span>.<span class="at">computeDispatchProps</span>(<span class="kw">this</span>.<span class="at">store</span><span class="op">,</span> <span class="kw">this</span>.<span class="at">props</span>)
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">dispatchProps</span> <span class="op">&amp;&amp;</span> <span class="at">shallowEqual</span>(nextDispatchProps<span class="op">,</span> <span class="kw">this</span>.<span class="at">dispatchProps</span>)) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">false</span>
+        <span class="op">}</span>
+
+        <span class="kw">this</span>.<span class="at">dispatchProps</span> <span class="op">=</span> nextDispatchProps
+        <span class="cf">return</span> <span class="kw">true</span>
+      <span class="op">}</span>
+
+      <span class="at">updateMergedPropsIfNeeded</span>() <span class="op">{</span>
+        <span class="kw">const</span> nextMergedProps <span class="op">=</span> <span class="at">computeMergedProps</span>(<span class="kw">this</span>.<span class="at">stateProps</span><span class="op">,</span> <span class="kw">this</span>.<span class="at">dispatchProps</span><span class="op">,</span> <span class="kw">this</span>.<span class="at">props</span>)
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">mergedProps</span> <span class="op">&amp;&amp;</span> checkMergedEquals <span class="op">&amp;&amp;</span> <span class="at">shallowEqual</span>(nextMergedProps<span class="op">,</span> <span class="kw">this</span>.<span class="at">mergedProps</span>)) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">false</span>
+        <span class="op">}</span>
+
+        <span class="kw">this</span>.<span class="at">mergedProps</span> <span class="op">=</span> nextMergedProps
+        <span class="cf">return</span> <span class="kw">true</span>
+      <span class="op">}</span></code></pre></div>
+<p>The other large block of methods are methods for managing subscriptions and the lifecycle <code>componentDidMount</code>, <code>componentWillUnmount</code> and <code>componentWillReceiveProps</code> methods. In the later <code>haveOwnPropsChanged</code> is set to true if the component is either marked as not pure of if the new props are not shallow equal to the old ones.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">isSubscribed</span>() <span class="op">{</span>
+        <span class="cf">return</span> <span class="kw">typeof</span> <span class="kw">this</span>.<span class="at">unsubscribe</span> <span class="op">===</span> <span class="st">&#39;function&#39;</span>
+      <span class="op">}</span>
+
+      <span class="at">trySubscribe</span>() <span class="op">{</span>
+        <span class="cf">if</span> (shouldSubscribe <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="kw">this</span>.<span class="at">unsubscribe</span>) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">unsubscribe</span> <span class="op">=</span> <span class="kw">this</span>.<span class="va">store</span>.<span class="at">subscribe</span>(<span class="kw">this</span>.<span class="va">handleChange</span>.<span class="at">bind</span>(<span class="kw">this</span>))
+          <span class="kw">this</span>.<span class="at">handleChange</span>()
+        <span class="op">}</span>
+      <span class="op">}</span>
+
+      <span class="at">tryUnsubscribe</span>() <span class="op">{</span>
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">unsubscribe</span>) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">unsubscribe</span>()
+          <span class="kw">this</span>.<span class="at">unsubscribe</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="op">}</span>
+      <span class="op">}</span>
+
+      <span class="at">componentDidMount</span>() <span class="op">{</span>
+        <span class="kw">this</span>.<span class="at">trySubscribe</span>()
+      <span class="op">}</span>
+
+      <span class="at">componentWillReceiveProps</span>(nextProps) <span class="op">{</span>
+        <span class="cf">if</span> (<span class="op">!</span>pure <span class="op">||</span> <span class="op">!</span><span class="at">shallowEqual</span>(nextProps<span class="op">,</span> <span class="kw">this</span>.<span class="at">props</span>)) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">haveOwnPropsChanged</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="op">}</span>
+      <span class="op">}</span>
+
+      <span class="at">componentWillUnmount</span>() <span class="op">{</span>
+        <span class="kw">this</span>.<span class="at">tryUnsubscribe</span>()
+        <span class="kw">this</span>.<span class="at">clearCache</span>()
+      <span class="op">}</span></code></pre></div>
+<p>Net up is the clear cache method, which shows us what is all cached on the new component, there are the three prop types (state, dispatch and merge), the final methods to compute them (<code>finalMapDispatchToProps</code>, <code>finalMapStateToProps</code>), the rendered wrapped element (<code>renderedElement</code>) and flags indicating if the stateProps or the storeProps have changed. I don’t quite understand what <code>haveStatePropsBeenPrecalculated</code> and <code>statePropsPrecalculationError</code> do quite yet.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">clearCache</span>() <span class="op">{</span>
+        <span class="kw">this</span>.<span class="at">dispatchProps</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">stateProps</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">mergedProps</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">haveOwnPropsChanged</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="kw">this</span>.<span class="at">hasStoreStateChanged</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="kw">this</span>.<span class="at">haveStatePropsBeenPrecalculated</span> <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">this</span>.<span class="at">statePropsPrecalculationError</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">finalMapStateToProps</span> <span class="op">=</span> <span class="kw">null</span>
+      <span class="op">}</span></code></pre></div>
+<p>The handleChange method is the one that is subscribed to the store, thus it is being called when the store has changed. When there is not <code>this.unsubscribe</code> method, we’re not yet subscribed, so we just return. If the component is <code>pure</code> and the new store state is shallowEqual to the old one, we also return. Otherwise, there is another optimization if the <code>stateProps</code> do not depend on the <code>ownProps</code>, we try to pre-compute the <code>stateProps</code>, store an error if there is an exception thrown and remember that the state props have been precalculated. In any case we set the <code>hasStoreStateChanged</code> flag to true and store the new state.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">handleChange</span>() <span class="op">{</span>
+        <span class="cf">if</span> (<span class="op">!</span><span class="kw">this</span>.<span class="at">unsubscribe</span>) <span class="op">{</span>
+          <span class="cf">return</span>
+        <span class="op">}</span>
+
+        <span class="kw">const</span> storeState <span class="op">=</span> <span class="kw">this</span>.<span class="va">store</span>.<span class="at">getState</span>()
+        <span class="kw">const</span> prevStoreState <span class="op">=</span> <span class="kw">this</span>.<span class="va">state</span>.<span class="at">storeState</span>
+        <span class="cf">if</span> (pure <span class="op">&amp;&amp;</span> prevStoreState <span class="op">===</span> storeState) <span class="op">{</span>
+          <span class="cf">return</span>
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (pure <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="kw">this</span>.<span class="at">doStatePropsDependOnOwnProps</span>) <span class="op">{</span>
+          <span class="kw">const</span> haveStatePropsChanged <span class="op">=</span> <span class="at">tryCatch</span>(<span class="kw">this</span>.<span class="at">updateStatePropsIfNeeded</span><span class="op">,</span> <span class="kw">this</span>)
+          <span class="cf">if</span> (<span class="op">!</span>haveStatePropsChanged) <span class="op">{</span>
+            <span class="cf">return</span>
+          <span class="op">}</span>
+          <span class="cf">if</span> (haveStatePropsChanged <span class="op">===</span> errorObject) <span class="op">{</span>
+            <span class="kw">this</span>.<span class="at">statePropsPrecalculationError</span> <span class="op">=</span> <span class="va">errorObject</span>.<span class="at">value</span>
+          <span class="op">}</span>
+          <span class="kw">this</span>.<span class="at">haveStatePropsBeenPrecalculated</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="op">}</span>
+
+        <span class="kw">this</span>.<span class="at">hasStoreStateChanged</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="kw">this</span>.<span class="at">setState</span>(<span class="op">{</span> storeState <span class="op">}</span>)
+      <span class="op">}</span></code></pre></div>
+<p>Finally, there is a <code>getWrappedInstance</code> convenience method.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">getWrappedInstance</span>() <span class="op">{</span>
+        <span class="at">invariant</span>(withRef<span class="op">,</span>
+          <span class="vs">`To access the wrapped instance, you need to specify `</span> <span class="op">+</span>
+          <span class="vs">`{ withRef: true } as the fourth argument of the connect() call.`</span>
+        )
+
+        <span class="cf">return</span> <span class="kw">this</span>.<span class="va">refs</span>.<span class="at">wrappedInstance</span>
+      <span class="op">}</span></code></pre></div>
+<h3 id="the-render-method">The render method</h3>
+<p>Finally the <code>render</code> method is pretty involved, it does far more than just rendering the wrapped compoent, it is where all the caching and precomputing mechanisms come into play.</p>
+<p>There is a bit (too much(?)) logic in this function, fortunately the variable names are really good. I’ve found it the easiest to work my way from the bottom up. At the very end, the <code>this.renderedElement</code> is returned, which is an instance of the wrapped element (with or without a ref).</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">        <span class="cf">if</span> (withRef) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="at">createElement</span>(WrappedComponent<span class="op">,</span> <span class="op">{</span>
+            ...<span class="va">this</span>.<span class="at">mergedProps</span><span class="op">,</span>
+            <span class="dt">ref</span><span class="op">:</span> <span class="st">&#39;wrappedInstance&#39;</span>
+          <span class="op">}</span>)
+        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="at">createElement</span>(WrappedComponent<span class="op">,</span>
+            <span class="kw">this</span>.<span class="at">mergedProps</span>
+          )
+        <span class="op">}</span>
+
+        <span class="cf">return</span> <span class="kw">this</span>.<span class="at">renderedElement</span></code></pre></div>
+<p>However, <code>this.renderedElement</code> is only computed if (a) <code>haveMergedPropsChanged</code> is true or (b) <code>renderedElement</code> is falsy (so probably undefined).</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">        <span class="cf">if</span> (<span class="op">!</span>haveMergedPropsChanged <span class="op">&amp;&amp;</span> renderedElement) <span class="op">{</span>
+          <span class="cf">return</span> renderedElement
+        <span class="op">}</span></code></pre></div>
+<p>Now <code>haveMergedPropsChanged</code> is either false if all of <code>haveStatePropsChanged</code>, <code>haveDispatchPropsChanged</code> and<code>haveOwnPropsChanged</code> are false (so no props have changed), or the result of the <code>this.updateMergedPropsIfNeeded()</code> method.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">        <span class="kw">let</span> haveMergedPropsChanged <span class="op">=</span> <span class="kw">true</span>
+        <span class="cf">if</span> (
+          haveStatePropsChanged <span class="op">||</span>
+          haveDispatchPropsChanged <span class="op">||</span>
+          haveOwnPropsChanged
+        ) <span class="op">{</span>
+          haveMergedPropsChanged <span class="op">=</span> <span class="kw">this</span>.<span class="at">updateMergedPropsIfNeeded</span>()
+        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+          haveMergedPropsChanged <span class="op">=</span> <span class="kw">false</span>
+        <span class="op">}</span></code></pre></div>
+<p><code>haveStatePropsChanged</code> is true if either <code>haveStatePropsBeenPrecalculated</code> is true or if <code>shouldUpdateStateProps</code> is true and <code>this.updateStatePropsIfNeeded()</code> returns true. <code>shouldUpdateStateProps</code> is true if either (a) the component is not pure or there is not rendered element yet, (b) <code>hasStoreStateChanged</code> is true or (c) <code>haveOwnPropsChanged</code> is true and <code>this.doStatePropsDependOnOwnProps</code> is. Similar conditions apply to <code>shouldUpdateDispatchProps</code>, except that the <code>hasStoreStateChanged</code> condition is not checked.</p>
+<p>Now, another interesting thing that is going on in the render method is that it sets a number of instance variables which control the caching behavior, namely <code>haveOwnPropsChanged</code>, <code>hasStoreStateChanged</code>, <code>haveStatePropsBeenPrecalculated</code>. After render has run, these are set to <code>false</code>, so that the respective components would not be recalculated on a second run of <code>render</code>. Other life cycle methods turn these instance variables to true again, this is essential for only recomputing the parts of the properties which are acutally needed.</p>
+<p>Now that we have examined the full render method, let’s see it once more from top to bottom in all of its glory:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">render</span>() <span class="op">{</span>
+        <span class="kw">const</span> <span class="op">{</span>
+          haveOwnPropsChanged<span class="op">,</span>
+          hasStoreStateChanged<span class="op">,</span>
+          haveStatePropsBeenPrecalculated<span class="op">,</span>
+          statePropsPrecalculationError<span class="op">,</span>
+          renderedElement
+        <span class="op">}</span> <span class="op">=</span> <span class="kw">this</span>
+
+        <span class="kw">this</span>.<span class="at">haveOwnPropsChanged</span> <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">this</span>.<span class="at">hasStoreStateChanged</span> <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">this</span>.<span class="at">haveStatePropsBeenPrecalculated</span> <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">this</span>.<span class="at">statePropsPrecalculationError</span> <span class="op">=</span> <span class="kw">null</span>
+
+        <span class="cf">if</span> (statePropsPrecalculationError) <span class="op">{</span>
+          <span class="cf">throw</span> statePropsPrecalculationError
+        <span class="op">}</span>
+
+        <span class="kw">let</span> shouldUpdateStateProps <span class="op">=</span> <span class="kw">true</span>
+        <span class="kw">let</span> shouldUpdateDispatchProps <span class="op">=</span> <span class="kw">true</span>
+        <span class="cf">if</span> (pure <span class="op">&amp;&amp;</span> renderedElement) <span class="op">{</span>
+          shouldUpdateStateProps <span class="op">=</span> hasStoreStateChanged <span class="op">||</span> (
+            haveOwnPropsChanged <span class="op">&amp;&amp;</span> <span class="kw">this</span>.<span class="at">doStatePropsDependOnOwnProps</span>
+          )
+          shouldUpdateDispatchProps <span class="op">=</span>
+            haveOwnPropsChanged <span class="op">&amp;&amp;</span> <span class="kw">this</span>.<span class="at">doDispatchPropsDependOnOwnProps</span>
+        <span class="op">}</span>
+
+        <span class="kw">let</span> haveStatePropsChanged <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">let</span> haveDispatchPropsChanged <span class="op">=</span> <span class="kw">false</span>
+        <span class="cf">if</span> (haveStatePropsBeenPrecalculated) <span class="op">{</span>
+          haveStatePropsChanged <span class="op">=</span> <span class="kw">true</span>
+        <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> (shouldUpdateStateProps) <span class="op">{</span>
+          haveStatePropsChanged <span class="op">=</span> <span class="kw">this</span>.<span class="at">updateStatePropsIfNeeded</span>()
+        <span class="op">}</span>
+        <span class="cf">if</span> (shouldUpdateDispatchProps) <span class="op">{</span>
+          haveDispatchPropsChanged <span class="op">=</span> <span class="kw">this</span>.<span class="at">updateDispatchPropsIfNeeded</span>()
+        <span class="op">}</span>
+
+        <span class="kw">let</span> haveMergedPropsChanged <span class="op">=</span> <span class="kw">true</span>
+        <span class="cf">if</span> (
+          haveStatePropsChanged <span class="op">||</span>
+          haveDispatchPropsChanged <span class="op">||</span>
+          haveOwnPropsChanged
+        ) <span class="op">{</span>
+          haveMergedPropsChanged <span class="op">=</span> <span class="kw">this</span>.<span class="at">updateMergedPropsIfNeeded</span>()
+        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+          haveMergedPropsChanged <span class="op">=</span> <span class="kw">false</span>
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (<span class="op">!</span>haveMergedPropsChanged <span class="op">&amp;&amp;</span> renderedElement) <span class="op">{</span>
+          <span class="cf">return</span> renderedElement
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (withRef) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="at">createElement</span>(WrappedComponent<span class="op">,</span> <span class="op">{</span>
+            ...<span class="va">this</span>.<span class="at">mergedProps</span><span class="op">,</span>
+            <span class="dt">ref</span><span class="op">:</span> <span class="st">&#39;wrappedInstance&#39;</span>
+          <span class="op">}</span>)
+        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="at">createElement</span>(WrappedComponent<span class="op">,</span>
+            <span class="kw">this</span>.<span class="at">mergedProps</span>
+          )
+        <span class="op">}</span>
+
+        <span class="cf">return</span> <span class="kw">this</span>.<span class="at">renderedElement</span>
+      <span class="op">}</span>
+    }</code></pre></div>
+<p>Finally, we have some additional properties installed on the Connect class (<code>static</code> properties in OO terms)</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">    <span class="va">Connect</span>.<span class="at">displayName</span> <span class="op">=</span> connectDisplayName
+    <span class="va">Connect</span>.<span class="at">WrappedComponent</span> <span class="op">=</span> WrappedComponent
+    <span class="va">Connect</span>.<span class="at">contextTypes</span> <span class="op">=</span> <span class="op">{</span>
+      <span class="dt">store</span><span class="op">:</span> storeShape
+    <span class="op">}</span>
+    <span class="va">Connect</span>.<span class="at">propTypes</span> <span class="op">=</span> <span class="op">{</span>
+      <span class="dt">store</span><span class="op">:</span> storeShape
+    <span class="op">}</span>
+
+    <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">&#39;production&#39;</span>) <span class="op">{</span>
+      <span class="va">Connect</span>.<span class="va">prototype</span>.<span class="at">componentWillUpdate</span> <span class="op">=</span> <span class="kw">function</span> <span class="at">componentWillUpdate</span>() <span class="op">{</span>
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">version</span> <span class="op">===</span> version) <span class="op">{</span>
+          <span class="cf">return</span>
+        <span class="op">}</span>
+
+        <span class="co">// We are hot reloading!</span>
+        <span class="kw">this</span>.<span class="at">version</span> <span class="op">=</span> version
+        <span class="kw">this</span>.<span class="at">trySubscribe</span>()
+        <span class="kw">this</span>.<span class="at">clearCache</span>()
+      <span class="op">}</span>
+    <span class="op">}</span>
+
+    <span class="cf">return</span> <span class="at">hoistStatics</span>(Connect<span class="op">,</span> WrappedComponent)
+  }</code></pre></div>
+<h2 id="conclusion-next-steps">Conclusion &amp; next steps</h2>
+<p>OK, we’ve seen that the generated component is somewhat involved and has some fancy optimizations going on. Splitting the creation of the properties of the wrapped component into external props, properties computed from the state and properties computed from the dispatch method allows deciding precisely which part has been updated and if the wrapped component should be rendered again or not. The caching mechanisms employed are also fancy, with a fairly precise control over what needs to be recomputed when and only recomputing the parts needed. All in all, the connect function is very simple apart from these optimizations.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>This is where I would prefer the constraints of a static type system - why do we need the case where <code>mapState</code> does not return a final result? To me this seems like a bit too much unneeded (=hard to understand) flexiblity, which dynamic languages tend to gravitate to.<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+]]></description>
+    <pubDate>Thu, 01 Dec 2016 00:00:00 UT</pubDate>
+    <guid>http://koerbitz.me/posts/Understanding-the-react-redux-connect-function.html</guid>
+    <dc:creator>Paul Koerbitz</dc:creator>
+</item>
+<item>
     <title>Trying and failing to make a type safe react-redux connect wrapper</title>
     <link>http://koerbitz.me/posts/Trying-and-failing-to-make-redux-connect-type-safe.html</link>
     <description><![CDATA[<h1 class="title">Trying and failing to make a type safe react-redux connect wrapper</h1>
@@ -1104,255 +1539,6 @@ pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <
 ]]></description>
     <pubDate>Fri, 10 Jan 2014 00:00:00 UT</pubDate>
     <guid>http://koerbitz.me/posts/Sum-Types-Visitors-and-the-Expression-Problem.html</guid>
-    <dc:creator>Paul Koerbitz</dc:creator>
-</item>
-<item>
-    <title>Understanding Pointers, Ownership, and Lifetimes in Rust</title>
-    <link>http://koerbitz.me/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</link>
-    <description><![CDATA[<h1 class="title">Understanding Pointers, Ownership, and Lifetimes in Rust</h1>
-
-<p class="date">published on December 21, 2013</p>
-
-<hr />
-<h2 id="update-2015-03-15">Update 2015-03-15</h2>
-<p>I have updated this post to reflect the new syntax for boxes or owned pointers in in rust 1.0.</p>
-<hr />
-<p>In the last couple of weeks I have been looking into <a href="http://www.rust-lang.org">Rust</a>, a new language developed by the good folks at Mozilla. Rust is fairly unique in that it is aimed at the same space as C++: a systems programming language that gives you full control over memory but also offers high level language features. In the past few years a few languages have come out that claim to target this space, for example <a href="http://www.go-lang.org">Go</a>, <a href="http://www.dlang.org">D</a>, and <a href="http://www.nimrod-lang.org">Nimrod</a>. However, these languages are garbage collected by default and loose their memory safety when memory is managed manually (D, Nimrod) or do not offer this possibility at all (Go). Therefore, these languages are not well equiped for applications which require full control over memory, which is the use case where C++ shines.</p>
-<p>I think it’s great that C++ finally gets some real competition. Even among C++ fans, few will deny that compatibility with C, decades of language evolution, and accidental language features have created a very complex language that is extremely difficult to master. I think it is quite sad that for a lot of applications, C++ is still the only sane choice. We need a simpler language that offers more modern language features while targeting the same space. Rust could just be that language.</p>
-<p>Ok now, the point of this post is not to argue the case for <a href="http://www.rust-lang.org">Rust</a> nor to heap (well deserved) praise onto the Rust designers and implementers. I want to talk about the ownership semantics in Rust and how they interact with the different type of pointers in Rust.</p>
-<h2 id="rusts-guiding-principles">Rust’s Guiding Principles</h2>
-<p>To me, understanding something means discovering and understanding the reasons and guiding principles behind the things on the surface. From these, it should be easy to reason about other things and quickly understand why they must be one way and not another. To me the guiding principles of memory managemend in Rust are the following:</p>
-<ol style="list-style-type: decimal">
-<li><p><strong><strong>Manual memory management</strong></strong>: There must be some way for the programmer to control when an object on the heap will be deleted.</p></li>
-<li><p><strong><strong>Memory safety</strong></strong>: Pointers must never point to areas of memory that have been changed or deleted.</p></li>
-<li><p><strong><strong>Safe Concurrency</strong></strong>: There should be no dataraces between threads. Multiple threads must not read and modify the same part of memory at the same time.</p></li>
-<li><p><strong><strong>Compile time checks</strong></strong>: Ensure correctness at compile time instead of runtime whenever possible.</p></li>
-</ol>
-<p>This, in conjunction with the features that Rust provides, will give us a good idea why certain things must be the way they are in Rust. This post focuses on exploring the memory management and safety aspects.</p>
-<h2 id="safe-manual-memory-management-by-enforcing-ownership">Safe Manual Memory Management by Enforcing Ownership</h2>
-<p>The way Rust achieves safe manual memory management is by enforcing sane ownership semantics through a number of different pointers. There are several types of pointers in Rust: the most important are <em>boxes or owned pointers</em> and <em>references or borrowed pointers</em>. There are also different kinds of reference counted pointers, but these are for more complicated situations which I won’t get into in this post. Therefore, this post will focus on owned and borrowed pointers.</p>
-<h3 id="boxes-owned-pointers"><em>Boxes</em> / <em>Owned Pointers</em></h3>
-<p>A <em>box</em> or <em>owned pointer</em> in Rust has ownership over a certain part of the heap. When it goes out of scope it deletes that part of the heap. This achieves <em>manual memory management</em>: the programmer has control over when memory is released by controlling when an owned pointer goes out of scope. A box is a datatype, parameterized by the type that it boxes, so <code>Box&lt;i32&gt;</code> is the type of an owned pointer to an <code>i32</code> and <code>Box::new(3)</code> is the literal notation for allocating space on the heap for an i32, putting 3 into it and handling back an owned pointer. Like all pointers, boxes are derferenced by prefixing them with <code>*</code>. Here is a bit of a contrived example:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="co">// The type annotations in the let statements in this example</span>
-<span class="co">// (e.g. &#39;: Box&lt;int&gt;&#39;) are not necessary and only for clarity</span>
-
-<span class="kw">fn</span> owned_seven() -&gt; <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt; {
-    <span class="co">// Allocate an i32 with value &#39;3&#39; on the heap, &#39;three&#39; points to it</span>
-    <span class="kw">let</span> three : <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt; = <span class="dt">Box</span>::new(<span class="dv">3</span>);
-    <span class="co">// The same for four</span>
-    <span class="kw">let</span> four : <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt; = <span class="dt">Box</span>::new(<span class="dv">4</span>);
-    <span class="co">// Dereference both &#39;three&#39; and &#39;four&#39;, add them, store the result</span>
-    <span class="co">// in a newly allocated variable on the heap</span>
-    <span class="dt">Box</span>::new(*three + *four)
-}   <span class="co">// &lt;-- &#39;three&#39; and &#39;four&#39; go out of scope, so the memory they own</span>
-    <span class="co">//     is released. The memory of the return value is owned by the</span>
-    <span class="co">//     return value so it survives the function call.</span>
-    <span class="co">// Note: returning a pointer from a function is considered an anti-</span>
-    <span class="co">// pattern in rust. It is prefered to return a value so the caller</span>
-    <span class="co">// can decide what he wants to do with it. This is done for illustration</span>
-    <span class="co">// purposes here.</span>
-
-
-<span class="kw">fn</span> main() {
-    <span class="kw">let</span> seven : <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt; = owned_seven();
-    <span class="pp">println!</span>(<span class="st">&quot;3 + 4 = {}&quot;</span>, *seven);
-}   <span class="co">// &lt;-- seven goes out of scope and the memory it points to is</span>
-    <span class="co">//     deallocated here</span></code></pre></div>
-<h3 id="referneces-borrowed-pointers"><em>Referneces</em> / <em>Borrowed Pointers</em></h3>
-<p>Having only owned pointers would make writing many programs difficult: there could only ever be one reference to every <em>thing</em>. Fortunately, Rust offers another type of pointer called a <em>reference</em> or <em>borrowed pointer</em>. References do not imply ownership and they can point to objects both on the heap and the stack, so they are quite flexible. We can create a reference by taking the address of something with the <em>address-of</em> operator <code>&amp;</code>. In a slight abuse of notation, the types of references are also denoted by prefixing the type of the variable it points to by <code>&amp;</code>, so <code>&amp;i32</code> is a borrowed pointer to an <code>i32</code>.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
-    <span class="kw">let</span> three : &amp;<span class="dt">i32</span> = &amp;<span class="dv">3</span>;
-    <span class="kw">let</span> four : &amp;<span class="dt">i32</span> = &amp;<span class="dv">4</span>;
-    <span class="pp">println!</span>(<span class="st">&quot;3 + 4 = {}&quot;</span>, *three + *four);
-}</code></pre></div>
-<p>References in Rust are a lot like references and pass-by-reference bound variables in C and C++, but note that unlike C/C++-references borrowed pointers must be dereferenced to get to their values. I think this is really more consistent, because references really hold the address to a memory location, just like other pointes. So it makes sense to treat them similarly in terms of syntax. References in Rust also have a number of safety mechanisms that C/C++ references lack, but more on that later.</p>
-<h2 id="move-semantics">Move Semantics</h2>
-<p><em>Memory safety</em> implies that owned pointers <em>cannot be copied or cloned</em>. Otherwise, two such pointers could point to the same block of memory and that memory would be deleted twice. Therefore, owned pointers have move semantics:<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> when owned pointer <code>o2</code> is initialized from owned pointer <code>o1</code>, <code>o1</code> is no longer valid. By guiding principle number four, we would perfer to ensure this at compile time, and Rust indeed does this.<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
-   <span class="kw">let</span> o1 = <span class="dt">Box</span>::new(<span class="st">&quot;world&quot;</span>);
-   <span class="kw">let</span> o2 = o1;                <span class="co">// &lt;-- o1 is &#39;moved&#39; into o2 and now invalid</span>
-   <span class="pp">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, o1); <span class="co">// &lt;-- this is a compile time error</span>
-}</code></pre></div>
-<p>Indeed the Rust compiler reports:</p>
-<pre><code>move.rs:4:27: 4:29 error: use of moved value: `o1`
-move.rs:4    println!(&quot;Hello, {}!&quot;, o1); // &lt;-- this is a compile time error
-                                    ^~</code></pre>
-<h3 id="structs-and-enums">Structs and Enums</h3>
-<p>In general Rust has move semantics. When an object is initialized via assignment its memory is moved to the newly assigned variable. However, structs can implement the <code>Copy</code> trait, which means they will have copy semantics instead: When assigned the new object gets a bitwise copy of the object used to assign it.</p>
-<p>The <code>Copy</code> trait cannot be implemented when an object contains a box: the box does not implement the copy trait, so we can’t copy it when copying the object containing it. This makes sense because the box has move semantics, the object containing it must also have move semantics, otherwise we would again incur two independent owning copies.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="co">// Derive the Copy trait so objects of this type have copy semantics</span>
-<span class="at">#[</span>derive<span class="at">(</span>Show<span class="at">,</span><span class="bu">Copy</span><span class="at">)]</span>
-<span class="kw">struct</span> Pod {x: <span class="dt">i32</span>, y: <span class="dt">u32</span>}
-
-<span class="co">// Can&#39;t derive the Copy trait because Box&lt;T&gt; does not have the Copy trait</span>
-<span class="at">#[</span>derive<span class="at">(</span>Show<span class="at">)]</span>
-<span class="kw">struct</span> WithBox {x: <span class="dt">i32</span>, p: <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt;}
-
-<span class="kw">fn</span> main() {
-   <span class="kw">let</span> a1 = Pod {x: <span class="dv">3</span>, y: <span class="dv">4</span>};
-   <span class="kw">let</span> a2 = a1;
-   <span class="pp">println!</span>(<span class="st">&quot;{:?}&quot;</span>, a1);                   <span class="co">// &lt;-- OK, a1 has been copied</span>
-   <span class="kw">let</span> b1 = WithBox {x: <span class="dv">3</span>, p: <span class="dt">Box</span>::new(<span class="dv">4</span>)};
-   <span class="kw">let</span> b2 = b1;
-   <span class="pp">println!</span>(<span class="st">&quot;{:?}&quot;</span>, b1);                   <span class="co">// &lt;-- Compile time error, b1 has been moved</span>
-}</code></pre></div>
-<p>The same rules apply to enums, but here the error messages can be a bit more confusing.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">enum</span> MyEnum {
-     X(<span class="dt">i32</span>),
-     Y(<span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt;)
-}
-
-<span class="kw">fn</span> match_and_print(e: &amp;MyEnum) {
-    <span class="kw">match</span> e {
-        &amp;MyEnum::X(x) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, x),  <span class="co">// &lt;-- OK, x can be copied</span>
-        &amp;MyEnum::Y(y) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, *y)  <span class="co">// &lt;-- Error, y cannot be moved out of a reference</span>
-    }
-}
-
-<span class="kw">fn</span> main() {
-   <span class="kw">let</span> x = MyEnum::X(<span class="dv">3</span>);
-   <span class="kw">let</span> y = MyEnum::Y(<span class="dt">Box</span>::new(<span class="dv">4</span>));
-   match_and_print(&amp;x);
-   match_and_print(&amp;y);
-}</code></pre></div>
-<p>In this case the compiler reports</p>
-<pre><code>move.rs:9:9: 9:22 error: cannot move out of borrowed content
-move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
-                  ^~~~~~~~~~~~~
-move.rs:9:20: 9:21 note: attempting to move value to here
-move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
-                             ^
-move.rs:9:20: 9:21 help: to prevent the move, use `ref y` or `ref mut y` to capture value by reference
-move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
-                             ^</code></pre>
-<p>Standard pattern matches are pass-by-value, meaning that the contents of the enum is moved. However, this can only be done when we have ownership over the values to be moved. When we apply <code>match</code> to a dereferenced borrowed pointer, we cannot move because we don’t have ownership. Changing the <code>match_and_print</code> function to take a value would work again.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: MyEnum) {
-    <span class="kw">match</span> e {
-        MyEnum::X(x) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
-        MyEnum::Y(y) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, *y)
-    }
-}</code></pre></div>
-<h3 id="the-ref-keyword">The <code>ref</code> Keyword</h3>
-<p>Moving values in pattern matches is not always what we want. Sometimes we just want to take a reference. This way we can pattern match on values which we have obtained via borrowed pointers or we can simply avoid a move. This is where the <code>ref</code> keyword comes into play: It changes the pass-by-value semantics of a pattern match to pass-by-borrowed-pointer semantics:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: &amp;MyEnum) {
-    <span class="kw">match</span> e {
-        &amp;MyEnum::X(x) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
-        &amp;MyEnum::Y(<span class="kw">ref</span> y) =&gt;                 <span class="co">// OK, y is a borrowed ptr to Box&lt;int&gt;</span>
-            <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, **y)     <span class="co">// y has type &amp;Box&lt;int&gt; and must be dereferenced twice</span>
-    }
-}</code></pre></div>
-<p>To bind mutable references there is also the <code>ref mut</code> version which allows modifying:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: &amp;<span class="kw">mut</span> MyEnum) {
-    <span class="kw">match</span> e {
-        &amp;<span class="kw">mut</span> MyEnum::X(x) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
-        &amp;<span class="kw">mut</span> MyEnum::Y(<span class="kw">ref</span> <span class="kw">mut</span> y) =&gt; {
-            **y = <span class="dv">5</span>;
-            <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, **y)
-        }
-    }
-}
-
-<span class="kw">fn</span> main() {
-   <span class="kw">let</span> <span class="kw">mut</span> x = MyEnum::X(<span class="dv">3</span>);
-   <span class="kw">let</span> <span class="kw">mut</span> y = MyEnum::Y(<span class="dt">Box</span>::new(<span class="dv">4</span>));
-   match_and_print(&amp;<span class="kw">mut</span> x);
-   match_and_print(&amp;<span class="kw">mut</span> y);
-}</code></pre></div>
-<p>The <code>ref</code> keyword and its <code>ref mut</code> variant also work in <code>let</code> bindings:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
-   <span class="kw">let</span> <span class="kw">mut</span> x = <span class="dv">3</span>;
-   <span class="kw">let</span> <span class="kw">ref</span> <span class="kw">mut</span> y = x;
-   *y = <span class="dv">4</span>;
-   <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, *y);
-}</code></pre></div>
-<h2 id="lifetimes">Lifetimes</h2>
-<p>The difficulty with borrowed pointers is that they themselves cannot ensure that they point to valid memory. What if the thing that owns the memory they point to goes out of scope or is reassigned? Since the borrowed pointer has no ownership that memory would be deleted and possibly reassigned. The borrowed pointer would become a <em>dangling reference</em>, which is precisely what we wanted to avoid per guiding principle number 2: <strong>memory safety</strong>.</p>
-<p>Therefore Rust must take a number of precautions to ensure these scenarios do not happen. First, the memory that a borrowed pointer points to must not be freed during that borrowed pointers <strong><strong>lifetime</strong></strong>. Second, this memory <strong><strong>must not change</strong></strong> while it is borrowed.</p>
-<p>The first requirement leads us to the concept of <strong><strong>lifetimes</strong></strong>, the amount of time that some object is guaranteed to exist.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> lifetimes1() {
-    <span class="kw">let</span> name = <span class="dt">Box</span>::new(<span class="st">&quot;world&quot;</span>);      <span class="co">//                 &lt;--+</span>
-    <span class="kw">if</span> <span class="dv">3</span> &lt; <span class="dv">5</span> {                         <span class="co">//                    |</span>
-        <span class="kw">let</span> bname = &amp;name;             <span class="co">// &lt;--+               | name&#39;s</span>
-        <span class="pp">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, name);  <span class="co">//    | bname&#39;s       | lifetime</span>
-        <span class="pp">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, bname); <span class="co">//    | lifetime      |</span>
-    }                                  <span class="co">// &lt;--+               |</span>
-}                                      <span class="co">//                 &lt;--+</span></code></pre></div>
-<p>In this example, it is quite clear that the lifetime of <code>bname</code> will be shorter than that of <code>name</code> and thus the compiler needs no help in figuring this out. However, things need not always be this simple, consider the following example:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> lifetimes2() {
-    <span class="kw">let</span> <span class="kw">mut</span> x_ref = &amp;<span class="dv">3</span>;       <span class="co">//                 &lt;--+</span>
-    <span class="kw">if</span> <span class="cn">true</span> {                 <span class="co">//                    |</span>
-        <span class="kw">let</span> <span class="kw">mut</span> y_ref = &amp;<span class="dv">4</span>;   <span class="co">// &lt;--+ y_ref&#39;s       | x_ref&#39;s</span>
-        x_ref = y_ref;        <span class="co">//    | lifetime      | lifetime</span>
-    }                         <span class="co">// &lt;--+               |</span>
-}                             <span class="co">//                 &lt;--+</span></code></pre></div>
-<p>Here we have a problem: <code>x_ref</code> is reassigned to point to the same memory location as <code>y_ref</code>, but <code>y_ref</code>’s lifetime is shorter than <code>x_ref</code>’s. To ensure memory safety, the compiler must rejetct this program, which it does:</p>
-<pre><code>lifetimes.rs:21:24: 21:26 error: borrowed value does not live long enough
-lifetimes.rs:18:16: 24:1 note: borrowed pointer must be valid for the block at 18:16...
-lifetimes.rs:20:12: 23:5 note: ...but borrowed value is only valid for the block at 20:12</code></pre>
-<p>Things become even more interesting when we work with borrowed pointers inside of a function:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> min_life(x: &amp;<span class="dt">i32</span>, y: &amp;<span class="dt">i32</span>) -&gt; &amp;<span class="dt">i32</span> {
-    <span class="kw">if</span> *x &lt; *y {
-        x
-    } <span class="kw">else</span> {
-        y
-    }
-}</code></pre></div>
-<p>Here the lifetime of the result depends on the condition evaluated in the if statement: depending on it the lifetime will either be that of x or that of y. Clearly, the compiler can’t resolve this automatically, it would need to know the values to which x and y point, which may only be known at runtime:</p>
-<pre><code>lifetimes.rs:1:33: 1:37 error: missing lifetime specifier [E0106]
-lifetimes.rs:1 fn minLife(x: &amp;i32, y: &amp;i32) -&gt; &amp;i32 {
-                                               ^~~~
-lifetimes.rs:1:33: 1:37 help: this function&#39;s return type contains a borrowed value, but the signature does not say whether it is borrowed from `x` or `y`
-lifetimes.rs:1 fn minLife(x: &amp;i32, y: &amp;i32) -&gt; &amp;i32 {
-                                               ^~~~</code></pre>
-<p>Since the compiler can’t infer the lifetimes we must annotate them. Alas, we too would be hard pressed to give the exact lifetime in this example. However, there is a trick by which we can manage this</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> min_life&lt;<span class="ot">&#39;a</span>&gt;(x: &amp;<span class="ot">&#39;a</span> <span class="dt">i32</span>, y: &amp;<span class="ot">&#39;a</span> <span class="dt">i32</span>) -&gt; &amp;<span class="ot">&#39;a</span> <span class="dt">i32</span> {
-    <span class="kw">if</span> *x &lt; *y {
-        x
-    } <span class="kw">else</span> {
-        y
-    }
-}</code></pre></div>
-<p>Here we explictly annotate the lifetime of the parameters and the return value. Lifetime parameters are introduced by a single tick <code>'</code> followed by an identifier. In functions these must be the first template parameters. As you can see we use the same parameter for the lifetime everywhere. If the compiler would take this information too literally, then this function whould be less flexible than we might wish: In this case we could only use it on borrowed pointers which have the exact same lifetime. Fortunately, the compiler interprets the provided lifetimes as a lower bound. Thus <code>'a</code> is the minimum of the lifetimes of <code>x</code> and <code>y</code>. There is one special lifetime, which is called <code>'static</code> and is for objects which are allocated for the entire life of the program.</p>
-<h2 id="freezing">Freezing</h2>
-<p>Another problem with borrowed pointers is that the memory must not be modified while it has been borrowed out. This is achieved by freezing the original object when a borrowed pointer to it exists:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> freeze() {
-    <span class="kw">let</span> <span class="kw">mut</span> x = <span class="dv">3</span>;
-    {
-        <span class="kw">let</span> <span class="kw">mut</span> y = &amp;x;
-        x = <span class="dv">4</span>;       <span class="co">// &lt;-- Error: x has been borrowed and is thus `frozen`</span>
-    }
-    x = <span class="dv">4</span>;           <span class="co">// OK</span>
-}</code></pre></div>
-<p>In the block we cannot modify <code>x</code> because it is borrowed:</p>
-<pre><code>freeze.rs:5:9: 5:14 error: cannot assign to `x` because it is borrowed
-freeze.rs:5         x = 4;       // &lt;-- Error: x has been borrowed and is thus `frozen`
-                    ^~~~~
-freeze.rs:4:22: 4:23 note: borrow of `x` occurs here
-freeze.rs:4         let mut y = &amp;x;
-                                 ^</code></pre>
-<p>Note that this restriction is irrespective of whether the borrowed pointer is mutable or not.</p>
-<div class="footnotes">
-<hr />
-<ol>
-<li id="fn1"><p>The other alternative would be that owned pointers can never be reassigned, they would be non-copiable and non-moveable. This seems pretty cumbersome, fortunately Rust’s owned pointers have move semantics.<a href="#fnref1">↩</a></p></li>
-<li id="fn2"><p>Ensuring the validity of owned pointers at compile time is much better than the alternatives: If it was assured at runtime, there would be fewer correctness guarantees about the program and the check would have to be performed every time a pointer is dereferenced. Checking the validity of pointers at compile time is a major achievement of the Rust language: tracking such moves at compile time requires an advanced type-system feature called <a href="http://en.wikipedia.org/wiki/Type_system">affine types</a>. As far as I know Rust is the only mainstreamy language which has such a feature.<a href="#fnref2">↩</a></p></li>
-</ol>
-</div>
-<hr />
-<div id="disqus_thread"></div>
-<script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-]]></description>
-    <pubDate>Sat, 21 Dec 2013 00:00:00 UT</pubDate>
-    <guid>http://koerbitz.me/posts/Understanding-Pointers-Ownership-and-Lifetimes-in-Rust.html</guid>
     <dc:creator>Paul Koerbitz</dc:creator>
 </item>
 

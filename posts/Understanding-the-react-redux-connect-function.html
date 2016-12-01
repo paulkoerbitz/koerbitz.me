@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Types and Tailcalls - Understanding the react-redux connection function</title>
+    <link rel="stylesheet" href="../css/default.css" type="text/css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <a href="../">Types and Tailcalls</a>
+      </div>
+      <div class="navigation">
+        <ul>
+          <li><a href="../">blog</a></li>
+          <li><a href="../til.html">til</a></li>
+          <li><a href="../archive.html">archive</a></li>
+          <li><a href="../about.html">about</a></li>
+          <li><a href="../rss.xml">rss</a></li>
+          <!--
+          <li><a href="/notes.html">notes</a></li>
+          <li><a href="/projects.html">projects</a></li>
+          -->
+        </ul>
+      </div>
+      <div class="body">
+        <h1 class="title">Understanding the react-redux connection function</h1>
+
+<p class="date">published on December  1, 2016</p>
+
+<p>As described in the <a href="http://koerbitz.me/posts/Trying-and-failing-to-make-redux-connect-type-safe.html">last post</a>, I tried and failed to write a type safe wrapper for the <a href="https://github.com/reactjs/react-redux/blob/master/src/components/connect.js">react-redux</a> connect function. In this post, I want to examine this function with a view towards writing a type safe replacement in the future. To do so I’m examining the <code>connect.js</code> module of react-redux version 4.4.32.</p>
+<p>The first 33 lines are prelude, defining some helper functions and objects, nothing too special. I’m not really sure how <code>nextVersion</code> helps with code reloading, we’ll hopefully figure this out as we’ll move along.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="im">import</span> <span class="op">{</span> Component<span class="op">,</span> createElement <span class="op">}</span> <span class="im">from</span> <span class="st">'react'</span>
+<span class="im">import</span> storeShape <span class="im">from</span> <span class="st">'../utils/storeShape'</span>
+<span class="im">import</span> shallowEqual <span class="im">from</span> <span class="st">'../utils/shallowEqual'</span>
+<span class="im">import</span> wrapActionCreators <span class="im">from</span> <span class="st">'../utils/wrapActionCreators'</span>
+<span class="im">import</span> warning <span class="im">from</span> <span class="st">'../utils/warning'</span>
+<span class="im">import</span> isPlainObject <span class="im">from</span> <span class="st">'lodash/isPlainObject'</span>
+<span class="im">import</span> hoistStatics <span class="im">from</span> <span class="st">'hoist-non-react-statics'</span>
+<span class="im">import</span> invariant <span class="im">from</span> <span class="st">'invariant'</span>
+
+<span class="kw">const</span> defaultMapStateToProps <span class="op">=</span> state <span class="op">=&gt;</span> (<span class="op">{}</span>) <span class="co">// eslint-disable-line no-unused-vars</span>
+<span class="kw">const</span> defaultMapDispatchToProps <span class="op">=</span> dispatch <span class="op">=&gt;</span> (<span class="op">{</span> dispatch <span class="op">}</span>)
+<span class="kw">const</span> defaultMergeProps <span class="op">=</span> (stateProps<span class="op">,</span> dispatchProps<span class="op">,</span> parentProps) <span class="op">=&gt;</span> (<span class="op">{</span>
+  ...<span class="at">parentProps</span><span class="op">,</span>
+  ...<span class="at">stateProps</span><span class="op">,</span>
+  ...<span class="at">dispatchProps</span>
+<span class="op">}</span>)
+
+<span class="kw">function</span> <span class="at">getDisplayName</span>(WrappedComponent) <span class="op">{</span>
+  <span class="cf">return</span> <span class="va">WrappedComponent</span>.<span class="at">displayName</span> <span class="op">||</span> <span class="va">WrappedComponent</span>.<span class="at">name</span> <span class="op">||</span> <span class="st">'Component'</span>
+<span class="op">}</span>
+
+<span class="kw">let</span> errorObject <span class="op">=</span> <span class="op">{</span> <span class="dt">value</span><span class="op">:</span> <span class="kw">null</span> <span class="op">}</span>
+<span class="kw">function</span> <span class="at">tryCatch</span>(fn<span class="op">,</span> ctx) <span class="op">{</span>
+  <span class="cf">try</span> <span class="op">{</span>
+    <span class="cf">return</span> <span class="va">fn</span>.<span class="at">apply</span>(ctx)
+  <span class="op">}</span> <span class="cf">catch</span> (e) <span class="op">{</span>
+    <span class="va">errorObject</span>.<span class="at">value</span> <span class="op">=</span> e
+    <span class="cf">return</span> errorObject
+  <span class="op">}</span>
+<span class="op">}</span>
+
+<span class="co">// Helps track hot reloading.</span>
+<span class="kw">let</span> nextVersion <span class="op">=</span> <span class="dv">0</span></code></pre></div>
+<p>Next, we’ll move on to define the <code>connect</code> function, which is obviously the heart of this module. The start of this function is again some prelude, where we figure out which parameters are passed and assign default values for the ones not present. One interesting part is maybe that the presence of <code>mapStateToProps</code> determines (via <code>shouldSubscribe</code>) if the new component subscribes to store changes or not.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="im">export</span> <span class="im">default</span> <span class="kw">function</span> <span class="at">connect</span>(mapStateToProps<span class="op">,</span> mapDispatchToProps<span class="op">,</span> mergeProps<span class="op">,</span> options <span class="op">=</span> <span class="op">{}</span>) <span class="op">{</span>
+  <span class="kw">const</span> shouldSubscribe <span class="op">=</span> <span class="at">Boolean</span>(mapStateToProps)
+  <span class="kw">const</span> mapState <span class="op">=</span> mapStateToProps <span class="op">||</span> defaultMapStateToProps
+
+  <span class="kw">let</span> mapDispatch
+  <span class="cf">if</span> (<span class="kw">typeof</span> mapDispatchToProps <span class="op">===</span> <span class="st">'function'</span>) <span class="op">{</span>
+    mapDispatch <span class="op">=</span> mapDispatchToProps
+  <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> (<span class="op">!</span>mapDispatchToProps) <span class="op">{</span>
+    mapDispatch <span class="op">=</span> defaultMapDispatchToProps
+  <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+    mapDispatch <span class="op">=</span> <span class="at">wrapActionCreators</span>(mapDispatchToProps)
+  <span class="op">}</span>
+
+  <span class="kw">const</span> finalMergeProps <span class="op">=</span> mergeProps <span class="op">||</span> defaultMergeProps
+  <span class="kw">const</span> <span class="op">{</span> pure <span class="op">=</span> <span class="kw">true</span><span class="op">,</span> withRef <span class="op">=</span> <span class="kw">false</span> <span class="op">}</span> <span class="op">=</span> options
+  <span class="kw">const</span> checkMergedEquals <span class="op">=</span> pure <span class="op">&amp;&amp;</span> finalMergeProps <span class="op">!==</span> defaultMergeProps
+
+  <span class="co">// Helps track hot reloading.</span>
+  <span class="kw">const</span> version <span class="op">=</span> nextVersion<span class="op">++</span></code></pre></div>
+<p>The way the <code>connect</code> function should be called is <code>connect(mapStateToProps, mapDispatchToProps)(Component)</code>, so it must return a function which receives the component which we want to wrap. This is what happens on line 55. <code>connectDisplayName</code> and <code>checkStateShape</code> are helper variables / functions for error messages.</p>
+<p>The <code>computeMergedProps</code> function is basically a wrapper around the mergeProps function which is the user defined merged props or a default version. The only difference is that it checks in non-production environments if the final props object has the right shape.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">  <span class="cf">return</span> <span class="kw">function</span> <span class="at">wrapWithConnect</span>(WrappedComponent) <span class="op">{</span>
+    <span class="kw">const</span> connectDisplayName <span class="op">=</span> <span class="vs">`Connect(</span><span class="sc">${</span><span class="at">getDisplayName</span>(WrappedComponent)<span class="sc">}</span><span class="vs">)`</span>
+
+    <span class="kw">function</span> <span class="at">checkStateShape</span>(props<span class="op">,</span> methodName) <span class="op">{</span>
+      <span class="cf">if</span> (<span class="op">!</span><span class="at">isPlainObject</span>(props)) <span class="op">{</span>
+        <span class="at">warning</span>(
+          <span class="vs">`</span><span class="sc">${</span>methodName<span class="sc">}</span><span class="vs">() in </span><span class="sc">${</span>connectDisplayName<span class="sc">}</span><span class="vs"> must return a plain object. `</span> <span class="op">+</span>
+          <span class="vs">`Instead received </span><span class="sc">${</span>props<span class="sc">}</span><span class="vs">.`</span>
+        )
+      <span class="op">}</span>
+    <span class="op">}</span>
+
+    <span class="kw">function</span> <span class="at">computeMergedProps</span>(stateProps<span class="op">,</span> dispatchProps<span class="op">,</span> parentProps) <span class="op">{</span>
+      <span class="kw">const</span> mergedProps <span class="op">=</span> <span class="at">finalMergeProps</span>(stateProps<span class="op">,</span> dispatchProps<span class="op">,</span> parentProps)
+      <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">'production'</span>) <span class="op">{</span>
+        <span class="at">checkStateShape</span>(mergedProps<span class="op">,</span> <span class="st">'mergeProps'</span>)
+      <span class="op">}</span>
+      <span class="cf">return</span> mergedProps
+    <span class="op">}</span></code></pre></div>
+<p>Now we get into the heart of the matter - creating the new react component which we’ll return from the <code>wrapWithConnect</code> function. The <code>shouldComponentUpdate</code> method already reveals some key information about the optimizations that this container performs - we’ll update if we’re either not pure, some of our properties have changed or if the store state has changed. Looks sensible ;)</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">    <span class="kw">class</span> Connect <span class="kw">extends</span> Component <span class="op">{</span>
+      <span class="at">shouldComponentUpdate</span>() <span class="op">{</span>
+        <span class="cf">return</span> <span class="op">!</span>pure <span class="op">||</span> <span class="kw">this</span>.<span class="at">haveOwnPropsChanged</span> <span class="op">||</span> <span class="kw">this</span>.<span class="at">hasStoreStateChanged</span>
+      <span class="op">}</span>
+
+      <span class="at">constructor</span>(props<span class="op">,</span> context) <span class="op">{</span>
+        <span class="kw">super</span>(props<span class="op">,</span> context)
+        <span class="kw">this</span>.<span class="at">version</span> <span class="op">=</span> version
+        <span class="kw">this</span>.<span class="at">store</span> <span class="op">=</span> <span class="va">props</span>.<span class="at">store</span> <span class="op">||</span> <span class="va">context</span>.<span class="at">store</span>
+
+        <span class="at">invariant</span>(<span class="kw">this</span>.<span class="at">store</span><span class="op">,</span>
+          <span class="vs">`Could not find &quot;store&quot; in either the context or `</span> <span class="op">+</span>
+          <span class="vs">`props of &quot;</span><span class="sc">${</span>connectDisplayName<span class="sc">}</span><span class="vs">&quot;. `</span> <span class="op">+</span>
+          <span class="vs">`Either wrap the root component in a &lt;Provider&gt;, `</span> <span class="op">+</span>
+          <span class="vs">`or explicitly pass &quot;store&quot; as a prop to &quot;</span><span class="sc">${</span>connectDisplayName<span class="sc">}</span><span class="vs">&quot;.`</span>
+        )
+
+        <span class="kw">const</span> storeState <span class="op">=</span> <span class="kw">this</span>.<span class="va">store</span>.<span class="at">getState</span>()
+        <span class="kw">this</span>.<span class="at">state</span> <span class="op">=</span> <span class="op">{</span> storeState <span class="op">}</span>
+        <span class="kw">this</span>.<span class="at">clearCache</span>()
+      <span class="op">}</span></code></pre></div>
+<p>This class contains a lot of methods which are concerned with figuring out how to compute the right state from the <code>mapStateToProps</code> and <code>mapDispatchToProps</code> methods. Let’s first take a look at <code>computeStateProps</code> and <code>configureFinalMapState</code> as there seems to be a lot going on here.</p>
+<p>The <code>configureFinalMapState</code> method is used to install the <code>finalMapStateToProps</code> method and is called from <code>computeStateProps</code> if it is not already present. It calls <code>mapState</code> on the state and the props, if this returns a function<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> that function is set as <code>finalMapStateToProps</code> and <code>computeStateProps</code> is called, otherwise <code>mapState</code> is used as the <code>finalMapStateToProps</code> and the result of the first call to <code>mapStateToProps</code> is returned. It helps that <code>configureFinalMapState</code> is only ever called from <code>computeStateProps</code>, so it is really an initialization method that should run at most once. I am not sure if the <em>optimization</em> of only installing the <code>finalMapStateToProps</code> property in the <code>computeStateProps</code> method, or the different magic cases are really needed, but that’s what we have.</p>
+<p>The only place where <code>computeStateProps</code> is called from is the <code>updateStatePropsIfNeeded</code> method, we will look at this functions purpose in a minute.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">computeStateProps</span>(store<span class="op">,</span> props) <span class="op">{</span>
+        <span class="cf">if</span> (<span class="op">!</span><span class="kw">this</span>.<span class="at">finalMapStateToProps</span>) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">this</span>.<span class="at">configureFinalMapState</span>(store<span class="op">,</span> props)
+        <span class="op">}</span>
+
+        <span class="kw">const</span> state <span class="op">=</span> <span class="va">store</span>.<span class="at">getState</span>()
+        <span class="kw">const</span> stateProps <span class="op">=</span> <span class="kw">this</span>.<span class="at">doStatePropsDependOnOwnProps</span> <span class="op">?</span>
+          <span class="kw">this</span>.<span class="at">finalMapStateToProps</span>(state<span class="op">,</span> props) :
+          <span class="kw">this</span>.<span class="at">finalMapStateToProps</span>(state)
+
+        <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">'production'</span>) <span class="op">{</span>
+          <span class="at">checkStateShape</span>(stateProps<span class="op">,</span> <span class="st">'mapStateToProps'</span>)
+        <span class="op">}</span>
+        <span class="cf">return</span> stateProps
+      <span class="op">}</span>
+
+      <span class="at">configureFinalMapState</span>(store<span class="op">,</span> props) <span class="op">{</span>
+        <span class="kw">const</span> mappedState <span class="op">=</span> <span class="at">mapState</span>(<span class="va">store</span>.<span class="at">getState</span>()<span class="op">,</span> props)
+        <span class="kw">const</span> isFactory <span class="op">=</span> <span class="kw">typeof</span> mappedState <span class="op">===</span> <span class="st">'function'</span>
+
+        <span class="kw">this</span>.<span class="at">finalMapStateToProps</span> <span class="op">=</span> isFactory <span class="op">?</span> mappedState : mapState
+        <span class="kw">this</span>.<span class="at">doStatePropsDependOnOwnProps</span> <span class="op">=</span> <span class="kw">this</span>.<span class="va">finalMapStateToProps</span>.<span class="at">length</span> <span class="op">!==</span> <span class="dv">1</span>
+
+        <span class="cf">if</span> (isFactory) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">this</span>.<span class="at">computeStateProps</span>(store<span class="op">,</span> props)
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">'production'</span>) <span class="op">{</span>
+          <span class="at">checkStateShape</span>(mappedState<span class="op">,</span> <span class="st">'mapStateToProps'</span>)
+        <span class="op">}</span>
+        <span class="cf">return</span> mappedState
+      <span class="op">}</span></code></pre></div>
+<p>The <code>computeDispatchProps</code> and <code>configureFinalMapDispatch</code> methods follow the same pattern as the <code>computeStateProps</code> and <code>configureFinalMapStat</code> methods above. In fact, they could almost be copied-and-pasted. <code>computeDispatchProps</code> first installs the <code>finalMapDispatchToProps</code> property by calling <code>configureFinalMapDispatch</code> method, if it is not already present. Analogously to the case above, the <code>configureFinalMapDispatch</code> method checks if <code>mapDispatch</code> returns a function and in this case installs that or <code>mapDispatch</code> as the <code>finalMapDispatchToProps</code> property. Again, <code>computeDispatchProps</code> is only ever called from the <code>updateDispatchPropsIfNeeded</code> method.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">computeDispatchProps</span>(store<span class="op">,</span> props) <span class="op">{</span>
+        <span class="cf">if</span> (<span class="op">!</span><span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span>) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">this</span>.<span class="at">configureFinalMapDispatch</span>(store<span class="op">,</span> props)
+        <span class="op">}</span>
+
+        <span class="kw">const</span> <span class="op">{</span> dispatch <span class="op">}</span> <span class="op">=</span> store
+        <span class="kw">const</span> dispatchProps <span class="op">=</span> <span class="kw">this</span>.<span class="at">doDispatchPropsDependOnOwnProps</span> <span class="op">?</span>
+          <span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span>(dispatch<span class="op">,</span> props) :
+          <span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span>(dispatch)
+
+        <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">'production'</span>) <span class="op">{</span>
+          <span class="at">checkStateShape</span>(dispatchProps<span class="op">,</span> <span class="st">'mapDispatchToProps'</span>)
+        <span class="op">}</span>
+        <span class="cf">return</span> dispatchProps
+      <span class="op">}</span>
+
+      <span class="at">configureFinalMapDispatch</span>(store<span class="op">,</span> props) <span class="op">{</span>
+        <span class="kw">const</span> mappedDispatch <span class="op">=</span> <span class="at">mapDispatch</span>(<span class="va">store</span>.<span class="at">dispatch</span><span class="op">,</span> props)
+        <span class="kw">const</span> isFactory <span class="op">=</span> <span class="kw">typeof</span> mappedDispatch <span class="op">===</span> <span class="st">'function'</span>
+
+        <span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span> <span class="op">=</span> isFactory <span class="op">?</span> mappedDispatch : mapDispatch
+        <span class="kw">this</span>.<span class="at">doDispatchPropsDependOnOwnProps</span> <span class="op">=</span> <span class="kw">this</span>.<span class="va">finalMapDispatchToProps</span>.<span class="at">length</span> <span class="op">!==</span> <span class="dv">1</span>
+
+        <span class="cf">if</span> (isFactory) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">this</span>.<span class="at">computeDispatchProps</span>(store<span class="op">,</span> props)
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">'production'</span>) <span class="op">{</span>
+          <span class="at">checkStateShape</span>(mappedDispatch<span class="op">,</span> <span class="st">'mapDispatchToProps'</span>)
+        <span class="op">}</span>
+        <span class="cf">return</span> mappedDispatch
+      <span class="op">}</span></code></pre></div>
+<p>Next up are three <code>updateXYZPropsIfNeeded</code> methods, where <code>XYZ</code> is either <code>State</code>, <code>Dispatch</code> or <code>Merge</code>. These always compute the new part of the properties, but only update the cached version on the object, if they are not <code>shallowEqual</code> to the currently cached version. If no update is performed, they return false, otherwise they return true.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">updateStatePropsIfNeeded</span>() <span class="op">{</span>
+        <span class="kw">const</span> nextStateProps <span class="op">=</span> <span class="kw">this</span>.<span class="at">computeStateProps</span>(<span class="kw">this</span>.<span class="at">store</span><span class="op">,</span> <span class="kw">this</span>.<span class="at">props</span>)
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">stateProps</span> <span class="op">&amp;&amp;</span> <span class="at">shallowEqual</span>(nextStateProps<span class="op">,</span> <span class="kw">this</span>.<span class="at">stateProps</span>)) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">false</span>
+        <span class="op">}</span>
+
+        <span class="kw">this</span>.<span class="at">stateProps</span> <span class="op">=</span> nextStateProps
+        <span class="cf">return</span> <span class="kw">true</span>
+      <span class="op">}</span>
+
+      <span class="at">updateDispatchPropsIfNeeded</span>() <span class="op">{</span>
+        <span class="kw">const</span> nextDispatchProps <span class="op">=</span> <span class="kw">this</span>.<span class="at">computeDispatchProps</span>(<span class="kw">this</span>.<span class="at">store</span><span class="op">,</span> <span class="kw">this</span>.<span class="at">props</span>)
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">dispatchProps</span> <span class="op">&amp;&amp;</span> <span class="at">shallowEqual</span>(nextDispatchProps<span class="op">,</span> <span class="kw">this</span>.<span class="at">dispatchProps</span>)) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">false</span>
+        <span class="op">}</span>
+
+        <span class="kw">this</span>.<span class="at">dispatchProps</span> <span class="op">=</span> nextDispatchProps
+        <span class="cf">return</span> <span class="kw">true</span>
+      <span class="op">}</span>
+
+      <span class="at">updateMergedPropsIfNeeded</span>() <span class="op">{</span>
+        <span class="kw">const</span> nextMergedProps <span class="op">=</span> <span class="at">computeMergedProps</span>(<span class="kw">this</span>.<span class="at">stateProps</span><span class="op">,</span> <span class="kw">this</span>.<span class="at">dispatchProps</span><span class="op">,</span> <span class="kw">this</span>.<span class="at">props</span>)
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">mergedProps</span> <span class="op">&amp;&amp;</span> checkMergedEquals <span class="op">&amp;&amp;</span> <span class="at">shallowEqual</span>(nextMergedProps<span class="op">,</span> <span class="kw">this</span>.<span class="at">mergedProps</span>)) <span class="op">{</span>
+          <span class="cf">return</span> <span class="kw">false</span>
+        <span class="op">}</span>
+
+        <span class="kw">this</span>.<span class="at">mergedProps</span> <span class="op">=</span> nextMergedProps
+        <span class="cf">return</span> <span class="kw">true</span>
+      <span class="op">}</span></code></pre></div>
+<p>The other large block of methods are methods for managing subscriptions and the lifecycle <code>componentDidMount</code>, <code>componentWillUnmount</code> and <code>componentWillReceiveProps</code> methods. In the later <code>haveOwnPropsChanged</code> is set to true if the component is either marked as not pure of if the new props are not shallow equal to the old ones.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">isSubscribed</span>() <span class="op">{</span>
+        <span class="cf">return</span> <span class="kw">typeof</span> <span class="kw">this</span>.<span class="at">unsubscribe</span> <span class="op">===</span> <span class="st">'function'</span>
+      <span class="op">}</span>
+
+      <span class="at">trySubscribe</span>() <span class="op">{</span>
+        <span class="cf">if</span> (shouldSubscribe <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="kw">this</span>.<span class="at">unsubscribe</span>) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">unsubscribe</span> <span class="op">=</span> <span class="kw">this</span>.<span class="va">store</span>.<span class="at">subscribe</span>(<span class="kw">this</span>.<span class="va">handleChange</span>.<span class="at">bind</span>(<span class="kw">this</span>))
+          <span class="kw">this</span>.<span class="at">handleChange</span>()
+        <span class="op">}</span>
+      <span class="op">}</span>
+
+      <span class="at">tryUnsubscribe</span>() <span class="op">{</span>
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">unsubscribe</span>) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">unsubscribe</span>()
+          <span class="kw">this</span>.<span class="at">unsubscribe</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="op">}</span>
+      <span class="op">}</span>
+
+      <span class="at">componentDidMount</span>() <span class="op">{</span>
+        <span class="kw">this</span>.<span class="at">trySubscribe</span>()
+      <span class="op">}</span>
+
+      <span class="at">componentWillReceiveProps</span>(nextProps) <span class="op">{</span>
+        <span class="cf">if</span> (<span class="op">!</span>pure <span class="op">||</span> <span class="op">!</span><span class="at">shallowEqual</span>(nextProps<span class="op">,</span> <span class="kw">this</span>.<span class="at">props</span>)) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">haveOwnPropsChanged</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="op">}</span>
+      <span class="op">}</span>
+
+      <span class="at">componentWillUnmount</span>() <span class="op">{</span>
+        <span class="kw">this</span>.<span class="at">tryUnsubscribe</span>()
+        <span class="kw">this</span>.<span class="at">clearCache</span>()
+      <span class="op">}</span></code></pre></div>
+<p>Net up is the clear cache method, which shows us what is all cached on the new component, there are the three prop types (state, dispatch and merge), the final methods to compute them (<code>finalMapDispatchToProps</code>, <code>finalMapStateToProps</code>), the rendered wrapped element (<code>renderedElement</code>) and flags indicating if the stateProps or the storeProps have changed. I don’t quite understand what <code>haveStatePropsBeenPrecalculated</code> and <code>statePropsPrecalculationError</code> do quite yet.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">clearCache</span>() <span class="op">{</span>
+        <span class="kw">this</span>.<span class="at">dispatchProps</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">stateProps</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">mergedProps</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">haveOwnPropsChanged</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="kw">this</span>.<span class="at">hasStoreStateChanged</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="kw">this</span>.<span class="at">haveStatePropsBeenPrecalculated</span> <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">this</span>.<span class="at">statePropsPrecalculationError</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">finalMapDispatchToProps</span> <span class="op">=</span> <span class="kw">null</span>
+        <span class="kw">this</span>.<span class="at">finalMapStateToProps</span> <span class="op">=</span> <span class="kw">null</span>
+      <span class="op">}</span></code></pre></div>
+<p>The handleChange method is the one that is subscribed to the store, thus it is being called when the store has changed. When there is not <code>this.unsubscribe</code> method, we’re not yet subscribed, so we just return. If the component is <code>pure</code> and the new store state is shallowEqual to the old one, we also return. Otherwise, there is another optimization if the <code>stateProps</code> do not depend on the <code>ownProps</code>, we try to pre-compute the <code>stateProps</code>, store an error if there is an exception thrown and remember that the state props have been precalculated. In any case we set the <code>hasStoreStateChanged</code> flag to true and store the new state.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">handleChange</span>() <span class="op">{</span>
+        <span class="cf">if</span> (<span class="op">!</span><span class="kw">this</span>.<span class="at">unsubscribe</span>) <span class="op">{</span>
+          <span class="cf">return</span>
+        <span class="op">}</span>
+
+        <span class="kw">const</span> storeState <span class="op">=</span> <span class="kw">this</span>.<span class="va">store</span>.<span class="at">getState</span>()
+        <span class="kw">const</span> prevStoreState <span class="op">=</span> <span class="kw">this</span>.<span class="va">state</span>.<span class="at">storeState</span>
+        <span class="cf">if</span> (pure <span class="op">&amp;&amp;</span> prevStoreState <span class="op">===</span> storeState) <span class="op">{</span>
+          <span class="cf">return</span>
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (pure <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="kw">this</span>.<span class="at">doStatePropsDependOnOwnProps</span>) <span class="op">{</span>
+          <span class="kw">const</span> haveStatePropsChanged <span class="op">=</span> <span class="at">tryCatch</span>(<span class="kw">this</span>.<span class="at">updateStatePropsIfNeeded</span><span class="op">,</span> <span class="kw">this</span>)
+          <span class="cf">if</span> (<span class="op">!</span>haveStatePropsChanged) <span class="op">{</span>
+            <span class="cf">return</span>
+          <span class="op">}</span>
+          <span class="cf">if</span> (haveStatePropsChanged <span class="op">===</span> errorObject) <span class="op">{</span>
+            <span class="kw">this</span>.<span class="at">statePropsPrecalculationError</span> <span class="op">=</span> <span class="va">errorObject</span>.<span class="at">value</span>
+          <span class="op">}</span>
+          <span class="kw">this</span>.<span class="at">haveStatePropsBeenPrecalculated</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="op">}</span>
+
+        <span class="kw">this</span>.<span class="at">hasStoreStateChanged</span> <span class="op">=</span> <span class="kw">true</span>
+        <span class="kw">this</span>.<span class="at">setState</span>(<span class="op">{</span> storeState <span class="op">}</span>)
+      <span class="op">}</span></code></pre></div>
+<p>Finally, there is a <code>getWrappedInstance</code> convenience method.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">getWrappedInstance</span>() <span class="op">{</span>
+        <span class="at">invariant</span>(withRef<span class="op">,</span>
+          <span class="vs">`To access the wrapped instance, you need to specify `</span> <span class="op">+</span>
+          <span class="vs">`{ withRef: true } as the fourth argument of the connect() call.`</span>
+        )
+
+        <span class="cf">return</span> <span class="kw">this</span>.<span class="va">refs</span>.<span class="at">wrappedInstance</span>
+      <span class="op">}</span></code></pre></div>
+<h3 id="the-render-method">The render method</h3>
+<p>Finally the <code>render</code> method is pretty involved, it does far more than just rendering the wrapped compoent, it is where all the caching and precomputing mechanisms come into play.</p>
+<p>There is a bit (too much(?)) logic in this function, fortunately the variable names are really good. I’ve found it the easiest to work my way from the bottom up. At the very end, the <code>this.renderedElement</code> is returned, which is an instance of the wrapped element (with or without a ref).</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">        <span class="cf">if</span> (withRef) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="at">createElement</span>(WrappedComponent<span class="op">,</span> <span class="op">{</span>
+            ...<span class="va">this</span>.<span class="at">mergedProps</span><span class="op">,</span>
+            <span class="dt">ref</span><span class="op">:</span> <span class="st">'wrappedInstance'</span>
+          <span class="op">}</span>)
+        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="at">createElement</span>(WrappedComponent<span class="op">,</span>
+            <span class="kw">this</span>.<span class="at">mergedProps</span>
+          )
+        <span class="op">}</span>
+
+        <span class="cf">return</span> <span class="kw">this</span>.<span class="at">renderedElement</span></code></pre></div>
+<p>However, <code>this.renderedElement</code> is only computed if (a) <code>haveMergedPropsChanged</code> is true or (b) <code>renderedElement</code> is falsy (so probably undefined).</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">        <span class="cf">if</span> (<span class="op">!</span>haveMergedPropsChanged <span class="op">&amp;&amp;</span> renderedElement) <span class="op">{</span>
+          <span class="cf">return</span> renderedElement
+        <span class="op">}</span></code></pre></div>
+<p>Now <code>haveMergedPropsChanged</code> is either false if all of <code>haveStatePropsChanged</code>, <code>haveDispatchPropsChanged</code> and<code>haveOwnPropsChanged</code> are false (so no props have changed), or the result of the <code>this.updateMergedPropsIfNeeded()</code> method.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">        <span class="kw">let</span> haveMergedPropsChanged <span class="op">=</span> <span class="kw">true</span>
+        <span class="cf">if</span> (
+          haveStatePropsChanged <span class="op">||</span>
+          haveDispatchPropsChanged <span class="op">||</span>
+          haveOwnPropsChanged
+        ) <span class="op">{</span>
+          haveMergedPropsChanged <span class="op">=</span> <span class="kw">this</span>.<span class="at">updateMergedPropsIfNeeded</span>()
+        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+          haveMergedPropsChanged <span class="op">=</span> <span class="kw">false</span>
+        <span class="op">}</span></code></pre></div>
+<p><code>haveStatePropsChanged</code> is true if either <code>haveStatePropsBeenPrecalculated</code> is true or if <code>shouldUpdateStateProps</code> is true and <code>this.updateStatePropsIfNeeded()</code> returns true. <code>shouldUpdateStateProps</code> is true if either (a) the component is not pure or there is not rendered element yet, (b) <code>hasStoreStateChanged</code> is true or (c) <code>haveOwnPropsChanged</code> is true and <code>this.doStatePropsDependOnOwnProps</code> is. Similar conditions apply to <code>shouldUpdateDispatchProps</code>, except that the <code>hasStoreStateChanged</code> condition is not checked.</p>
+<p>Now, another interesting thing that is going on in the render method is that it sets a number of instance variables which control the caching behavior, namely <code>haveOwnPropsChanged</code>, <code>hasStoreStateChanged</code>, <code>haveStatePropsBeenPrecalculated</code>. After render has run, these are set to <code>false</code>, so that the respective components would not be recalculated on a second run of <code>render</code>. Other life cycle methods turn these instance variables to true again, this is essential for only recomputing the parts of the properties which are acutally needed.</p>
+<p>Now that we have examined the full render method, let’s see it once more from top to bottom in all of its glory:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">      <span class="at">render</span>() <span class="op">{</span>
+        <span class="kw">const</span> <span class="op">{</span>
+          haveOwnPropsChanged<span class="op">,</span>
+          hasStoreStateChanged<span class="op">,</span>
+          haveStatePropsBeenPrecalculated<span class="op">,</span>
+          statePropsPrecalculationError<span class="op">,</span>
+          renderedElement
+        <span class="op">}</span> <span class="op">=</span> <span class="kw">this</span>
+
+        <span class="kw">this</span>.<span class="at">haveOwnPropsChanged</span> <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">this</span>.<span class="at">hasStoreStateChanged</span> <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">this</span>.<span class="at">haveStatePropsBeenPrecalculated</span> <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">this</span>.<span class="at">statePropsPrecalculationError</span> <span class="op">=</span> <span class="kw">null</span>
+
+        <span class="cf">if</span> (statePropsPrecalculationError) <span class="op">{</span>
+          <span class="cf">throw</span> statePropsPrecalculationError
+        <span class="op">}</span>
+
+        <span class="kw">let</span> shouldUpdateStateProps <span class="op">=</span> <span class="kw">true</span>
+        <span class="kw">let</span> shouldUpdateDispatchProps <span class="op">=</span> <span class="kw">true</span>
+        <span class="cf">if</span> (pure <span class="op">&amp;&amp;</span> renderedElement) <span class="op">{</span>
+          shouldUpdateStateProps <span class="op">=</span> hasStoreStateChanged <span class="op">||</span> (
+            haveOwnPropsChanged <span class="op">&amp;&amp;</span> <span class="kw">this</span>.<span class="at">doStatePropsDependOnOwnProps</span>
+          )
+          shouldUpdateDispatchProps <span class="op">=</span>
+            haveOwnPropsChanged <span class="op">&amp;&amp;</span> <span class="kw">this</span>.<span class="at">doDispatchPropsDependOnOwnProps</span>
+        <span class="op">}</span>
+
+        <span class="kw">let</span> haveStatePropsChanged <span class="op">=</span> <span class="kw">false</span>
+        <span class="kw">let</span> haveDispatchPropsChanged <span class="op">=</span> <span class="kw">false</span>
+        <span class="cf">if</span> (haveStatePropsBeenPrecalculated) <span class="op">{</span>
+          haveStatePropsChanged <span class="op">=</span> <span class="kw">true</span>
+        <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> (shouldUpdateStateProps) <span class="op">{</span>
+          haveStatePropsChanged <span class="op">=</span> <span class="kw">this</span>.<span class="at">updateStatePropsIfNeeded</span>()
+        <span class="op">}</span>
+        <span class="cf">if</span> (shouldUpdateDispatchProps) <span class="op">{</span>
+          haveDispatchPropsChanged <span class="op">=</span> <span class="kw">this</span>.<span class="at">updateDispatchPropsIfNeeded</span>()
+        <span class="op">}</span>
+
+        <span class="kw">let</span> haveMergedPropsChanged <span class="op">=</span> <span class="kw">true</span>
+        <span class="cf">if</span> (
+          haveStatePropsChanged <span class="op">||</span>
+          haveDispatchPropsChanged <span class="op">||</span>
+          haveOwnPropsChanged
+        ) <span class="op">{</span>
+          haveMergedPropsChanged <span class="op">=</span> <span class="kw">this</span>.<span class="at">updateMergedPropsIfNeeded</span>()
+        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+          haveMergedPropsChanged <span class="op">=</span> <span class="kw">false</span>
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (<span class="op">!</span>haveMergedPropsChanged <span class="op">&amp;&amp;</span> renderedElement) <span class="op">{</span>
+          <span class="cf">return</span> renderedElement
+        <span class="op">}</span>
+
+        <span class="cf">if</span> (withRef) <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="at">createElement</span>(WrappedComponent<span class="op">,</span> <span class="op">{</span>
+            ...<span class="va">this</span>.<span class="at">mergedProps</span><span class="op">,</span>
+            <span class="dt">ref</span><span class="op">:</span> <span class="st">'wrappedInstance'</span>
+          <span class="op">}</span>)
+        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+          <span class="kw">this</span>.<span class="at">renderedElement</span> <span class="op">=</span> <span class="at">createElement</span>(WrappedComponent<span class="op">,</span>
+            <span class="kw">this</span>.<span class="at">mergedProps</span>
+          )
+        <span class="op">}</span>
+
+        <span class="cf">return</span> <span class="kw">this</span>.<span class="at">renderedElement</span>
+      <span class="op">}</span>
+    }</code></pre></div>
+<p>Finally, we have some additional properties installed on the Connect class (<code>static</code> properties in OO terms)</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">    <span class="va">Connect</span>.<span class="at">displayName</span> <span class="op">=</span> connectDisplayName
+    <span class="va">Connect</span>.<span class="at">WrappedComponent</span> <span class="op">=</span> WrappedComponent
+    <span class="va">Connect</span>.<span class="at">contextTypes</span> <span class="op">=</span> <span class="op">{</span>
+      <span class="dt">store</span><span class="op">:</span> storeShape
+    <span class="op">}</span>
+    <span class="va">Connect</span>.<span class="at">propTypes</span> <span class="op">=</span> <span class="op">{</span>
+      <span class="dt">store</span><span class="op">:</span> storeShape
+    <span class="op">}</span>
+
+    <span class="cf">if</span> (<span class="va">process</span>.<span class="va">env</span>.<span class="at">NODE_ENV</span> <span class="op">!==</span> <span class="st">'production'</span>) <span class="op">{</span>
+      <span class="va">Connect</span>.<span class="va">prototype</span>.<span class="at">componentWillUpdate</span> <span class="op">=</span> <span class="kw">function</span> <span class="at">componentWillUpdate</span>() <span class="op">{</span>
+        <span class="cf">if</span> (<span class="kw">this</span>.<span class="at">version</span> <span class="op">===</span> version) <span class="op">{</span>
+          <span class="cf">return</span>
+        <span class="op">}</span>
+
+        <span class="co">// We are hot reloading!</span>
+        <span class="kw">this</span>.<span class="at">version</span> <span class="op">=</span> version
+        <span class="kw">this</span>.<span class="at">trySubscribe</span>()
+        <span class="kw">this</span>.<span class="at">clearCache</span>()
+      <span class="op">}</span>
+    <span class="op">}</span>
+
+    <span class="cf">return</span> <span class="at">hoistStatics</span>(Connect<span class="op">,</span> WrappedComponent)
+  }</code></pre></div>
+<h2 id="conclusion-next-steps">Conclusion &amp; next steps</h2>
+<p>OK, we’ve seen that the generated component is somewhat involved and has some fancy optimizations going on. Splitting the creation of the properties of the wrapped component into external props, properties computed from the state and properties computed from the dispatch method allows deciding precisely which part has been updated and if the wrapped component should be rendered again or not. The caching mechanisms employed are also fancy, with a fairly precise control over what needs to be recomputed when and only recomputing the parts needed. All in all, the connect function is very simple apart from these optimizations.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>This is where I would prefer the constraints of a static type system - why do we need the case where <code>mapState</code> does not return a final result? To me this seems like a bit too much unneeded (=hard to understand) flexiblity, which dynamic languages tend to gravitate to.<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+  var disqus_shortname = 'paulkoerbitz';
+  (function() {
+  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+      </div>
+      <div class="footer">
+        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
+        <p>
+          Contact me via
+          <a href="http://twitter.com/paulkoer">twitter</a> or
+          <a href="http://github.com/paulkoerbitz">github</a>.
+        </p>
+        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
+        <p><a href="../impressum.html">Impressum</a></p>
+      </div>
+    </div>
+    <script type="text/javascript">
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-20755947-1']);
+      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+      _gaq.push(['_setAllowLinker', true]);
+      _gaq.push(['_trackPageview']);
+      _gaq.push(['anonymizeIp']);
+      (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+    </script>
+  </body>
+</html>
