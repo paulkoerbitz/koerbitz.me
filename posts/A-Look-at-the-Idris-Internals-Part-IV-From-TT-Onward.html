@@ -1,96 +1,186 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <title>Types and Tailcalls - A Look at the Idris Internals, Part IV: From TT Onward</title>
-    <link rel="stylesheet" href="../css/default.css" type="text/css">
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="../">Types and Tailcalls</a>
-      </div>
-      <div class="navigation">
-        <ul>
-          <li><a href="../">blog</a></li>
-          <li><a href="../til.html">til</a></li>
-          <li><a href="../archive.html">archive</a></li>
-          <li><a href="../about.html">about</a></li>
-          <li><a href="../rss.xml">rss</a></li>
-          <!--
-          <li><a href="/notes.html">notes</a></li>
-          <li><a href="/projects.html">projects</a></li>
-          -->
-        </ul>
-      </div>
-      <div class="body">
-        <h1 class="title">A Look at the Idris Internals, Part IV: From TT Onward</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>A Look at the Idris Internals, Part IV - From TT Onward</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
 
-<p class="date">published on July 19, 2016</p>
+<h1 class="title">A Look at the Idris Internals, Part IV - From TT Onward</h1>
+<p class="date">published on July 19th, 2016</p>
 
-<p>So after looking at the invocation of the elaborator in the <a href="../posts/A-Look-at-the-Idris-Internals-Part-III-From-Parsing-to-Elaboration.html">last post</a>, I now want to look into how the resulting TT terms are further processed and simplified into the other intermediary languages. The <a href="https://eb.host.cs.st-andrews.ac.uk/drafts/compile-idris.pdf">cross-platform compilers</a> paper by Edwin Brady gives a high level description of the later stage intermediate languages of Idris. This post will take a look at where the intermediate languages are located in the code and what functions are invoked to simplify TT further.</p>
-<h2 id="idriss-later-stage-intermediate-languages">Idris’s later stage intermediate languages</h2>
-<p>After converting Idris to <code>TT</code>, there are a number of additional intermediate languages, which get produced in subsequent steps. The idea is that these languages are progressively simpler and that each code generator can pick a lanugage which it is easiest to generate the desired code from. The <a href="https://eb.host.cs.st-andrews.ac.uk/drafts/compile-idris.pdf">cross-platform compilers</a> paper by Edwin Brady ilustrates the intermediate languages used in Idris. After Idris and TT, the paper lists the following:</p>
+<p>So after looking at the invocation of the elaborator in the
+<a href="/posts/A-Look-at-the-Idris-Internals-Part-III-From-Parsing-to-Elaboration.html">last post</a>, I now want to look into how the resulting TT
+terms are further processed and simplified into the other
+intermediary languages. The <a href="https://eb.host.cs.st-andrews.ac.uk/drafts/compile-idris.pdf">cross-platform compilers</a> paper by Edwin
+Brady gives a high level description of the later stage
+intermediate languages of Idris. This post will take a
+look at where the intermediate languages are located in
+the code and what functions are invoked to simplify TT further.</p>
+<h2 id="idris-s-later-stage-intermediate-languages">Idris&#39;s later stage intermediate languages</h2>
+<p>After converting Idris to <code>TT</code>, there are a number of additional
+intermediate languages, which get produced in subsequent steps. The
+idea is that these languages are progressively simpler and that each
+code generator can pick a lanugage which it is easiest to generate the
+desired code from. The <a href="https://eb.host.cs.st-andrews.ac.uk/drafts/compile-idris.pdf">cross-platform compilers</a> paper by Edwin Brady
+ilustrates the intermediate languages used in Idris. After Idris and TT,
+the paper lists the following:</p>
 <ul>
-<li><p>TT_case in which pattern matching is converted to simple case trees via a pattern match compiler.</p></li>
-<li><p>IR_case in which all types are erased, as well as any values which are provably not used at run-time.</p></li>
-<li><p>IR_lift in which there are no lambda bindings other than at the top level.</p></li>
-<li><p>IR_defunc in which all functions are fully applied. All functions are first-order, by defunctionalisation.</p></li>
-<li><p>IR_ANF in which all functions are in Applicative Normal Form (ANF), that is all arguments to functions are trivial. By “trivial”, we mean that evaluation of an argument must terminate immediately, that is arguments are either constant or variables.</p></li>
+<li><p>TT_case in which pattern matching is converted to simple case trees via a
+pattern match compiler.</p>
+</li>
+<li><p>IR_case in which all types are erased, as well as any values which are provably
+not used at run-time.</p>
+</li>
+<li><p>IR_lift in which there are no lambda bindings other than at the top level.</p>
+</li>
+<li><p>IR_defunc in which all functions are fully applied. All functions are first-order,
+by defunctionalisation.</p>
+</li>
+<li><p>IR_ANF in which all functions are in Applicative Normal Form (ANF), that
+is all arguments to functions are trivial. By “trivial”, we mean that
+evaluation of an argument must terminate immediately, that is arguments
+are either constant or variables.</p>
+</li>
 </ul>
-<h2 id="where-are-the-intermediate-languages-produced">Where are the intermediate languages produced?</h2>
-<p>Looking at the <code>idrisMain</code> function in <code>Idris/REPL.hs</code> again, we first <code>loadInputs</code> (which ends up calling either <code>loadSource</code> or reloading the equivalent from ibc files). As discussed in the <a href="../posts/A-Look-at-the-Idris-Internals-Part-III-From-Parsing-to-Elaboration.html">last post</a>, the <code>loadSource</code> function from <code>Idris/Parser.hs</code> does a lot of work, namely parsing source files, invoking the elaborator via the <code>elabDecls</code> function from <code>Idris/ElabDecls.hs</code>, simplifying case definitions via the <code>simplifyCasedef</code> function (this converts <code>TT</code> to <code>TT_case</code>), totality checking (first building a size change graph via <code>buildSCG</code>, then <code>checkDeclTotality</code> and <code>verifyTotality</code>), and finally writing out the ibc file.</p>
-<p>Next we call the <code>process</code> function with a <code>Compile</code> command. <code>process</code> (also in <code>REPL.hs</code>) calls the <code>compile</code> function in <code>IRTS/Compiler.hs</code>, so this seems to be the main entry point for further processing of the TT code.</p>
-<p><code>compile</code> does some usage analysis to find reachable names, then calls <code>mkDecls</code> on a list of these names. <code>mkDecls</code> has a type of <code>[Name] -&gt; Idris [(Name, LDecl)]</code>, so outputs a list of declarations of type <code>LDecl</code>. <code>LDecl</code> is the first post-TT intermediate language, it is defined in <code>IRTS/Lang.hs</code>. If I am not mistaken, this should correspond to <code>IR_case</code> in the above list (<code>TT_case</code> is a special case of TT which is represented in the same data structure as <code>TT</code>). <code>LDecl</code> just has two constructors, <code>LFun</code> and <code>LConstructor</code>. The latter just has a <code>Name</code>, an <code>Int</code> (tag) and another <code>Int</code> (arity), the former has options, names (name and argument names) and an expression of type <code>LExp</code>, which is the actual definition of the function (defined in the same file).</p>
-<p><code>mkLDecls</code> is basically a wrapper around the <code>build</code> function, which creates a <code>(Name, LDecl)</code> pair for each <code>(Name, Def)</code> declaration that it gets, so <code>LDecls</code> seem to correspond directly to <code>Defs</code>. If the provided name is a primitive operation <code>build</code> directly constructs an <code>LFun</code> which contains an <code>LOp</code> with some machine generated names for the arguments, otherwise it calls <code>mkLDecl</code> to do this.</p>
-<p><code>mkLDecl</code> handles the constructors <code>Function</code>, <code>CaseOp</code>, <code>TyDecl DCon</code> and <code>TyDecl TCon</code> explicitly, for everything else it creates an <code>LFun [Inline] name [] LNothing</code> construction, this seems to be a function which does a no-op. For the <code>Function</code> and the <code>CaseOp</code> constructors, the <code>irTerm</code> and <code>irTree</code> seem to be the real work horses, we’ll check these out next.</p>
-<p>Of the two <code>irTree</code> itself is short, handing of its work to <code>irSC</code>, which pattern matches on a variable of type <code>SC</code>, this seems to be the case tree representation of the TT terms generated by <code>simplifyCasedef</code> earlier. <code>irSC</code> is pretty involved and looks like it is handeling a lot of special cases. A better understanding of the case trees is probably necessary to understand what is happening in <code>irSC</code> and why.</p>
-<p><code>irTerm</code> on the other hand handles conversions of TT terms, handling <code>App</code>, <code>P</code>, <code>V</code>, <code>Bind</code>, <code>Proj</code>, <code>Constant</code>, <code>TType</code>, <code>Erased</code> and <code>Impossible</code> constructors. The latter three are mapped directly to <code>LNothing</code>, transformations for <code>P</code>, <code>V</code>, <code>Bind</code>, <code>Proj</code> and <code>Constant</code> seem pretty straight-forward, however, the <code>App</code> case is very involved, it <code>unApply</code>s the application and has about 20 different pattern matches on the <code>P</code> constructor alone.</p>
-<p>Nevertheless <code>mkDecls</code> and the functions it calls handle the transformation from <code>TT</code> to <code>LDecl</code> - some complications along these lines should have been expected ;).</p>
+<h2 id="where-are-the-intermediate-languages-produced-">Where are the intermediate languages produced?</h2>
+<p>Looking at the <code>idrisMain</code> function in <code>Idris/REPL.hs</code> again, we first
+<code>loadInputs</code> (which ends up calling either <code>loadSource</code> or reloading
+the equivalent from ibc files).  As discussed in the <a href="/posts/A-Look-at-the-Idris-Internals-Part-III-From-Parsing-to-Elaboration.html">last post</a>, the
+<code>loadSource</code> function from <code>Idris/Parser.hs</code> does a lot of work,
+namely parsing source files, invoking the elaborator via the
+<code>elabDecls</code> function from <code>Idris/ElabDecls.hs</code>, simplifying case
+definitions via the <code>simplifyCasedef</code> function (this converts <code>TT</code> to
+<code>TT_case</code>), totality checking (first building a size change graph via
+<code>buildSCG</code>, then <code>checkDeclTotality</code> and <code>verifyTotality</code>), and
+finally writing out the ibc file.</p>
+<p>Next we call the <code>process</code> function with a <code>Compile</code>
+command. <code>process</code> (also in <code>REPL.hs</code>) calls the <code>compile</code> function
+in <code>IRTS/Compiler.hs</code>, so this seems to be the main entry point
+for further processing of the TT code.</p>
+<p><code>compile</code> does some usage analysis to find reachable names, then calls
+<code>mkDecls</code> on a list of these names. <code>mkDecls</code> has a type of <code>[Name] -&gt;
+Idris [(Name, LDecl)]</code>, so outputs a list of declarations of type
+<code>LDecl</code>. <code>LDecl</code> is the first post-TT intermediate language, it is
+defined in <code>IRTS/Lang.hs</code>. If I am not mistaken, this should
+correspond to <code>IR_case</code> in the above list (<code>TT_case</code> is a special case
+of TT which is represented in the same data structure as <code>TT</code>).
+<code>LDecl</code> just has two constructors, <code>LFun</code> and <code>LConstructor</code>. The
+latter just has a <code>Name</code>, an <code>Int</code> (tag) and another <code>Int</code> (arity),
+the former has options, names (name and argument names) and an
+expression of type <code>LExp</code>, which is the actual definition of the
+function (defined in the same file).</p>
+<p><code>mkLDecls</code> is basically a wrapper around the <code>build</code> function, which
+creates a <code>(Name, LDecl)</code> pair for each <code>(Name, Def)</code> declaration that
+it gets, so <code>LDecls</code> seem to correspond directly to <code>Defs</code>. If the
+provided name is a primitive operation <code>build</code> directly constructs an
+<code>LFun</code> which contains an <code>LOp</code> with some machine generated names for
+the arguments, otherwise it calls <code>mkLDecl</code> to do this.</p>
+<p><code>mkLDecl</code> handles the constructors <code>Function</code>, <code>CaseOp</code>, <code>TyDecl DCon</code>
+and <code>TyDecl TCon</code> explicitly, for everything else it creates an <code>LFun
+[Inline] name [] LNothing</code> construction, this seems to be a function
+which does a no-op. For the <code>Function</code> and the <code>CaseOp</code> constructors,
+the <code>irTerm</code> and <code>irTree</code> seem to be the real work horses, we&#39;ll check
+these out next.</p>
+<p>Of the two <code>irTree</code> itself is short, handing of its work to <code>irSC</code>,
+which pattern matches on a variable of type <code>SC</code>, this seems to be the
+case tree representation of the TT terms generated by
+<code>simplifyCasedef</code> earlier. <code>irSC</code> is pretty involved and looks like it
+is handeling a lot of special cases. A better understanding of the
+case trees is probably necessary to understand what is happening in
+<code>irSC</code> and why.</p>
+<p><code>irTerm</code> on the other hand handles conversions of TT terms, handling
+<code>App</code>, <code>P</code>, <code>V</code>, <code>Bind</code>, <code>Proj</code>, <code>Constant</code>, <code>TType</code>, <code>Erased</code> and
+<code>Impossible</code> constructors. The latter three are mapped directly to
+<code>LNothing</code>, transformations for <code>P</code>, <code>V</code>, <code>Bind</code>, <code>Proj</code> and
+<code>Constant</code> seem pretty straight-forward, however, the <code>App</code> case
+is very involved, it <code>unApply</code>s the application and has about 20
+different pattern matches on the <code>P</code> constructor alone.</p>
+<p>Nevertheless <code>mkDecls</code> and the functions it calls handle the
+transformation from <code>TT</code> to <code>LDecl</code> - some complications along
+these lines should have been expected ;).</p>
 <h2 id="further-processing">Further processing</h2>
-<p>Returning to the <code>compile</code> function, the <code>inlineAll</code> function from <code>IRTS/LangOpts.hs</code> is invoked on our <code>LDecls</code>, which, for all <code>LDecls</code> basically searches for <code>LApp</code> constructs (so function applications), checks a number of conditions to see that these are inlineable, invents fresh names for the variables and replaces the application with the function body.</p>
-<p>Next <code>allocUnique</code> and <code>addTags</code> make some tranforms to maintain unique names (?) and tag constructors(?). In there <code>liftAll</code> does lambda lifting for all LDecls, the work horse here seems to be the <code>lift</code> function in <code>IRTS/Lang.hs</code>. So this innocent looking step does the transformation from <code>IR_case</code> to <code>IR_lift</code>, all the while the data type is still <code>LDecl</code>.</p>
-<p>Next up is a call to <code>defunctionalise</code> which turns <code>LDefs</code> into <code>DDefs</code>, this is the representation of <code>IR_defunc</code> where all function applications are fully applied and first order. <code>DDefs</code> is a <code>Ctxt</code> around <code>DDecl</code>, which looks pretty similar to <code>LDecl</code> (some cases have been simplified, I suppose). Next, <code>DDefs</code> are <code>inline</code>ed, as far as I can tell this does not do anything at the moment.</p>
-<p>The next call is to <code>simplifyDefs</code> which turns the <code>DDefs</code> into <code>SDefs</code>, where <code>SDefs</code> are definitions in the simplified language defined in <code>IRTS/Simplified.hs</code>, I think this corresponds to <code>IR_ANF</code>, xthe simplest of the intermediate languages.</p>
-<p>With this we’re pretty much through the intermediate language generation and return a <code>CodegenInfo</code>, which contains the simplified (<code>c</code>, IR_ANF), defunctionalized (<code>defuns</code> IR_defun) and lifted (<code>tagged</code>, IR_lift) representations.</p>
+<p>Returning to the <code>compile</code> function, the <code>inlineAll</code> function
+from <code>IRTS/LangOpts.hs</code> is invoked on our <code>LDecls</code>, which, for
+all <code>LDecls</code> basically searches for <code>LApp</code> constructs (so function
+applications), checks a number of conditions to see that these are
+inlineable, invents fresh names for the variables and replaces
+the application with the function body.</p>
+<p>Next <code>allocUnique</code> and <code>addTags</code> make some tranforms to maintain
+unique names (?) and tag constructors(?). In there <code>liftAll</code>
+does lambda lifting for all LDecls, the work horse here seems
+to be the <code>lift</code> function in <code>IRTS/Lang.hs</code>. So this innocent
+looking step does the transformation from <code>IR_case</code> to <code>IR_lift</code>,
+all the while the data type is still <code>LDecl</code>.</p>
+<p>Next up is a call to <code>defunctionalise</code> which turns <code>LDefs</code> into
+<code>DDefs</code>, this is the representation of <code>IR_defunc</code> where all function
+applications are fully applied and first order. <code>DDefs</code> is a <code>Ctxt</code>
+around <code>DDecl</code>, which looks pretty similar to <code>LDecl</code> (some cases have
+been simplified, I suppose). Next, <code>DDefs</code> are <code>inline</code>ed, as far as I
+can tell this does not do anything at the moment.</p>
+<p>The next call is to <code>simplifyDefs</code> which turns the <code>DDefs</code> into
+<code>SDefs</code>, where <code>SDefs</code> are definitions in the simplified language
+defined in <code>IRTS/Simplified.hs</code>, I think this corresponds to <code>IR_ANF</code>,
+xthe simplest of the intermediate languages.</p>
+<p>With this we&#39;re pretty much through the intermediate language
+generation and return a <code>CodegenInfo</code>, which contains the simplified
+(<code>c</code>, IR_ANF), defunctionalized (<code>defuns</code> IR_defun) and lifted
+(<code>tagged</code>, IR_lift) representations.</p>
+
+
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-      </div>
-      <div class="footer">
-        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
-        <p>
-          Contact me via
-          <a href="http://twitter.com/paulkoer">twitter</a> or
-          <a href="http://github.com/paulkoerbitz">github</a>.
-        </p>
-        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
-        <p><a href="../impressum.html">Impressum</a></p>
-      </div>
-    </div>
-    <script type="text/javascript">
-      var _gaq = _gaq || [];
-      _gaq.push(['_setAccount', 'UA-20755947-1']);
-      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
-      _gaq.push(['_setAllowLinker', true]);
-      _gaq.push(['_trackPageview']);
-      _gaq.push(['anonymizeIp']);
-      (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-      })();
-    </script>
-  </body>
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>

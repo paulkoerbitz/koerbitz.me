@@ -1,296 +1,450 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <title>Types and Tailcalls - Understanding Pointers, Ownership, and Lifetimes in Rust</title>
-    <link rel="stylesheet" href="../css/default.css" type="text/css">
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="../">Types and Tailcalls</a>
-      </div>
-      <div class="navigation">
-        <ul>
-          <li><a href="../">blog</a></li>
-          <li><a href="../til.html">til</a></li>
-          <li><a href="../archive.html">archive</a></li>
-          <li><a href="../about.html">about</a></li>
-          <li><a href="../rss.xml">rss</a></li>
-          <!--
-          <li><a href="/notes.html">notes</a></li>
-          <li><a href="/projects.html">projects</a></li>
-          -->
-        </ul>
-      </div>
-      <div class="body">
-        <h1 class="title">Understanding Pointers, Ownership, and Lifetimes in Rust</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>Understanding Pointers, Ownership, and Lifetimes in Rust</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
 
-<p class="date">published on December 21, 2013</p>
+<h1 class="title">Understanding Pointers, Ownership, and Lifetimes in Rust</h1>
+<p class="date">published on December 21st, 2013</p>
 
-<hr />
+<hr>
 <h2 id="update-2015-03-15">Update 2015-03-15</h2>
-<p>I have updated this post to reflect the new syntax for boxes or owned pointers in in rust 1.0.</p>
-<hr />
-<p>In the last couple of weeks I have been looking into <a href="http://www.rust-lang.org">Rust</a>, a new language developed by the good folks at Mozilla. Rust is fairly unique in that it is aimed at the same space as C++: a systems programming language that gives you full control over memory but also offers high level language features. In the past few years a few languages have come out that claim to target this space, for example <a href="http://www.go-lang.org">Go</a>, <a href="http://www.dlang.org">D</a>, and <a href="http://www.nimrod-lang.org">Nimrod</a>. However, these languages are garbage collected by default and loose their memory safety when memory is managed manually (D, Nimrod) or do not offer this possibility at all (Go). Therefore, these languages are not well equiped for applications which require full control over memory, which is the use case where C++ shines.</p>
-<p>I think it’s great that C++ finally gets some real competition. Even among C++ fans, few will deny that compatibility with C, decades of language evolution, and accidental language features have created a very complex language that is extremely difficult to master. I think it is quite sad that for a lot of applications, C++ is still the only sane choice. We need a simpler language that offers more modern language features while targeting the same space. Rust could just be that language.</p>
-<p>Ok now, the point of this post is not to argue the case for <a href="http://www.rust-lang.org">Rust</a> nor to heap (well deserved) praise onto the Rust designers and implementers. I want to talk about the ownership semantics in Rust and how they interact with the different type of pointers in Rust.</p>
-<h2 id="rusts-guiding-principles">Rust’s Guiding Principles</h2>
-<p>To me, understanding something means discovering and understanding the reasons and guiding principles behind the things on the surface. From these, it should be easy to reason about other things and quickly understand why they must be one way and not another. To me the guiding principles of memory managemend in Rust are the following:</p>
-<ol style="list-style-type: decimal">
-<li><p><strong><strong>Manual memory management</strong></strong>: There must be some way for the programmer to control when an object on the heap will be deleted.</p></li>
-<li><p><strong><strong>Memory safety</strong></strong>: Pointers must never point to areas of memory that have been changed or deleted.</p></li>
-<li><p><strong><strong>Safe Concurrency</strong></strong>: There should be no dataraces between threads. Multiple threads must not read and modify the same part of memory at the same time.</p></li>
-<li><p><strong><strong>Compile time checks</strong></strong>: Ensure correctness at compile time instead of runtime whenever possible.</p></li>
+<p>I have updated this post to reflect the new syntax for boxes or owned
+pointers in in rust 1.0.</p>
+<hr>
+<p>In the last couple of weeks I have been looking into <a href="http://www.rust-lang.org">Rust</a>, a
+new language developed by the good folks at Mozilla. Rust is fairly
+unique in that it is aimed at the same space as C++: a systems
+programming language that gives you full control over memory but also
+offers high level language features. In the past few years a few
+languages have come out that claim to target this space, for example
+<a href="http://www.go-lang.org">Go</a>, <a href="http://www.dlang.org">D</a>, and <a href="http://www.nimrod-lang.org">Nimrod</a>. However, these languages are garbage
+collected by default and loose their memory safety when memory is
+managed manually (D, Nimrod) or do not offer this possibility at all
+(Go). Therefore, these languages are not well equiped for applications
+which require full control over memory, which is the use case
+where C++ shines.</p>
+<p>I think it&#39;s great that C++ finally gets some real competition. Even
+among C++ fans, few will deny that compatibility with C, decades of
+language evolution, and accidental language features have created a
+very complex language that is extremely difficult to master. I think
+it is quite sad that for a lot of applications, C++ is still the only
+sane choice. We need a simpler language that offers more modern
+language features while targeting the same space. Rust could just be
+that language.</p>
+<p>Ok now, the point of this post is not to argue the case for <a href="http://www.rust-lang.org">Rust</a> nor
+to heap (well deserved) praise onto the Rust designers and
+implementers. I want to talk about the ownership semantics in Rust and
+how they interact with the different type of pointers in Rust.</p>
+<h2 id="rust-s-guiding-principles">Rust&#39;s Guiding Principles</h2>
+<p>To me, understanding something means discovering and understanding the
+reasons and guiding principles behind the things on the surface. From
+these, it should be easy to reason about other things and quickly
+understand why they must be one way and not another. To me the guiding
+principles of memory managemend in Rust are the following:</p>
+<ol>
+<li><p><strong><strong>Manual memory management</strong></strong>: There must be some way for the
+programmer to control when an object on the heap will be deleted.</p>
+</li>
+<li><p><strong><strong>Memory safety</strong></strong>: Pointers must never point to areas of memory
+that have been changed or deleted.</p>
+</li>
+<li><p><strong><strong>Safe Concurrency</strong></strong>: There should be no dataraces between
+threads. Multiple threads must not read and modify the same part of
+memory at the same time.</p>
+</li>
+<li><p><strong><strong>Compile time checks</strong></strong>: Ensure correctness at compile time
+instead of runtime whenever possible.</p>
+</li>
 </ol>
-<p>This, in conjunction with the features that Rust provides, will give us a good idea why certain things must be the way they are in Rust. This post focuses on exploring the memory management and safety aspects.</p>
+<p>This, in conjunction with the features that Rust provides, will give
+us a good idea why certain things must be the way they are in Rust.
+This post focuses on exploring the memory management and safety aspects.</p>
 <h2 id="safe-manual-memory-management-by-enforcing-ownership">Safe Manual Memory Management by Enforcing Ownership</h2>
-<p>The way Rust achieves safe manual memory management is by enforcing sane ownership semantics through a number of different pointers. There are several types of pointers in Rust: the most important are <em>boxes or owned pointers</em> and <em>references or borrowed pointers</em>. There are also different kinds of reference counted pointers, but these are for more complicated situations which I won’t get into in this post. Therefore, this post will focus on owned and borrowed pointers.</p>
-<h3 id="boxes-owned-pointers"><em>Boxes</em> / <em>Owned Pointers</em></h3>
-<p>A <em>box</em> or <em>owned pointer</em> in Rust has ownership over a certain part of the heap. When it goes out of scope it deletes that part of the heap. This achieves <em>manual memory management</em>: the programmer has control over when memory is released by controlling when an owned pointer goes out of scope. A box is a datatype, parameterized by the type that it boxes, so <code>Box&lt;i32&gt;</code> is the type of an owned pointer to an <code>i32</code> and <code>Box::new(3)</code> is the literal notation for allocating space on the heap for an i32, putting 3 into it and handling back an owned pointer. Like all pointers, boxes are derferenced by prefixing them with <code>*</code>. Here is a bit of a contrived example:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="co">// The type annotations in the let statements in this example</span>
-<span class="co">// (e.g. ': Box&lt;int&gt;') are not necessary and only for clarity</span>
+<p>The way Rust achieves safe manual memory management is by enforcing
+sane ownership semantics through a number of different pointers.
+There are several types of pointers in Rust: the most important are
+<em>boxes or owned pointers</em> and <em>references or borrowed pointers</em>.
+There are also different kinds of reference counted pointers, but
+these are for more complicated situations which I won&#39;t get into in
+this post.  Therefore, this post will focus on owned and borrowed
+pointers.</p>
+<h3 id="-boxes-owned-pointers-"><em>Boxes</em> / <em>Owned Pointers</em></h3>
+<p>A <em>box</em> or <em>owned pointer</em> in Rust has ownership over a certain part
+of the heap. When it goes out of scope it deletes that part of the
+heap.  This achieves <em>manual memory management</em>: the programmer has
+control over when memory is released by controlling when an owned
+pointer goes out of scope. A box is a datatype, parameterized by the
+type that it boxes, so <code>Box&lt;i32&gt;</code> is the type of an owned pointer to
+an <code>i32</code> and <code>Box::new(3)</code> is the literal notation for allocating
+space on the heap for an i32, putting 3 into it and handling back an
+owned pointer. Like all pointers, boxes are derferenced by prefixing
+them with <code>*</code>. Here is a bit of a contrived example:</p>
+<pre><code class="lang-{.rust}">// The type annotations in the let statements in this example
+// (e.g. &#39;: Box&lt;int&gt;&#39;) are not necessary and only for clarity
 
-<span class="kw">fn</span> owned_seven() -&gt; <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt; {
-    <span class="co">// Allocate an i32 with value '3' on the heap, 'three' points to it</span>
-    <span class="kw">let</span> three : <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt; = <span class="dt">Box</span>::new(<span class="dv">3</span>);
-    <span class="co">// The same for four</span>
-    <span class="kw">let</span> four : <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt; = <span class="dt">Box</span>::new(<span class="dv">4</span>);
-    <span class="co">// Dereference both 'three' and 'four', add them, store the result</span>
-    <span class="co">// in a newly allocated variable on the heap</span>
-    <span class="dt">Box</span>::new(*three + *four)
-}   <span class="co">// &lt;-- 'three' and 'four' go out of scope, so the memory they own</span>
-    <span class="co">//     is released. The memory of the return value is owned by the</span>
-    <span class="co">//     return value so it survives the function call.</span>
-    <span class="co">// Note: returning a pointer from a function is considered an anti-</span>
-    <span class="co">// pattern in rust. It is prefered to return a value so the caller</span>
-    <span class="co">// can decide what he wants to do with it. This is done for illustration</span>
-    <span class="co">// purposes here.</span>
+fn owned_seven() -&gt; Box&lt;i32&gt; {
+    // Allocate an i32 with value &#39;3&#39; on the heap, &#39;three&#39; points to it
+    let three : Box&lt;i32&gt; = Box::new(3);
+    // The same for four
+    let four : Box&lt;i32&gt; = Box::new(4);
+    // Dereference both &#39;three&#39; and &#39;four&#39;, add them, store the result
+    // in a newly allocated variable on the heap
+    Box::new(*three + *four)
+}   // &lt;-- &#39;three&#39; and &#39;four&#39; go out of scope, so the memory they own
+    //     is released. The memory of the return value is owned by the
+    //     return value so it survives the function call.
+    // Note: returning a pointer from a function is considered an anti-
+    // pattern in rust. It is prefered to return a value so the caller
+    // can decide what he wants to do with it. This is done for illustration
+    // purposes here.
 
 
-<span class="kw">fn</span> main() {
-    <span class="kw">let</span> seven : <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt; = owned_seven();
-    <span class="pp">println!</span>(<span class="st">&quot;3 + 4 = {}&quot;</span>, *seven);
-}   <span class="co">// &lt;-- seven goes out of scope and the memory it points to is</span>
-    <span class="co">//     deallocated here</span></code></pre></div>
-<h3 id="referneces-borrowed-pointers"><em>Referneces</em> / <em>Borrowed Pointers</em></h3>
-<p>Having only owned pointers would make writing many programs difficult: there could only ever be one reference to every <em>thing</em>. Fortunately, Rust offers another type of pointer called a <em>reference</em> or <em>borrowed pointer</em>. References do not imply ownership and they can point to objects both on the heap and the stack, so they are quite flexible. We can create a reference by taking the address of something with the <em>address-of</em> operator <code>&amp;</code>. In a slight abuse of notation, the types of references are also denoted by prefixing the type of the variable it points to by <code>&amp;</code>, so <code>&amp;i32</code> is a borrowed pointer to an <code>i32</code>.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
-    <span class="kw">let</span> three : &amp;<span class="dt">i32</span> = &amp;<span class="dv">3</span>;
-    <span class="kw">let</span> four : &amp;<span class="dt">i32</span> = &amp;<span class="dv">4</span>;
-    <span class="pp">println!</span>(<span class="st">&quot;3 + 4 = {}&quot;</span>, *three + *four);
-}</code></pre></div>
-<p>References in Rust are a lot like references and pass-by-reference bound variables in C and C++, but note that unlike C/C++-references borrowed pointers must be dereferenced to get to their values. I think this is really more consistent, because references really hold the address to a memory location, just like other pointes. So it makes sense to treat them similarly in terms of syntax. References in Rust also have a number of safety mechanisms that C/C++ references lack, but more on that later.</p>
+fn main() {
+    let seven : Box&lt;i32&gt; = owned_seven();
+    println!(&quot;3 + 4 = {}&quot;, *seven);
+}   // &lt;-- seven goes out of scope and the memory it points to is
+    //     deallocated here
+</code></pre>
+<h3 id="-referneces-borrowed-pointers-"><em>Referneces</em> / <em>Borrowed Pointers</em></h3>
+<p>Having only owned pointers would make writing many programs difficult:
+there could only ever be one reference to every <em>thing</em>. Fortunately,
+Rust offers another type of pointer called a <em>reference</em> or <em>borrowed
+pointer</em>. References do not imply ownership and they can point to
+objects both on the heap and the stack, so they are quite flexible.
+We can create a reference by taking the address of something with the
+<em>address-of</em> operator <code>&amp;</code>. In a slight abuse of notation, the types of
+references are also denoted by prefixing the type of the variable it
+points to by <code>&amp;</code>, so <code>&amp;i32</code> is a borrowed pointer to an <code>i32</code>.</p>
+<pre><code class="lang-{.rust}">fn main() {
+    let three : &amp;i32 = &amp;3;
+    let four : &amp;i32 = &amp;4;
+    println!(&quot;3 + 4 = {}&quot;, *three + *four);
+}
+</code></pre>
+<p>References in Rust are a lot like references and pass-by-reference
+bound variables in C and C++, but note that unlike C/C++-references
+borrowed pointers must be dereferenced to get to their values. I think
+this is really more consistent, because references really hold the
+address to a memory location, just like other pointes. So it makes
+sense to treat them similarly in terms of syntax. References in Rust
+also have a number of safety mechanisms that C/C++ references lack,
+but more on that later.</p>
 <h2 id="move-semantics">Move Semantics</h2>
-<p><em>Memory safety</em> implies that owned pointers <em>cannot be copied or cloned</em>. Otherwise, two such pointers could point to the same block of memory and that memory would be deleted twice. Therefore, owned pointers have move semantics:<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> when owned pointer <code>o2</code> is initialized from owned pointer <code>o1</code>, <code>o1</code> is no longer valid. By guiding principle number four, we would perfer to ensure this at compile time, and Rust indeed does this.<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
-   <span class="kw">let</span> o1 = <span class="dt">Box</span>::new(<span class="st">&quot;world&quot;</span>);
-   <span class="kw">let</span> o2 = o1;                <span class="co">// &lt;-- o1 is 'moved' into o2 and now invalid</span>
-   <span class="pp">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, o1); <span class="co">// &lt;-- this is a compile time error</span>
-}</code></pre></div>
+<p><em>Memory safety</em> implies that owned pointers <em>cannot be copied or
+cloned</em>. Otherwise, two such pointers could point to the same block of
+memory and that memory would be deleted twice. Therefore, owned
+pointers have move semantics:^[The other alternative would be that
+owned pointers can never be reassigned, they would be non-copiable and
+non-moveable. This seems pretty cumbersome, fortunately Rust&#39;s owned
+pointers have move semantics.] when owned pointer <code>o2</code> is initialized
+from owned pointer <code>o1</code>, <code>o1</code> is no longer valid. By guiding principle
+number four, we would perfer to ensure this at compile time, and Rust
+indeed does this.^[Ensuring the validity of owned pointers at compile
+time is much better than the alternatives: If it was assured at
+runtime, there would be fewer correctness guarantees about the program
+and the check would have to be performed every time a pointer is
+dereferenced. Checking the validity of pointers at compile time is a
+major achievement of the Rust language: tracking such moves at compile
+time requires an advanced type-system feature called <a href="http://en.wikipedia.org/wiki/Type_system">affine
+types</a>. As far as I know
+Rust is the only mainstreamy language which has such a feature.]</p>
+<pre><code class="lang-{.rust}">fn main() {
+   let o1 = Box::new(&quot;world&quot;);
+   let o2 = o1;                // &lt;-- o1 is &#39;moved&#39; into o2 and now invalid
+   println!(&quot;Hello, {}!&quot;, o1); // &lt;-- this is a compile time error
+}
+</code></pre>
 <p>Indeed the Rust compiler reports:</p>
 <pre><code>move.rs:4:27: 4:29 error: use of moved value: `o1`
 move.rs:4    println!(&quot;Hello, {}!&quot;, o1); // &lt;-- this is a compile time error
-                                    ^~</code></pre>
-<h3 id="structs-and-enums">Structs and Enums</h3>
-<p>In general Rust has move semantics. When an object is initialized via assignment its memory is moved to the newly assigned variable. However, structs can implement the <code>Copy</code> trait, which means they will have copy semantics instead: When assigned the new object gets a bitwise copy of the object used to assign it.</p>
-<p>The <code>Copy</code> trait cannot be implemented when an object contains a box: the box does not implement the copy trait, so we can’t copy it when copying the object containing it. This makes sense because the box has move semantics, the object containing it must also have move semantics, otherwise we would again incur two independent owning copies.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="co">// Derive the Copy trait so objects of this type have copy semantics</span>
-<span class="at">#[</span>derive<span class="at">(</span>Show<span class="at">,</span><span class="bu">Copy</span><span class="at">)]</span>
-<span class="kw">struct</span> Pod {x: <span class="dt">i32</span>, y: <span class="dt">u32</span>}
+                                    ^~
+</code></pre><h3 id="structs-and-enums">Structs and Enums</h3>
+<p>In general Rust has move semantics. When an object is initialized via
+assignment its memory is moved to the newly assigned
+variable. However, structs can implement the <code>Copy</code> trait, which means
+they will have copy semantics instead: When assigned the new object
+gets a bitwise copy of the object used to assign it.</p>
+<p>The <code>Copy</code> trait cannot be implemented when an object contains a box:
+the box does not implement the copy trait, so we can&#39;t copy it when
+copying the object containing it. This makes sense because the box has
+move semantics, the object containing it must also have move
+semantics, otherwise we would again incur two independent owning
+copies.</p>
+<pre><code class="lang-{.rust}">// Derive the Copy trait so objects of this type have copy semantics
+#[derive(Show,Copy)]
+struct Pod {x: i32, y: u32}
 
-<span class="co">// Can't derive the Copy trait because Box&lt;T&gt; does not have the Copy trait</span>
-<span class="at">#[</span>derive<span class="at">(</span>Show<span class="at">)]</span>
-<span class="kw">struct</span> WithBox {x: <span class="dt">i32</span>, p: <span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt;}
+// Can&#39;t derive the Copy trait because Box&lt;T&gt; does not have the Copy trait
+#[derive(Show)]
+struct WithBox {x: i32, p: Box&lt;i32&gt;}
 
-<span class="kw">fn</span> main() {
-   <span class="kw">let</span> a1 = Pod {x: <span class="dv">3</span>, y: <span class="dv">4</span>};
-   <span class="kw">let</span> a2 = a1;
-   <span class="pp">println!</span>(<span class="st">&quot;{:?}&quot;</span>, a1);                   <span class="co">// &lt;-- OK, a1 has been copied</span>
-   <span class="kw">let</span> b1 = WithBox {x: <span class="dv">3</span>, p: <span class="dt">Box</span>::new(<span class="dv">4</span>)};
-   <span class="kw">let</span> b2 = b1;
-   <span class="pp">println!</span>(<span class="st">&quot;{:?}&quot;</span>, b1);                   <span class="co">// &lt;-- Compile time error, b1 has been moved</span>
-}</code></pre></div>
-<p>The same rules apply to enums, but here the error messages can be a bit more confusing.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">enum</span> MyEnum {
-     X(<span class="dt">i32</span>),
-     Y(<span class="dt">Box</span>&lt;<span class="dt">i32</span>&gt;)
+fn main() {
+   let a1 = Pod {x: 3, y: 4};
+   let a2 = a1;
+   println!(&quot;{:?}&quot;, a1);                   // &lt;-- OK, a1 has been copied
+   let b1 = WithBox {x: 3, p: Box::new(4)};
+   let b2 = b1;
+   println!(&quot;{:?}&quot;, b1);                   // &lt;-- Compile time error, b1 has been moved
+}
+</code></pre>
+<p>The same rules apply to enums, but here the error messages can be a bit
+more confusing.</p>
+<pre><code class="lang-{.rust}">enum MyEnum {
+     X(i32),
+     Y(Box&lt;i32&gt;)
 }
 
-<span class="kw">fn</span> match_and_print(e: &amp;MyEnum) {
-    <span class="kw">match</span> e {
-        &amp;MyEnum::X(x) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, x),  <span class="co">// &lt;-- OK, x can be copied</span>
-        &amp;MyEnum::Y(y) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, *y)  <span class="co">// &lt;-- Error, y cannot be moved out of a reference</span>
+fn match_and_print(e: &amp;MyEnum) {
+    match e {
+        &amp;MyEnum::X(x) =&gt; println!(&quot;{}&quot;, x),  // &lt;-- OK, x can be copied
+        &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
     }
 }
 
-<span class="kw">fn</span> main() {
-   <span class="kw">let</span> x = MyEnum::X(<span class="dv">3</span>);
-   <span class="kw">let</span> y = MyEnum::Y(<span class="dt">Box</span>::new(<span class="dv">4</span>));
+fn main() {
+   let x = MyEnum::X(3);
+   let y = MyEnum::Y(Box::new(4));
    match_and_print(&amp;x);
    match_and_print(&amp;y);
-}</code></pre></div>
+}
+</code></pre>
 <p>In this case the compiler reports</p>
 <pre><code>move.rs:9:9: 9:22 error: cannot move out of borrowed content
 move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
-                  ^~~~~~~~~~~~~
-move.rs:9:20: 9:21 note: attempting to move value to here
-move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
+                  ^~~~~~~~~~
+</code></pre><p>move.rs:9:20: 9:21 note: attempting to move value to here
+move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, <em>y)  // &lt;-- Error, y cannot be moved out of a reference
                              ^
-move.rs:9:20: 9:21 help: to prevent the move, use `ref y` or `ref mut y` to capture value by reference
-move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
-                             ^</code></pre>
-<p>Standard pattern matches are pass-by-value, meaning that the contents of the enum is moved. However, this can only be done when we have ownership over the values to be moved. When we apply <code>match</code> to a dereferenced borrowed pointer, we cannot move because we don’t have ownership. Changing the <code>match_and_print</code> function to take a value would work again.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: MyEnum) {
-    <span class="kw">match</span> e {
-        MyEnum::X(x) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
-        MyEnum::Y(y) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, *y)
+move.rs:9:20: 9:21 help: to prevent the move, use <code>ref y</code> or <code>ref mut y</code> to capture value by reference
+move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, </em>y)  // &lt;-- Error, y cannot be moved out of a reference
+                             ^</p>
+<pre><code>
+Standard pattern matches are pass-by-value, meaning that the contents
+of the enum is moved. However, this can only be done when we have
+ownership over the values to be moved. When we apply `match` to a
+dereferenced borrowed pointer, we cannot move because we don&#39;t have
+ownership. Changing the `match_and_print` function to take a value
+would work again.
+
+~~~{.rust}
+fn match_and_print(e: MyEnum) {
+    match e {
+        MyEnum::X(x) =&gt; println!(&quot;{}&quot;, x),
+        MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)
     }
-}</code></pre></div>
-<h3 id="the-ref-keyword">The <code>ref</code> Keyword</h3>
-<p>Moving values in pattern matches is not always what we want. Sometimes we just want to take a reference. This way we can pattern match on values which we have obtained via borrowed pointers or we can simply avoid a move. This is where the <code>ref</code> keyword comes into play: It changes the pass-by-value semantics of a pattern match to pass-by-borrowed-pointer semantics:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: &amp;MyEnum) {
-    <span class="kw">match</span> e {
-        &amp;MyEnum::X(x) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
-        &amp;MyEnum::Y(<span class="kw">ref</span> y) =&gt;                 <span class="co">// OK, y is a borrowed ptr to Box&lt;int&gt;</span>
-            <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, **y)     <span class="co">// y has type &amp;Box&lt;int&gt; and must be dereferenced twice</span>
+}
+</code></pre><h3 id="the-ref-keyword">The <code>ref</code> Keyword</h3>
+<p>Moving values in pattern matches is not always what we want.
+Sometimes we just want to take a reference. This way we can pattern
+match on values which we have obtained via borrowed pointers or we can
+simply avoid a move. This is where the <code>ref</code> keyword comes into play:
+It changes the pass-by-value semantics of a pattern match to
+pass-by-borrowed-pointer semantics:</p>
+<pre><code class="lang-{.rust}">fn match_and_print(e: &amp;MyEnum) {
+    match e {
+        &amp;MyEnum::X(x) =&gt; println!(&quot;{}&quot;, x),
+        &amp;MyEnum::Y(ref y) =&gt;                 // OK, y is a borrowed ptr to Box&lt;int&gt;
+            println!(&quot;{}&quot;, **y)     // y has type &amp;Box&lt;int&gt; and must be dereferenced twice
     }
-}</code></pre></div>
-<p>To bind mutable references there is also the <code>ref mut</code> version which allows modifying:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> match_and_print(e: &amp;<span class="kw">mut</span> MyEnum) {
-    <span class="kw">match</span> e {
-        &amp;<span class="kw">mut</span> MyEnum::X(x) =&gt; <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, x),
-        &amp;<span class="kw">mut</span> MyEnum::Y(<span class="kw">ref</span> <span class="kw">mut</span> y) =&gt; {
-            **y = <span class="dv">5</span>;
-            <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, **y)
+}
+</code></pre>
+<p>To bind mutable references there is also the <code>ref mut</code> version which
+allows modifying:</p>
+<pre><code class="lang-{.rust}">fn match_and_print(e: &amp;mut MyEnum) {
+    match e {
+        &amp;mut MyEnum::X(x) =&gt; println!(&quot;{}&quot;, x),
+        &amp;mut MyEnum::Y(ref mut y) =&gt; {
+            **y = 5;
+            println!(&quot;{}&quot;, **y)
         }
     }
 }
 
-<span class="kw">fn</span> main() {
-   <span class="kw">let</span> <span class="kw">mut</span> x = MyEnum::X(<span class="dv">3</span>);
-   <span class="kw">let</span> <span class="kw">mut</span> y = MyEnum::Y(<span class="dt">Box</span>::new(<span class="dv">4</span>));
-   match_and_print(&amp;<span class="kw">mut</span> x);
-   match_and_print(&amp;<span class="kw">mut</span> y);
-}</code></pre></div>
+fn main() {
+   let mut x = MyEnum::X(3);
+   let mut y = MyEnum::Y(Box::new(4));
+   match_and_print(&amp;mut x);
+   match_and_print(&amp;mut y);
+}
+</code></pre>
 <p>The <code>ref</code> keyword and its <code>ref mut</code> variant also work in <code>let</code> bindings:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> main() {
-   <span class="kw">let</span> <span class="kw">mut</span> x = <span class="dv">3</span>;
-   <span class="kw">let</span> <span class="kw">ref</span> <span class="kw">mut</span> y = x;
-   *y = <span class="dv">4</span>;
-   <span class="pp">println!</span>(<span class="st">&quot;{}&quot;</span>, *y);
-}</code></pre></div>
+<pre><code class="lang-{.rust}">fn main() {
+   let mut x = 3;
+   let ref mut y = x;
+   *y = 4;
+   println!(&quot;{}&quot;, *y);
+}
+</code></pre>
 <h2 id="lifetimes">Lifetimes</h2>
-<p>The difficulty with borrowed pointers is that they themselves cannot ensure that they point to valid memory. What if the thing that owns the memory they point to goes out of scope or is reassigned? Since the borrowed pointer has no ownership that memory would be deleted and possibly reassigned. The borrowed pointer would become a <em>dangling reference</em>, which is precisely what we wanted to avoid per guiding principle number 2: <strong>memory safety</strong>.</p>
-<p>Therefore Rust must take a number of precautions to ensure these scenarios do not happen. First, the memory that a borrowed pointer points to must not be freed during that borrowed pointers <strong><strong>lifetime</strong></strong>. Second, this memory <strong><strong>must not change</strong></strong> while it is borrowed.</p>
-<p>The first requirement leads us to the concept of <strong><strong>lifetimes</strong></strong>, the amount of time that some object is guaranteed to exist.</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> lifetimes1() {
-    <span class="kw">let</span> name = <span class="dt">Box</span>::new(<span class="st">&quot;world&quot;</span>);      <span class="co">//                 &lt;--+</span>
-    <span class="kw">if</span> <span class="dv">3</span> &lt; <span class="dv">5</span> {                         <span class="co">//                    |</span>
-        <span class="kw">let</span> bname = &amp;name;             <span class="co">// &lt;--+               | name's</span>
-        <span class="pp">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, name);  <span class="co">//    | bname's       | lifetime</span>
-        <span class="pp">println!</span>(<span class="st">&quot;Hello, {}!&quot;</span>, bname); <span class="co">//    | lifetime      |</span>
-    }                                  <span class="co">// &lt;--+               |</span>
-}                                      <span class="co">//                 &lt;--+</span></code></pre></div>
-<p>In this example, it is quite clear that the lifetime of <code>bname</code> will be shorter than that of <code>name</code> and thus the compiler needs no help in figuring this out. However, things need not always be this simple, consider the following example:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> lifetimes2() {
-    <span class="kw">let</span> <span class="kw">mut</span> x_ref = &amp;<span class="dv">3</span>;       <span class="co">//                 &lt;--+</span>
-    <span class="kw">if</span> <span class="cn">true</span> {                 <span class="co">//                    |</span>
-        <span class="kw">let</span> <span class="kw">mut</span> y_ref = &amp;<span class="dv">4</span>;   <span class="co">// &lt;--+ y_ref's       | x_ref's</span>
-        x_ref = y_ref;        <span class="co">//    | lifetime      | lifetime</span>
-    }                         <span class="co">// &lt;--+               |</span>
-}                             <span class="co">//                 &lt;--+</span></code></pre></div>
-<p>Here we have a problem: <code>x_ref</code> is reassigned to point to the same memory location as <code>y_ref</code>, but <code>y_ref</code>’s lifetime is shorter than <code>x_ref</code>’s. To ensure memory safety, the compiler must rejetct this program, which it does:</p>
+<p>The difficulty with borrowed pointers is that they themselves cannot
+ensure that they point to valid memory. What if the thing that owns
+the memory they point to goes out of scope or is reassigned? Since the
+borrowed pointer has no ownership that memory would be deleted and
+possibly reassigned. The borrowed pointer would become a <em>dangling
+reference</em>, which is precisely what we wanted to avoid per guiding
+principle number 2: <strong>memory safety</strong>.</p>
+<p>Therefore Rust must take a number of precautions to ensure these
+scenarios do not happen. First, the memory that a borrowed pointer
+points to must not be freed during that borrowed pointers
+<strong><strong>lifetime</strong></strong>. Second, this memory <strong><strong>must not change</strong></strong> while it
+is borrowed.</p>
+<p>The first requirement leads us to the concept of <strong><strong>lifetimes</strong></strong>,
+the amount of time that some object is guaranteed to exist.</p>
+<pre><code class="lang-{.rust}">fn lifetimes1() {
+    let name = Box::new(&quot;world&quot;);      //                 &lt;--+
+    if 3 &lt; 5 {                         //                    |
+        let bname = &amp;name;             // &lt;--+               | name&#39;s
+        println!(&quot;Hello, {}!&quot;, name);  //    | bname&#39;s       | lifetime
+        println!(&quot;Hello, {}!&quot;, bname); //    | lifetime      |
+    }                                  // &lt;--+               |
+}                                      //                 &lt;--+
+</code></pre>
+<p>In this example, it is quite clear that the lifetime of <code>bname</code> will
+be shorter than that of <code>name</code> and thus the compiler needs no help in
+figuring this out. However, things need not always be this simple,
+consider the following example:</p>
+<pre><code class="lang-{.rust}">fn lifetimes2() {
+    let mut x_ref = &amp;3;       //                 &lt;--+
+    if true {                 //                    |
+        let mut y_ref = &amp;4;   // &lt;--+ y_ref&#39;s       | x_ref&#39;s
+        x_ref = y_ref;        //    | lifetime      | lifetime
+    }                         // &lt;--+               |
+}                             //                 &lt;--+
+</code></pre>
+<p>Here we have a problem: <code>x_ref</code> is reassigned to point to the same
+memory location as <code>y_ref</code>, but <code>y_ref</code>&#39;s lifetime is shorter than
+<code>x_ref</code>&#39;s. To ensure memory safety, the compiler must rejetct this
+program, which it does:</p>
 <pre><code>lifetimes.rs:21:24: 21:26 error: borrowed value does not live long enough
 lifetimes.rs:18:16: 24:1 note: borrowed pointer must be valid for the block at 18:16...
-lifetimes.rs:20:12: 23:5 note: ...but borrowed value is only valid for the block at 20:12</code></pre>
-<p>Things become even more interesting when we work with borrowed pointers inside of a function:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> min_life(x: &amp;<span class="dt">i32</span>, y: &amp;<span class="dt">i32</span>) -&gt; &amp;<span class="dt">i32</span> {
-    <span class="kw">if</span> *x &lt; *y {
+lifetimes.rs:20:12: 23:5 note: ...but borrowed value is only valid for the block at 20:12
+</code></pre><p>Things become even more interesting when we work with borrowed
+pointers inside of a function:</p>
+<pre><code class="lang-{.rust}">fn min_life(x: &amp;i32, y: &amp;i32) -&gt; &amp;i32 {
+    if *x &lt; *y {
         x
-    } <span class="kw">else</span> {
+    } else {
         y
     }
-}</code></pre></div>
-<p>Here the lifetime of the result depends on the condition evaluated in the if statement: depending on it the lifetime will either be that of x or that of y. Clearly, the compiler can’t resolve this automatically, it would need to know the values to which x and y point, which may only be known at runtime:</p>
+}
+</code></pre>
+<p>Here the lifetime of the result depends on the condition evaluated in
+the if statement: depending on it the lifetime will either be that of
+x or that of y. Clearly, the compiler can&#39;t resolve this
+automatically, it would need to know the values to which x and y
+point, which may only be known at runtime:</p>
 <pre><code>lifetimes.rs:1:33: 1:37 error: missing lifetime specifier [E0106]
 lifetimes.rs:1 fn minLife(x: &amp;i32, y: &amp;i32) -&gt; &amp;i32 {
-                                               ^~~~
-lifetimes.rs:1:33: 1:37 help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `x` or `y`
+                                               ^
+</code></pre><p>lifetimes.rs:1:33: 1:37 help: this function&#39;s return type contains a borrowed value, but the signature does not say whether it is borrowed from <code>x</code> or <code>y</code>
 lifetimes.rs:1 fn minLife(x: &amp;i32, y: &amp;i32) -&gt; &amp;i32 {
-                                               ^~~~</code></pre>
-<p>Since the compiler can’t infer the lifetimes we must annotate them. Alas, we too would be hard pressed to give the exact lifetime in this example. However, there is a trick by which we can manage this</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> min_life&lt;<span class="ot">'a</span>&gt;(x: &amp;<span class="ot">'a</span> <span class="dt">i32</span>, y: &amp;<span class="ot">'a</span> <span class="dt">i32</span>) -&gt; &amp;<span class="ot">'a</span> <span class="dt">i32</span> {
-    <span class="kw">if</span> *x &lt; *y {
+                                               ^~~~</p>
+<pre><code>
+Since the compiler can&#39;t infer the lifetimes we must annotate
+them. Alas, we too would be hard pressed to give the exact lifetime
+in this example. However, there is a trick by which we can manage this
+
+~~~{.rust}
+fn min_life&lt;&#39;a&gt;(x: &amp;&#39;a i32, y: &amp;&#39;a i32) -&gt; &amp;&#39;a i32 {
+    if *x &lt; *y {
         x
-    } <span class="kw">else</span> {
+    } else {
         y
     }
-}</code></pre></div>
-<p>Here we explictly annotate the lifetime of the parameters and the return value. Lifetime parameters are introduced by a single tick <code>'</code> followed by an identifier. In functions these must be the first template parameters. As you can see we use the same parameter for the lifetime everywhere. If the compiler would take this information too literally, then this function whould be less flexible than we might wish: In this case we could only use it on borrowed pointers which have the exact same lifetime. Fortunately, the compiler interprets the provided lifetimes as a lower bound. Thus <code>'a</code> is the minimum of the lifetimes of <code>x</code> and <code>y</code>. There is one special lifetime, which is called <code>'static</code> and is for objects which are allocated for the entire life of the program.</p>
+}
+</code></pre><p>Here we explictly annotate the lifetime of the parameters and the
+return value. Lifetime parameters are introduced by a single tick <code>&#39;</code>
+followed by an identifier. In functions these must be the first
+template parameters. As you can see we use the same parameter for the
+lifetime everywhere. If the compiler would take this information
+too literally, then this function whould be less flexible than we
+might wish: In this case we could only use it on borrowed pointers
+which have the exact same lifetime. Fortunately, the compiler
+interprets the provided lifetimes as a lower bound. Thus <code>&#39;a</code> is
+the minimum of the lifetimes of <code>x</code> and <code>y</code>.
+There is one special lifetime, which is called <code>&#39;static</code> and is for
+objects which are allocated for the entire life of the program.</p>
 <h2 id="freezing">Freezing</h2>
-<p>Another problem with borrowed pointers is that the memory must not be modified while it has been borrowed out. This is achieved by freezing the original object when a borrowed pointer to it exists:</p>
-<div class="sourceCode"><pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> freeze() {
-    <span class="kw">let</span> <span class="kw">mut</span> x = <span class="dv">3</span>;
+<p>Another problem with borrowed pointers is that the memory must not
+be modified while it has been borrowed out. This is achieved by freezing
+the original object when a borrowed pointer to it exists:</p>
+<pre><code class="lang-{.rust}">fn freeze() {
+    let mut x = 3;
     {
-        <span class="kw">let</span> <span class="kw">mut</span> y = &amp;x;
-        x = <span class="dv">4</span>;       <span class="co">// &lt;-- Error: x has been borrowed and is thus `frozen`</span>
+        let mut y = &amp;x;
+        x = 4;       // &lt;-- Error: x has been borrowed and is thus `frozen`
     }
-    x = <span class="dv">4</span>;           <span class="co">// OK</span>
-}</code></pre></div>
+    x = 4;           // OK
+}
+</code></pre>
 <p>In the block we cannot modify <code>x</code> because it is borrowed:</p>
 <pre><code>freeze.rs:5:9: 5:14 error: cannot assign to `x` because it is borrowed
 freeze.rs:5         x = 4;       // &lt;-- Error: x has been borrowed and is thus `frozen`
-                    ^~~~~
-freeze.rs:4:22: 4:23 note: borrow of `x` occurs here
-freeze.rs:4         let mut y = &amp;x;
-                                 ^</code></pre>
-<p>Note that this restriction is irrespective of whether the borrowed pointer is mutable or not.</p>
-<div class="footnotes">
-<hr />
-<ol>
-<li id="fn1"><p>The other alternative would be that owned pointers can never be reassigned, they would be non-copiable and non-moveable. This seems pretty cumbersome, fortunately Rust’s owned pointers have move semantics.<a href="#fnref1">↩</a></p></li>
-<li id="fn2"><p>Ensuring the validity of owned pointers at compile time is much better than the alternatives: If it was assured at runtime, there would be fewer correctness guarantees about the program and the check would have to be performed every time a pointer is dereferenced. Checking the validity of pointers at compile time is a major achievement of the Rust language: tracking such moves at compile time requires an advanced type-system feature called <a href="http://en.wikipedia.org/wiki/Type_system">affine types</a>. As far as I know Rust is the only mainstreamy language which has such a feature.<a href="#fnref2">↩</a></p></li>
-</ol>
-</div>
+                    ^~
+</code></pre><p>freeze.rs:4:22: 4:23 note: borrow of <code>x</code> occurs here
+freeze.rs:4         let mut y = &x;
+                                 ^
+~~~</p>
+<p>Note that this restriction is irrespective of whether the borrowed
+pointer is mutable or not.</p>
+
+
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-      </div>
-      <div class="footer">
-        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
-        <p>
-          Contact me via
-          <a href="http://twitter.com/paulkoer">twitter</a> or
-          <a href="http://github.com/paulkoerbitz">github</a>.
-        </p>
-        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
-        <p><a href="../impressum.html">Impressum</a></p>
-      </div>
-    </div>
-    <script type="text/javascript">
-      var _gaq = _gaq || [];
-      _gaq.push(['_setAccount', 'UA-20755947-1']);
-      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
-      _gaq.push(['_setAllowLinker', true]);
-      _gaq.push(['_trackPageview']);
-      _gaq.push(['anonymizeIp']);
-      (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-      })();
-    </script>
-  </body>
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>

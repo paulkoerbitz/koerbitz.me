@@ -1,78 +1,82 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <title>Types and Tailcalls - A Clojure Macro to Generate Functions</title>
-    <link rel="stylesheet" href="../css/default.css" type="text/css">
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="../">Types and Tailcalls</a>
-      </div>
-      <div class="navigation">
-        <ul>
-          <li><a href="../">blog</a></li>
-          <li><a href="../til.html">til</a></li>
-          <li><a href="../archive.html">archive</a></li>
-          <li><a href="../about.html">about</a></li>
-          <li><a href="../rss.xml">rss</a></li>
-          <!--
-          <li><a href="/notes.html">notes</a></li>
-          <li><a href="/projects.html">projects</a></li>
-          -->
-        </ul>
-      </div>
-      <div class="body">
-        <h1 class="title">A Clojure Macro to Generate Functions</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>A Clojure Macro to Generate Functions</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
 
-<p class="date">published on October 21, 2011</p>
+<h1 class="title">A Clojure Macro to Generate Functions</h1>
+<p class="date">published on October 21st, 2011</p>
 
-<p>Prompted by <a href="%22http://stackoverflow.com/q/7852351/346587%22">this question</a> on Stackoverflow I thought a little bit about macros that generate functions. Here is what I came up with:</p>
-<div class="sourceCode"><pre class="sourceCode Clojure"><code class="sourceCode clojure">(<span class="kw">defmacro</span><span class="fu"> make-placeholders </span>[n]
-  `(<span class="kw">map</span> <span class="kw">eval</span>
-        '<span class="kw">~(for</span> [cntr (<span class="kw">range</span> <span class="dv">0</span> n)]
-           `(<span class="kw">defn</span><span class="fu"> </span><span class="kw">~(symbol</span> (<span class="kw">str</span> <span class="st">&quot;_&quot;</span> cntr))
-               {<span class="kw">:placeholder</span> true} [&amp; args] (<span class="kw">nth</span> args <span class="kw">~cntr)))))</span></code></pre></div>
-<p>This is macro generates functions <code>_0 .. _n-1</code> that calls nth on the list of the arguments following it, so <code>(_2 1 2 3 4)</code> returns 3. I have not made up my mind if it is really a good idea to do this, but for now it’s a clever hack - maybe I’ll use it until I discover why it’s a bad idea…</p>
+<p>Prompted by <a href="&quot;http://stackoverflow.com/q/7852351/346587&quot;">this question</a>
+on Stackoverflow I thought a little bit about macros that generate functions. Here is what I came up with:</p>
+<pre><code class="lang-{.Clojure}">(defmacro make-placeholders [n]
+  `(map eval
+        &#39;~(for [cntr (range 0 n)]
+           `(defn ~(symbol (str &quot;_&quot; cntr))
+               {:placeholder true} [&amp; args] (nth args ~cntr)))))
+</code></pre>
+<p>This is macro generates functions <code>_0 .. _n-1</code> that calls nth on the list
+of the arguments following it, so <code>(_2 1 2 3 4)</code> returns 3. I have not
+made up my mind if it is really a good idea to do this, but for now it&#39;s
+ a clever hack - maybe I&#39;ll use it until I discover why it&#39;s a bad
+idea...</p>
+
+
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-      </div>
-      <div class="footer">
-        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
-        <p>
-          Contact me via
-          <a href="http://twitter.com/paulkoer">twitter</a> or
-          <a href="http://github.com/paulkoerbitz">github</a>.
-        </p>
-        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
-        <p><a href="../impressum.html">Impressum</a></p>
-      </div>
-    </div>
-    <script type="text/javascript">
-      var _gaq = _gaq || [];
-      _gaq.push(['_setAccount', 'UA-20755947-1']);
-      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
-      _gaq.push(['_setAllowLinker', true]);
-      _gaq.push(['_trackPageview']);
-      _gaq.push(['anonymizeIp']);
-      (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-      })();
-    </script>
-  </body>
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>

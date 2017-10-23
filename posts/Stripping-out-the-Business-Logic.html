@@ -1,126 +1,203 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <title>Types and Tailcalls - Stripping out the Business Logic</title>
-    <link rel="stylesheet" href="../css/default.css" type="text/css">
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="../">Types and Tailcalls</a>
-      </div>
-      <div class="navigation">
-        <ul>
-          <li><a href="../">blog</a></li>
-          <li><a href="../til.html">til</a></li>
-          <li><a href="../archive.html">archive</a></li>
-          <li><a href="../about.html">about</a></li>
-          <li><a href="../rss.xml">rss</a></li>
-          <!--
-          <li><a href="/notes.html">notes</a></li>
-          <li><a href="/projects.html">projects</a></li>
-          -->
-        </ul>
-      </div>
-      <div class="body">
-        <h1 class="title">Stripping out the Business Logic</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>Stripping out the Business Logic</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
 
-<p class="date">published on August  7, 2013</p>
+<h1 class="title">Stripping out the Business Logic</h1>
+<p class="date">published on August 7th, 2013</p>
 
-<p>What I am writing day-in and day-out can probably best be described as <em>business programs</em>. To me <em>business programs</em> are programs whose essential purpose it is to keep track of some state, control processes, make decisions, and communicate with external services. One question that intrigues me is how one can seperate out the <em>business logic</em> from the rest of the program.</p>
-<p>Business logic is, as the name implies, about business first and logic second, and since business needs can change on a whim, the business logic needs to change too, usually much more often than the rest of the application. Furthermore, the business logic is the raison d’être of the whole application, so it makes sense to have this logic in one place instead of intermingling it with implementation specific logic. Finally, when I write such programs it always seems I have to do way too much work to achieve what I want. To me, seperating out the business logic into a seperate domain specific language (DSL), module, workflow pattern, or whatever, holds the promise that to create additional functionality I only need to implement that functionality in the business logic DSL or module, reducing the amount of work needed and thus speeding up development considerably.</p>
-<p>However, while there is surely some interest in this topic, I have yet to find the best way to achieve this. As far as I can tell there may be a lot of activity, but this activity doesn’t result in well communicated solutions that are easy to comprehend. Maybe I just don’t get it, but I have yet to find somebody to tell me: this is how you do it. It seems that quite often business logic is simply mixed with the rest of the application. In this post I want to explore several possibilities of how business logic can be seperated from the rest of the application and described concisely.</p>
+<p>What I am writing day-in and day-out can probably best be described as
+<em>business programs</em>.  To me <em>business programs</em> are programs whose
+essential purpose it is to keep track of some state, control
+processes, make decisions, and communicate with external services.
+One question that intrigues me is how one can seperate out the
+<em>business logic</em> from the rest of the program.</p>
+<p>Business logic is, as the name implies, about business first and logic
+second, and since business needs can change on a whim, the business
+logic needs to change too, usually much more often than the rest of
+the application. Furthermore, the business logic is the raison d&#39;être
+of the whole application, so it makes sense to have this logic in one
+place instead of intermingling it with implementation specific
+logic. Finally, when I write such programs it always seems I have to
+do way too much work to achieve what I want. To me, seperating out the
+business logic into a seperate domain specific language (DSL), module,
+workflow pattern, or whatever, holds the promise that to create
+additional functionality I only need to implement that functionality
+in the business logic DSL or module, reducing the amount of work
+needed and thus speeding up development considerably.</p>
+<p>However, while there is surely some interest in this topic, I have yet
+to find the best way to achieve this. As far as I can tell there may
+be a lot of activity, but this activity doesn&#39;t result in well
+communicated solutions that are easy to comprehend. Maybe I just don&#39;t
+get it, but I have yet to find somebody to tell me: this is how you do
+it. It seems that quite often business logic is simply mixed with the
+rest of the application. In this post I want to explore several
+possibilities of how business logic can be seperated from the rest of
+the application and described concisely.</p>
 <h2 id="goals">Goals</h2>
-<p>In an ideal world, the representation of the business logic should fulfill the following criteria:</p>
-<dl>
-<dt>Succinct</dt>
-<dd><p>Since one of the objectives is to have the business logic in one place, the representation of it should be as small as possible. Boilerplate and verboseness should be avoided.</p>
-</dd>
-<dt>Unambiguous</dt>
-<dd><p>Each instance of a representation should have only one meaning. This may seem obvious, but as far as I understand this is not necessarily true for <a href="http://www.bpmn.org/" title="Business Process Model and Notation">BPMN</a>. This means that a <em>rountrip translation</em> (representation <span class="math inline">→</span> program <span class="math inline">→</span> representation) should at least be theoretically possible and lead to equivalent results.</p>
-</dd>
-<dt>Easy to understand</dt>
-<dd><p>The representation of the business logic should convey the logic to a reasonably intelligent reader. The reader should not have to have intimate knowledge with how this representation is translated to a program in order to understand what will happen.</p>
-</dd>
-<dt>Testable</dt>
-<dd><p>Since the representation will contain the entire business logic, which will change often and might be complex, it is important that this logic is easily testable to make sure we got everything right.</p>
-</dd>
-<dt>Representable</dt>
-<dd><p>The representation should be easily representable in the language one is working with. If it is it becomes easier to serialize and deserialize a representation along with its state and to display it to a (support) user.</p>
-</dd>
-<dt>Complete</dt>
-<dd><p>We should be able to represent everything we want to represent in this representation, otherwise we’ll have to work around it at which point we would have probably better done without it.</p>
-</dd>
-</dl>
+<p>In an ideal world, the representation of the business logic should
+fulfill the following criteria:</p>
+<p>Succinct</p>
+<p>:   Since one of the objectives is to have the business logic in one
+    place, the representation of it should be as small as
+    possible. Boilerplate and verboseness should be avoided.</p>
+<p>Unambiguous</p>
+<p>:   Each instance of a representation should have only one meaning.
+    This may seem obvious, but as far as I understand this is not
+    necessarily true for <a href="http://www.bpmn.org/" title="Business Process Model and Notation">BPMN</a>. This means that a <em>rountrip
+    translation</em> (representation $\rightarrow$ program $\rightarrow$
+    representation) should at least be theoretically possible and lead
+    to equivalent results.</p>
+<p>Easy to understand</p>
+<p>:   The representation of the business logic should convey the logic
+    to a reasonably intelligent reader. The reader should not have to
+    have intimate knowledge with how this representation is translated
+    to a program in order to understand what will happen.</p>
+<p>Testable</p>
+<p>:   Since the representation will contain the entire business logic,
+    which will change often and might be complex, it is important that
+    this logic is easily testable to make sure we got everything right.</p>
+<p>Representable</p>
+<p>:   The representation should be easily representable in the language
+    one is working with. If it is it becomes easier to serialize and
+    deserialize a representation along with its state and to display
+    it to a (support) user.</p>
+<p>Complete</p>
+<p>:   We should be able to represent everything we want to represent
+    in this representation, otherwise we&#39;ll have to work around it
+    at which point we would have probably better done without it.</p>
 <h2 id="some-possible-solutions">Some Possible Solutions</h2>
 <h3 id="finite-state-machines">Finite-State Machines</h3>
-<p><a href="http://en.wikipedia.org/wiki/Finite_state_machine" title="Wikipedia: Finite State Machines">Finite-state machines</a> are sometimes<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a><sup>,</sup><a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> suggested for this task. Finite-state machines are well understood, easy to draw and are able to model all processes which only have a, well, finite number of states. On a high level, this should include all sensible business processes. However, once we include storing and modifying arbitrary data in our application, we are clearly out of finite-state machine territory. Therefore, to describe <em>all</em> of the business logic we will clearly need some extension to finite state machines. If that extension is <em>ad-hoc</em> then we might lose the benefits that finite-state machines provide in the first place.</p>
+<p><a href="http://en.wikipedia.org/wiki/Finite_state_machine" title="Wikipedia: Finite State Machines">Finite-state machines</a> are sometimes[^1]^,^[^2] suggested for
+this task. Finite-state machines are well understood, easy to draw
+and are able to model all processes which only have a, well, finite
+number of states. On a high level, this should include all sensible
+business processes. However, once we include storing and modifying
+arbitrary data in our application, we are clearly out of finite-state
+machine territory. Therefore, to describe <em>all</em> of the business logic
+we will clearly need some extension to finite state machines. If that
+extension is <em>ad-hoc</em> then we might lose the benefits that finite-state
+machines provide in the first place.</p>
 <h3 id="workflow-languages">Workflow Languages</h3>
-<p>There are also a large number of workflow languages, many of which are found in some enterprise software vendors packages.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a><sup>,</sup><a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> To me the most interesting are the <em>Business Process Modell and Notation</em><a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a> and the <em>Yet Another Workflow Language</em><a href="#fn6" class="footnoteRef" id="fnref6"><sup>6</sup></a> which was created by Arthur ter Hofstede, an academic how studies the field and has written an influential review paper.<a href="#fn7" class="footnoteRef" id="fnref7"><sup>7</sup></a> These languages seem interesting and have clearly some industry weight behind them, it seems fairly difficult to find good introductory material on them that is not (a) a 1000-page tome of a standard or (b) some software vendors sales pitch documents. Some of these languages also have problems, for example there seems to be no general unambiguous way to translate BPMN into a program.<a href="#fn8" class="footnoteRef" id="fnref8"><sup>8</sup></a></p>
-<p>Overall, I am a little disappointed with the quality of the introductory information that I have found so far. The most promising document seems to be the review paper by ter Hofstede and the YAWL language.</p>
+<p>There are also a large number of workflow languages, many of which are
+found in some enterprise software vendors packages.[^5]^,^[^6] To me
+the most interesting are the <em>Business Process Modell and
+Notation</em>^[<a href="http://www.bpmn.org/" title="Business Process Model and Notation">Business Process Modell and Notation website</a>.] and
+the <em>Yet Another Workflow Language</em>[^3] which was created by Arthur
+ter Hofstede, an academic how studies the field and has written an
+influential review paper.[^4] These languages seem interesting and
+have clearly some industry weight behind them, it seems fairly
+difficult to find good introductory material on them that is not (a) a
+1000-page tome of a standard or (b) some software vendors sales pitch
+documents. Some of these languages also have problems, for example
+there seems to be no general unambiguous way to translate BPMN into
+a program.[^7]</p>
+<p>Overall, I am a little disappointed with the quality of the
+introductory information that I have found so far. The most promising
+document seems to be the review paper by ter Hofstede and the
+YAWL language.</p>
 <h3 id="a-process-dsl">A Process DSL</h3>
-<p>What we have done at work is that we have basically defined an expression language that is a C++ DSL. With this language you can write expressions such as</p>
-<div class="sourceCode"><pre class="sourceCode cpp"><code class="sourceCode cpp">if_(customerHasValidEmailAddress())
+<p>What we have done at work is that we have basically defined an
+expression language that is a C++ DSL. With this language you
+can write expressions such as</p>
+<pre><code class="lang-{.cpp}">if_(customerHasValidEmailAddress())
 .then_(completeLogin())
-.else_(sendVerificationEmail() <span class="kw">and</span> showEmailVerificationPage())</code></pre></div>
-<p>and so on. Each of the mentioned steps has to be implemented in the host language to perform the desired action. This means of course that the implementation burden is still there, but at least steps that are already defined can be reused in a different context.</p>
-<p>One problem I see with this approach is that there is no way to store state inside the process description, in essence this is a language that has boolean expressions and stores everything else in global state. This also means that for every new piece of state, however temporary, requires a new <em>thing</em> that can contain it. I have found that this can limit reuse and sometimes make these processes confusing. But this DSL seems essentially like an implementation of the previously described workflow languages.</p>
+.else_(sendVerificationEmail() and showEmailVerificationPage())
+</code></pre>
+<p>and so on. Each of the mentioned steps has to be implemented in
+the host language to perform the desired action. This means of
+course that the implementation burden is still there, but at
+least steps that are already defined can be reused in a different
+context.</p>
+<p>One problem I see with this approach is that there is no way to store
+state inside the process description, in essence this is a language
+that has boolean expressions and stores everything else in global
+state. This also means that for every new piece of state, however
+temporary, requires a new <em>thing</em> that can contain it. I have found
+that this can limit reuse and sometimes make these processes
+confusing. But this DSL seems essentially like an implementation
+of the previously described workflow languages.</p>
 <h3 id="a-more-powerful-dsl">A More Powerful DSL</h3>
-<p>This is where I would like to go. A DSL that can hold some temporary state, where variables can be bound and reused at a later state. Ideally, this DSL would also permit a way to manage the data model directly, so that it would essentially be able to implement the entire business logic without having to fall back to implementations in the host language all the time. Alas, right now, this is only an idea and I am not sure how it will work.</p>
+<p>This is where I would like to go. A DSL that can hold some temporary
+state, where variables can be bound and reused at a later state.
+Ideally, this DSL would also permit a way to manage the data model
+directly, so that it would essentially be able to implement the
+entire business logic without having to fall back to implementations
+in the host language all the time. Alas, right now, this is only
+an idea and I am not sure how it will work.</p>
 <h2 id="outlook">Outlook</h2>
-<p>This post has barely scratched the surface of the task of abstracting out the business language into a seperate representation. I hope I have transmitted the idea of why this is desireable and outlined a few of the possible approaches that I have found during my inital research of the topic. In future posts I hope that I’ll be able to explore some of these approaches in more depth.</p>
-<div class="footnotes">
-<hr />
-<ol>
-<li id="fn1"><p><a href="http://stackoverflow.com/questions/11327564/web-development-complex-processes-are-state-machines-the-only-way-to-go">My question</a> on stackoverflow about a year ago on the same topic.<a href="#fnref1">↩</a></p></li>
-<li id="fn2"><p>Shopify technical blog: <a href="http://www.shopify.com/technology/3383012-why-developers-should-be-force-fed-state-machines">Why developers should be force-fed finite state machines</a>.<a href="#fnref2">↩</a></p></li>
-<li id="fn3"><p><a href="http://static.springsource.org/spring-webflow/docs/2.0.x/reference/html/index.html">Spring Web Flow Reference Guide</a>.<a href="#fnref3">↩</a></p></li>
-<li id="fn4"><p><a href="https://java.net/projects/osworkflow">OS Workflow</a>.<a href="#fnref4">↩</a></p></li>
-<li id="fn5"><p><a href="http://www.bpmn.org/" title="Business Process Model and Notation">Business Process Modell and Notation website</a>.<a href="#fnref5">↩</a></p></li>
-<li id="fn6"><p><a href="http://www.yawlfoundation.org">Yet Another Workflow Language website</a>.<a href="#fnref6">↩</a></p></li>
-<li id="fn7"><p><a href="http://eprints.qut.edu.au/9950/1/9950.pdf">Workflow Patterns</a> review paper by of workflow pattern systems by Arthur ter Hofstede.<a href="#fnref7">↩</a></p></li>
-<li id="fn8"><p><a href="http://www.infoq.com/articles/bpelbpm">Why BPEL is not the holy grail for BPM</a>.<a href="#fnref8">↩</a></p></li>
-</ol>
-</div>
+<p>This post has barely scratched the surface of the task of abstracting
+out the business language into a seperate representation. I hope I
+have transmitted the idea of why this is desireable and outlined a
+few of the possible approaches that I have found during my inital
+research of the topic. In future posts I hope that I&#39;ll be able to
+explore some of these approaches in more depth.</p>
+<p>[^1]: <a href="http://stackoverflow.com/questions/11327564/web-development-complex-processes-are-state-machines-the-only-way-to-go">My question</a> on stackoverflow about a year ago on the same topic.</p>
+<p>[^2]: Shopify technical blog: <a href="http://www.shopify.com/technology/3383012-why-developers-should-be-force-fed-state-machines">Why developers should be force-fed finite state machines</a>.</p>
+<p>[^3]: <a href="http://www.yawlfoundation.org">Yet Another Workflow Language website</a>.</p>
+<p>[^4]: <a href="http://eprints.qut.edu.au/9950/1/9950.pdf">Workflow Patterns</a> review
+      paper by of workflow pattern systems by Arthur ter Hofstede.</p>
+<p>[^5]: <a href="http://static.springsource.org/spring-webflow/docs/2.0.x/reference/html/index.html">Spring Web Flow Reference Guide</a>.</p>
+<p>[^6]: <a href="https://java.net/projects/osworkflow">OS Workflow</a>.</p>
+<p>[^7]: <a href="http://www.infoq.com/articles/bpelbpm">Why BPEL is not the holy grail for BPM</a>.</p>
+
+
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-      </div>
-      <div class="footer">
-        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
-        <p>
-          Contact me via
-          <a href="http://twitter.com/paulkoer">twitter</a> or
-          <a href="http://github.com/paulkoerbitz">github</a>.
-        </p>
-        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
-        <p><a href="../impressum.html">Impressum</a></p>
-      </div>
-    </div>
-    <script type="text/javascript">
-      var _gaq = _gaq || [];
-      _gaq.push(['_setAccount', 'UA-20755947-1']);
-      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
-      _gaq.push(['_setAllowLinker', true]);
-      _gaq.push(['_trackPageview']);
-      _gaq.push(['anonymizeIp']);
-      (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-      })();
-    </script>
-  </body>
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>

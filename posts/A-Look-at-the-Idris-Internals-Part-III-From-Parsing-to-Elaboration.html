@@ -1,88 +1,114 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <title>Types and Tailcalls - A Look at the Idris Internals, Part III: From Parsing to Elaboration</title>
-    <link rel="stylesheet" href="../css/default.css" type="text/css">
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="../">Types and Tailcalls</a>
-      </div>
-      <div class="navigation">
-        <ul>
-          <li><a href="../">blog</a></li>
-          <li><a href="../til.html">til</a></li>
-          <li><a href="../archive.html">archive</a></li>
-          <li><a href="../about.html">about</a></li>
-          <li><a href="../rss.xml">rss</a></li>
-          <!--
-          <li><a href="/notes.html">notes</a></li>
-          <li><a href="/projects.html">projects</a></li>
-          -->
-        </ul>
-      </div>
-      <div class="body">
-        <h1 class="title">A Look at the Idris Internals, Part III: From Parsing to Elaboration</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>A Look at the Idris Internals, Part III - From Parsing to Elaboration</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
 
-<p class="date">published on March 15, 2016</p>
+<h1 class="title">A Look at the Idris Internals, Part III - From Parsing to Elaboration</h1>
+<p class="date">published on March 15th, 2016</p>
 
-<p>So after looking at the parser in the <a href="../posts/A-Look-at-the-Idris-Internals-Part-II-Taking-the-Parser-for-a-Spin.html">last post</a>, this post will explore what happens after an Idris has been parsed, namely how it is desugared and elaborated to a TT program.</p>
-<p>Looking throught the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1635"><code>idrisMain</code></a> method in <code>REPL.hs</code>, it seems that code is actually loaded by either the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535"><code>loadInputs</code></a> function (also in <code>REPL.hs</code>) or the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583"><code>loadModule</code></a> from <code>Parser.hs</code>.</p>
-<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535"><code>loadInputs</code></a> <em>loads</em> a list of Idris files, meaning that it tries to completely process these files (reading, parsing, elaborating, saving the state in the <code>IState</code>) and all their dependencies. It uses the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Chaser.hs#L116"><code>buildTree</code></a> function from <code>Chaser.hs</code> to retrieve the actual files along with modification times and indicating if a file needs to be re-loaded. It uses the locally defined <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1599"><code>tryLoad</code></a> function, which uses <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1615"><code>loadFromIFile</code></a> from <code>Parser.hs</code> which either re-loads an existing IBC file or processes a file via the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> function. Similarly, the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583"><code>loadModule</code></a> function also checks if a module is already loaded, if not either loads it from an up-to-date IBC file or ends up loading it from source via <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a>. So either way <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> seems like an important part of processing and loading source files in Idris ;).</p>
-<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> does <em>a lot of things</em><a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>, such as loading all required IBC files for modules required by that file (which presumably must exist at this point), clears the current IBC cache, parses the file with the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1554"><code>parseProg</code></a> function and then (dam, dam, dam), goes on to elaborate and typecheck the loaded program by calling <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148"><code>elabDecls</code></a> on the parsed declarations.</p>
-<p>So looking at Idris as a compiler (as opposed to say the REPL functionality), the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148"><code>elabDecls</code></a> seems to be the most important entry point into the elaborator. The <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L815"><code>process</code></a> function which seems to be processing REPL commands is also an interesting entry point, as it is processing pieces of Idris code in smaller chunks. It ends up making a few calls to the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92"><code>elabVal</code></a> and <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L135"><code>elabREPL</code></a> (which is a wrapper with a catch around <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92"><code>elabVal</code></a>) functions.</p>
+<p>So after looking at the parser in the <a href="/posts/A-Look-at-the-Idris-Internals-Part-II-Taking-the-Parser-for-a-Spin.html">last post</a>, this post will
+explore what happens after an Idris has been parsed, namely how
+it is desugared and elaborated to a TT program.</p>
+<p>Looking throught the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1635"><code>idrisMain</code></a> method in <code>REPL.hs</code>, it seems that
+code is actually loaded by either the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535"><code>loadInputs</code></a> function (also in
+<code>REPL.hs</code>) or the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583"><code>loadModule</code></a> from <code>Parser.hs</code>.</p>
+<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535"><code>loadInputs</code></a> <em>loads</em> a list of Idris files, meaning that it tries to
+completely process these files (reading, parsing, elaborating, saving
+the state in the <code>IState</code>) and all their dependencies. It uses the
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Chaser.hs#L116"><code>buildTree</code></a> function from <code>Chaser.hs</code> to retrieve the actual files
+along with modification times and indicating if a file needs to be
+re-loaded. It uses the locally defined <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1599"><code>tryLoad</code></a> function, which
+uses <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1615"><code>loadFromIFile</code></a> from <code>Parser.hs</code> which either re-loads an
+existing IBC file or processes a file via the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a>
+function. Similarly, the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583"><code>loadModule</code></a> function also checks if a
+module is already loaded, if not either loads it from an up-to-date
+IBC file or ends up loading it from source via <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a>. So
+either way <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> seems like an important part of processing
+and loading source files in Idris ;).</p>
+<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> does <em>a lot of things</em>^[I must admit I am a bit unhappy
+with the plethora of 150+ line monadic functions in the Idris source code,
+but that&#39;s just a newbie complaining....], such as loading all required
+IBC files for modules required by that file (which presumably must exist
+at this point), clears the current IBC cache, parses the file with the
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1554"><code>parseProg</code></a> function and then (dam, dam, dam), goes on to elaborate and
+typecheck the loaded program by calling <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148"><code>elabDecls</code></a> on the parsed declarations.</p>
+<p>So looking at Idris as a compiler (as opposed to say the REPL
+functionality), the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148"><code>elabDecls</code></a> seems to be the most important entry
+point into the elaborator. The <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L815"><code>process</code></a> function which seems to be
+processing REPL commands is also an interesting entry point, as it is
+processing pieces of Idris code in smaller chunks. It ends up making a
+few calls to the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92"><code>elabVal</code></a> and <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L135"><code>elabREPL</code></a> (which is a wrapper with
+a catch around <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92"><code>elabVal</code></a>) functions.</p>
 <!--
 In keeping with the spirit of the [last post], let's try to run the
 elaborator on a small piece of Idris code to see what it
 does. Spinning up a `cabal repl` as in the last post,
 -->
-<p>All in all, we’ve basically looked a bit more at how the elaborator ends up being invoked, but not at how it really works. Unfortunately, the latter is really a bit beyond of the scope of these blog posts (at least for now), where I try to familiarize myself with the Idris code base bit by bit. The <a href="https://eb.host.cs.st-andrews.ac.uk/drafts/impldtp.pdf"><em>design and implementation paper</em> (PDF)</a> by Edwin Brady goes into some details of how elaboration works, I am not yet confident to explore this topic here.</p>
-<div class="footnotes">
-<hr />
-<ol>
-<li id="fn1"><p>I must admit I am a bit unhappy with the plethora of 150+ line monadic functions in the Idris source code, but that’s just a newbie complaining….<a href="#fnref1">↩</a></p></li>
-</ol>
-</div>
+<p>All in all, we&#39;ve basically looked a bit more at how the elaborator
+ends up being invoked, but not at how it really works. Unfortunately,
+the latter is really a bit beyond of the scope of these blog posts (at
+least for now), where I try to familiarize myself with the Idris code
+base bit by bit. The <a href="https://eb.host.cs.st-andrews.ac.uk/drafts/impldtp.pdf"><em>design and implementation paper</em> (PDF)</a> by Edwin Brady
+goes into some details of how elaboration works, I am not yet confident
+to explore this topic here.</p>
+
+
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-      </div>
-      <div class="footer">
-        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
-        <p>
-          Contact me via
-          <a href="http://twitter.com/paulkoer">twitter</a> or
-          <a href="http://github.com/paulkoerbitz">github</a>.
-        </p>
-        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
-        <p><a href="../impressum.html">Impressum</a></p>
-      </div>
-    </div>
-    <script type="text/javascript">
-      var _gaq = _gaq || [];
-      _gaq.push(['_setAccount', 'UA-20755947-1']);
-      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
-      _gaq.push(['_setAllowLinker', true]);
-      _gaq.push(['_trackPageview']);
-      _gaq.push(['anonymizeIp']);
-      (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-      })();
-    </script>
-  </body>
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>

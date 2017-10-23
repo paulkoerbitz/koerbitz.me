@@ -1,249 +1,356 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <title>Types and Tailcalls - Solving the Expression Problem in Haskell and Java</title>
-    <link rel="stylesheet" href="../css/default.css" type="text/css">
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="../">Types and Tailcalls</a>
-      </div>
-      <div class="navigation">
-        <ul>
-          <li><a href="../">blog</a></li>
-          <li><a href="../til.html">til</a></li>
-          <li><a href="../archive.html">archive</a></li>
-          <li><a href="../about.html">about</a></li>
-          <li><a href="../rss.xml">rss</a></li>
-          <!--
-          <li><a href="/notes.html">notes</a></li>
-          <li><a href="/projects.html">projects</a></li>
-          -->
-        </ul>
-      </div>
-      <div class="body">
-        <h1 class="title">Solving the Expression Problem in Haskell and Java</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>Solving the Expression Problem in Haskell and Java</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
 
-<p class="date">published on June 14, 2014</p>
+<h1 class="title">Solving the Expression Problem in Haskell and Java</h1>
+<p class="date">published on June 14th, 2014</p>
 
-<p>After my <a href="../posts/Sum-Types-Visitors-and-the-Expression-Problem.html">last post</a> on the expression problem, I thought that I would explore ways to solve it in the next post and that I would write that post shortly after. I knew how the solution worked in Haskell and that solutions existed for OO languages, so that post should not have been terribly hard to write. Well, here we are five months later and I am finally getting around to writing the post ;).</p>
+<p>After my <a href="/posts/Sum-Types-Visitors-and-the-Expression-Problem.html">last
+post</a> on
+the expression problem, I thought that I would explore ways to solve
+it in the next post and that I would write that post shortly after. I
+knew how the solution worked in Haskell and that solutions existed for
+OO languages, so that post should not have been terribly hard to
+write. Well, here we are five months later and I am finally getting
+around to writing the post ;).</p>
 <h2 id="expression-problem-recap">Expression Problem Recap</h2>
-<p>The term <em>Expression Problem</em> was coined by Philip Waldler in a <a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">mail</a> to the Java Generics mailing list. The goal is to be able to define datatypes by cases and functions over these datatypes in a way that is extensible: one should be able to add both new cases and new functions without touching or recompiling old code and while maintaining static type safety.</p>
-<p>As an example I’ll reuse the simple expression language from the last post. To represent such an expression language we will have a number of variants to capture the different types of expressions, for example literal integers, addition, and multiplication. To work with this representation we will have different functions to transform such expressions, for example evaluating or pretty-printing them.</p>
-<p>Once we have defined the cases and functions how difficult will it be to add new cases and new functions? Statically type-checked functional languages make it easy to add new functions (see <a href="../posts/Sum-Types-Visitors-and-the-Expression-Problem.html">last post</a>) while the object oriented languages make it easy to add new cases. The default approach in both languages does not make it easy<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> to either add new cases or new functions. That means that the default approach in both languages does not solve the Expression Problem. However, it turns out that solutions are possible in both types of languages. This post will describe a possible solution in both Haskell and Java.</p>
+<p>The term <em>Expression Problem</em> was coined by Philip Waldler in a
+<a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">mail</a> to the Java Generics mailing list. The goal
+is to be able to define datatypes by cases and functions over these
+datatypes in a way that is extensible: one should be able to add both
+new cases and new functions without touching or recompiling old code
+and while maintaining static type safety.</p>
+<p>As an example I&#39;ll reuse the simple expression language from the last
+post. To represent such an expression language we will have a number
+of variants to capture the different types of expressions, for example
+literal integers, addition, and multiplication. To work with this
+representation we will have different functions to transform such
+expressions, for example evaluating or pretty-printing them.</p>
+<p>Once we have defined the cases and functions how difficult will it be
+to add new cases and new functions? Statically type-checked functional
+languages make it easy to add new functions (see <a href="/posts/Sum-Types-Visitors-and-the-Expression-Problem.html">last post</a>) while
+the object oriented languages make it easy to add new cases. The
+default approach in both languages does not make it easy^[Easy here
+means that no code needs to be changed / dublicated and type-safety is
+maintained.] to either add new cases or new functions. That means that
+the default approach in both languages does not solve the Expression
+Problem. However, it turns out that solutions are possible in both
+types of languages. This post will describe a possible solution in
+both Haskell and Java.</p>
 <h2 id="a-haskell-solution">A Haskell Solution</h2>
-<p>The key to solving the Expression Problem in Haskell is to define typeclasses for the desired functions and make the datatypes instances of these typeclasses. We also define the different variants as their own datatypes, though this is not strictly necessary yet. For our expression language the setup looks as follows:</p>
-<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Lit</span> <span class="fu">=</span> <span class="dt">Lit</span> <span class="dt">Int</span>
-<span class="kw">data</span> <span class="dt">Add</span> l r <span class="fu">=</span> <span class="dt">Add</span> l r
+<p>The key to solving the Expression Problem in Haskell is to define
+typeclasses for the desired functions and make the datatypes instances
+of these typeclasses. We also define the different variants as their
+own datatypes, though this is not strictly necessary yet. For our
+expression language the setup looks as follows:</p>
+<pre><code class="lang-{.Haskell}">data Lit = Lit Int
+data Add l r = Add l r
 
-<span class="kw">class</span> <span class="dt">Eval</span> x <span class="kw">where</span>
-<span class="ot">  eval ::</span> x <span class="ot">-&gt;</span> <span class="dt">Int</span>
+class Eval x where
+  eval :: x -&gt; Int
 
-<span class="kw">instance</span> <span class="dt">Eval</span> <span class="dt">Lit</span> <span class="kw">where</span>
-  eval (<span class="dt">Lit</span> x) <span class="fu">=</span> x
+instance Eval Lit where
+  eval (Lit x) = x
 
-<span class="kw">instance</span> (<span class="dt">Eval</span> l, <span class="dt">Eval</span> r) <span class="ot">=&gt;</span> <span class="dt">Eval</span> (<span class="dt">Add</span> l r) <span class="kw">where</span>
-  eval (<span class="dt">Add</span> l r) <span class="fu">=</span> eval l <span class="fu">+</span> eval r</code></pre></div>
-<p>The extension that is typically easy in functional languages is to add a new function over the datatype. With the setup as above, we now add a new typeclass which contains the function as a method and add instances for each of our datatypes. Compared to the standard approach in functional languages, this requires slightly more code, but is still fairly clear:</p>
-<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">class</span> <span class="dt">PPrint</span> x <span class="kw">where</span>
-<span class="ot">  pprint ::</span> x <span class="ot">-&gt;</span> <span class="dt">String</span>
+instance (Eval l, Eval r) =&gt; Eval (Add l r) where
+  eval (Add l r) = eval l + eval r
+</code></pre>
+<p>The extension that is typically easy in functional languages is to add
+a new function over the datatype. With the setup as above, we now add
+a new typeclass which contains the function as a method and add instances
+for each of our datatypes. Compared to the standard approach in functional
+languages, this requires slightly more code, but is still fairly clear:</p>
+<pre><code class="lang-{.Haskell}">class PPrint x where
+  pprint :: x -&gt; String
 
-<span class="kw">instance</span> <span class="dt">PPrint</span> <span class="dt">Lit</span> <span class="kw">where</span>
-  pprint (<span class="dt">Lit</span> x) <span class="fu">=</span> show x
+instance PPrint Lit where
+  pprint (Lit x) = show x
 
-<span class="kw">instance</span> (<span class="dt">PPrint</span> l, <span class="dt">PPrint</span> r) <span class="ot">=&gt;</span> <span class="dt">PPrint</span> (<span class="dt">Add</span> l r) <span class="kw">where</span>
-  pprint (<span class="dt">Add</span> l r) <span class="fu">=</span> <span class="st">&quot;(&quot;</span> <span class="fu">++</span> pprint l <span class="fu">++</span> <span class="st">&quot; + &quot;</span> <span class="fu">++</span> pprint r <span class="fu">++</span> <span class="st">&quot;)&quot;</span></code></pre></div>
-<p>OK, so adding new functions is still easy, how about adding new cases? Adding a new case is the interesting part, because this is the side of the Expression Problem which the standard approach in Haskell can’t handle. However, with the setup we have introduced above this becomes quite easy: we just add a new datatype and then add instances for each of our typeclasses:</p>
-<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Mult</span> l r <span class="fu">=</span> <span class="dt">Mult</span> l r
+instance (PPrint l, PPrint r) =&gt; PPrint (Add l r) where
+  pprint (Add l r) = &quot;(&quot; ++ pprint l ++ &quot; + &quot; ++ pprint r ++ &quot;)&quot;
+</code></pre>
+<p>OK, so adding new functions is still easy, how about adding new cases?
+Adding a new case is the interesting part, because this is the side of
+the Expression Problem which the standard approach in Haskell can&#39;t
+handle. However, with the setup we have introduced above this becomes
+quite easy: we just add a new datatype and then add instances for each
+of our typeclasses:</p>
+<pre><code class="lang-{.Haskell}">data Mult l r = Mult l r
 
-<span class="kw">instance</span> (<span class="dt">Eval</span> l, <span class="dt">Eval</span> r) <span class="ot">=&gt;</span> <span class="dt">Eval</span> (<span class="dt">Mult</span> l r) <span class="kw">where</span>
-  eval (<span class="dt">Mult</span> l r) <span class="fu">=</span> eval l <span class="fu">*</span> eval r
+instance (Eval l, Eval r) =&gt; Eval (Mult l r) where
+  eval (Mult l r) = eval l * eval r
 
-<span class="kw">instance</span> (<span class="dt">PPrint</span> l, <span class="dt">PPrint</span> r) <span class="ot">=&gt;</span> <span class="dt">PPrint</span> (<span class="dt">Mult</span> l r) <span class="kw">where</span>
-  pprint (<span class="dt">Mult</span> l r) <span class="fu">=</span> pprint l <span class="fu">++</span> <span class="st">&quot; * &quot;</span> <span class="fu">++</span> pprint r</code></pre></div>
-<p>OK, so this approach lets us indeed add new cases and new functions without having to modify existing code. Note that we also have type safety: in the code below both <code>eval</code> and <code>pprint</code> can be called on both <code>threePlus5</code> and <code>threePlus5Times7</code> because these operations are defined on each of the datatypes. Had we forgotten to derive a typeclass instance for one of the cases <code>Lit</code>, <code>Add</code> or <code>Mult</code> the compiler would bark. The full code is available at this <a href="https://gist.github.com/paulkoerbitz/106277417325fd43a64c">gist</a>.</p>
-<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell">threePlus5 <span class="fu">=</span> <span class="dt">Add</span> (<span class="dt">Lit</span> <span class="dv">3</span>) (<span class="dt">Lit</span> <span class="dv">5</span>)
-threePlus5Times7 <span class="fu">=</span> <span class="dt">Mult</span> threePlus5 (<span class="dt">Lit</span> <span class="dv">7</span>)
+instance (PPrint l, PPrint r) =&gt; PPrint (Mult l r) where
+  pprint (Mult l r) = pprint l ++ &quot; * &quot; ++ pprint r
+</code></pre>
+<p>OK, so this approach lets us indeed add new cases and new functions
+without having to modify existing code. Note that we also have type
+safety: in the code below both <code>eval</code> and <code>pprint</code> can be called on
+both <code>threePlus5</code> and <code>threePlus5Times7</code> because these operations are
+defined on each of the datatypes. Had we forgotten to derive a
+typeclass instance for one of the cases <code>Lit</code>, <code>Add</code> or <code>Mult</code> the
+compiler would bark. The full code is available at this <a href="https://gist.github.com/paulkoerbitz/106277417325fd43a64c">gist</a>.</p>
+<pre><code class="lang-{.Haskell}">threePlus5 = Add (Lit 3) (Lit 5)
+threePlus5Times7 = Mult threePlus5 (Lit 7)
 
-main <span class="fu">=</span> <span class="kw">do</span>
-  putStrLn <span class="fu">$</span> pprint threePlus5 <span class="fu">++</span> <span class="st">&quot; = &quot;</span> <span class="fu">++</span> show (eval threePlus5)
-  putStrLn <span class="fu">$</span> pprint threePlus5Times7 <span class="fu">++</span> <span class="st">&quot; = &quot;</span> <span class="fu">++</span> show (eval threePlus5Times7)</code></pre></div>
+main = do
+  putStrLn $ pprint threePlus5 ++ &quot; = &quot; ++ show (eval threePlus5)
+  putStrLn $ pprint threePlus5Times7 ++ &quot; = &quot; ++ show (eval threePlus5Times7)
+</code></pre>
 <h2 id="a-java-solution">A Java Solution</h2>
-<p>Solving the Expression Problem in classical (statically typed) OO languages is a bit more difficult. The solution I’ll present here is taken from the paper <a href="http://www.cs.utexas.edu/~wcook/Drafts/2012/ecoop2012.pdf">Extensibility for the masses (PDF)</a> which has won the ECOOP 2012 best paper award. The idea is to use <em>object algebras</em> which implement so-called <em>algebraic signatures</em>. We will use the same example as above. The algebraic signature for the expression language looks as follows:<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
+<p>Solving the Expression Problem in classical (statically typed) OO
+languages is a bit more difficult. The solution I&#39;ll present here is
+taken from the paper <a href="http://www.cs.utexas.edu/~wcook/Drafts/2012/ecoop2012.pdf">Extensibility for the masses (PDF)</a> which has
+won the ECOOP 2012 best paper award. The idea is to use <em>object
+algebras</em> which implement so-called <em>algebraic signatures</em>. We will
+use the same example as above. The algebraic signature for the
+expression language looks as follows:^[Note the similarity to type
+classes!]</p>
 <pre><code>signature E
     lit:  Int -&gt; E
-    add:  E x E -&gt; E</code></pre>
-<p>The general idea is this: we will represent the above signature as an interface which is parameterized over <code>E</code>. To actually use objects created with this interface we’ll instantiate <code>E</code> to a concrete interface, for example to <code>Eval</code> and call the operations provided by this interface (<code>eval()</code>). However, code creating objects with the above interface does not need to know what <code>E</code> is and can thus be completely generic.</p>
-<p>In case this is a bit confusing (it certainly was to me), let’s look at a piece of code which will hopefully make this idea somwhat clearer:</p>
-<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> Alg1&lt;E&gt; {
-    E <span class="fu">lit</span>(<span class="dt">int</span> x);
-    E <span class="fu">add</span>(E l, E r);
+    add:  E x E -&gt; E
+</code></pre><p>The general idea is this: we will represent the above signature as an
+interface which is parameterized over <code>E</code>. To actually use objects
+created with this interface we&#39;ll instantiate <code>E</code> to a concrete
+interface, for example to <code>Eval</code> and call the operations provided by
+this interface (<code>eval()</code>). However, code creating objects with the above
+interface does not need to know what <code>E</code> is and can thus be completely
+generic.</p>
+<p>In case this is a bit confusing (it certainly was to me), let&#39;s look
+at a piece of code which will hopefully make this idea somwhat clearer:</p>
+<pre><code class="lang-{.Java}">interface Alg1&lt;E&gt; {
+    E lit(int x);
+    E add(E l, E r);
 }
 
-<span class="kw">class</span> Impl1&lt;E&gt; {
-    <span class="kw">public</span> <span class="dt">static</span> &lt;E&gt; E <span class="fu">make3Plus5</span>(Alg1&lt;E&gt; f) {
-        <span class="kw">return</span> f.<span class="fu">add</span>(f.<span class="fu">lit</span>(<span class="dv">3</span>), f.<span class="fu">lit</span>(<span class="dv">5</span>));
+class Impl1&lt;E&gt; {
+    public static &lt;E&gt; E make3Plus5(Alg1&lt;E&gt; f) {
+        return f.add(f.lit(3), f.lit(5));
     }
 }
 
-<span class="kw">interface</span> Eval {
-    <span class="dt">int</span> <span class="fu">eval</span>();
+interface Eval {
+    int eval();
 }
 
-<span class="kw">class</span> ELit <span class="kw">implements</span> Eval {
-    <span class="kw">private</span> <span class="dt">int</span> x;
-    <span class="kw">public</span> <span class="fu">ELit</span>(<span class="dt">int</span> x) { <span class="kw">this</span>.<span class="fu">x</span> = x; }
-    <span class="kw">public</span> <span class="dt">int</span> <span class="fu">eval</span>() { <span class="kw">return</span> x; }
+class ELit implements Eval {
+    private int x;
+    public ELit(int x) { this.x = x; }
+    public int eval() { return x; }
 }
 
-<span class="kw">class</span> EAdd <span class="kw">implements</span> Eval {
-    <span class="kw">private</span> Eval l, r;
-    <span class="kw">public</span> <span class="fu">EAdd</span>(Eval l, Eval r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
-    <span class="kw">public</span> <span class="dt">int</span> <span class="fu">eval</span>() { <span class="kw">return</span> l.<span class="fu">eval</span>() + r.<span class="fu">eval</span>(); }
+class EAdd implements Eval {
+    private Eval l, r;
+    public EAdd(Eval l, Eval r) { this.l = l; this.r = r; }
+    public int eval() { return l.eval() + r.eval(); }
 }
 
-<span class="kw">class</span> Alg1EvalFactory <span class="kw">implements</span> Alg1&lt;Eval&gt; {
-    <span class="kw">public</span> Eval <span class="fu">lit</span>(<span class="dt">int</span> x) { <span class="kw">return</span> <span class="kw">new</span> <span class="fu">ELit</span>(x); }
-    <span class="kw">public</span> Eval <span class="fu">add</span>(Eval l, Eval r) { <span class="kw">return</span> <span class="kw">new</span> <span class="fu">EAdd</span>(l, r); }
+class Alg1EvalFactory implements Alg1&lt;Eval&gt; {
+    public Eval lit(int x) { return new ELit(x); }
+    public Eval add(Eval l, Eval r) { return new EAdd(l, r); }
 }
 
-<span class="kw">class</span> Impl2 {
-    <span class="dt">static</span> <span class="dt">int</span> <span class="fu">eval3Plus5</span>() {
-        <span class="kw">return</span> Impl1.<span class="fu">make3Plus5</span>(<span class="kw">new</span> <span class="fu">Alg1EvalFactory</span>()).<span class="fu">eval</span>();
+class Impl2 {
+    static int eval3Plus5() {
+        return Impl1.make3Plus5(new Alg1EvalFactory()).eval();
     }
-}</code></pre></div>
-<p>So we first define a generic interface called <code>Alg1</code> which represents the algebraic signature above.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> Programs such as <code>make3Plus5</code> can use this interface completely generically without needing to know what <code>E</code> acutally is.</p>
-<p>Only when we acutally want to use the objects created from the <code>Alg1</code> interface do we need to define a concrete interface such as <code>Eval</code> and classes that implement it. We also need a class that implements <code>Alg1&lt;E&gt;</code>, in the code above this is <code>Alg1EvalFactory</code>. An instance of this factory is passed to the generic program <code>make3Plus5</code> which then produces an object which implements <code>Eval</code> so that we can call the <code>eval()</code> method on it.</p>
-<p>Comparing this approach to the Haskell one there are some similarities: The <code>interface Eval</code> here plays the role of the <code>typeclass Eval</code> in the Haskell version and the classes <code>ELit</code> and <code>EAdd</code> correspond to the instance declarations. The piece that is missing from the Haskell version is the <code>Alg1</code> interface and its implementation, but I think there are some similarities to what the Haskell compiler does behind the scenes.<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a></p>
-<p>Now let’s check if we can extend this setup with both new functions and new variants. First, adding new functions is fairly easy: The interface <code>Alg1</code> can stay unchanged, we merely need to create a new interface <code>PPrint</code> which will take the place of <code>Eval</code> and corresponding classes <code>PLit</code> and <code>PAdd</code> that implement this interface. To actually make use of <code>Alg1</code> instantiated to this new interface we also need a new factory.</p>
-<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> PPrint {
-    <span class="kw">public</span> String <span class="fu">pprint</span>();
+}
+</code></pre>
+<p>So we first define a generic interface called <code>Alg1</code> which represents
+the algebraic signature above.^[The paper calls such interfaces
+<em>object algebras</em> and goes a bit into the category theoretical
+motivations for these terms which I&#39;m ignoring here.]  Programs such
+as <code>make3Plus5</code> can use this interface completely generically without
+needing to know what <code>E</code> acutally is.</p>
+<p>Only when we acutally want to use the objects created from the <code>Alg1</code>
+interface do we need to define a concrete interface such as <code>Eval</code> and
+classes that implement it. We also need a class that implements
+<code>Alg1&lt;E&gt;</code>, in the code above this is <code>Alg1EvalFactory</code>. An instance of
+this factory is passed to the generic program <code>make3Plus5</code> which then
+produces an object which implements <code>Eval</code> so that we can call the
+<code>eval()</code> method on it.</p>
+<p>Comparing this approach to the Haskell one there are some
+similarities: The <code>interface Eval</code> here plays the role of the
+<code>typeclass Eval</code> in the Haskell version and the classes <code>ELit</code> and
+<code>EAdd</code> correspond to the instance declarations. The piece that is
+missing from the Haskell version is the <code>Alg1</code> interface and its
+implementation, but I think there are some similarities to what the
+Haskell compiler does behind the scenes.^[Clearly the Haskell code is
+considerably easier to understand and - I would argue - also more
+elegant, but let&#39;s not get into that.]</p>
+<p>Now let&#39;s check if we can extend this setup with both new functions
+and new variants. First, adding new functions is fairly easy: The
+interface <code>Alg1</code> can stay unchanged, we merely need to create a new
+interface <code>PPrint</code> which will take the place of <code>Eval</code> and
+corresponding classes <code>PLit</code> and <code>PAdd</code> that implement this
+interface. To actually make use of <code>Alg1</code> instantiated to this new
+interface we also need a new factory.</p>
+<pre><code class="lang-{.Java}">interface PPrint {
+    public String pprint();
 }
 
-<span class="kw">class</span> PLit <span class="kw">implements</span> PPrint {
-    <span class="kw">private</span> <span class="dt">int</span> x;
-    <span class="kw">public</span> <span class="fu">PLit</span>(<span class="dt">int</span> x) { <span class="kw">this</span>.<span class="fu">x</span> = x; }
-    <span class="kw">public</span> String <span class="fu">pprint</span>() { <span class="kw">return</span> Integer.<span class="fu">valueOf</span>(x).<span class="fu">toString</span>(); }
+class PLit implements PPrint {
+    private int x;
+    public PLit(int x) { this.x = x; }
+    public String pprint() { return Integer.valueOf(x).toString(); }
 }
 
-<span class="kw">class</span> PAdd <span class="kw">implements</span> PPrint {
-    <span class="kw">private</span> PPrint l, r;
-    <span class="kw">public</span> <span class="fu">PAdd</span>(PPrint l, PPrint r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
-    <span class="kw">public</span> String <span class="fu">pprint</span>() { <span class="kw">return</span> <span class="st">&quot;(&quot;</span> + l.<span class="fu">pprint</span>() + <span class="st">&quot; + &quot;</span> + r.<span class="fu">pprint</span>() + <span class="st">&quot;)&quot;</span>; }
+class PAdd implements PPrint {
+    private PPrint l, r;
+    public PAdd(PPrint l, PPrint r) { this.l = l; this.r = r; }
+    public String pprint() { return &quot;(&quot; + l.pprint() + &quot; + &quot; + r.pprint() + &quot;)&quot;; }
 }
 
-<span class="kw">class</span> Alg1PPrintFactory <span class="kw">implements</span> Alg1&lt;PPrint&gt; {
-    <span class="kw">public</span> PPrint <span class="fu">lit</span>(<span class="dt">int</span> x) { <span class="kw">return</span> <span class="kw">new</span> <span class="fu">PLit</span>(x); }
-    <span class="kw">public</span> PPrint <span class="fu">add</span>(PPrint l, PPrint r) { <span class="kw">return</span> <span class="kw">new</span> <span class="fu">PAdd</span>(l, r); }
+class Alg1PPrintFactory implements Alg1&lt;PPrint&gt; {
+    public PPrint lit(int x) { return new PLit(x); }
+    public PPrint add(PPrint l, PPrint r) { return new PAdd(l, r); }
 }
 
-<span class="kw">class</span> Impl3 {
-    <span class="dt">static</span> String <span class="fu">pprint3Plus5</span>() {
-        <span class="kw">return</span> Impl1.<span class="fu">make3Plus5</span>(<span class="kw">new</span> <span class="fu">Alg1PPrintFactory</span>()).<span class="fu">pprint</span>();
+class Impl3 {
+    static String pprint3Plus5() {
+        return Impl1.make3Plus5(new Alg1PPrintFactory()).pprint();
     }
-}</code></pre></div>
-<p>This may look like a lot of code, but again, this roughly corresponds to the Haskell version. We did not need to duplicate any code (apart from the usual boilerplate that is required by Java). Also note that we were able to reuse <code>make3Plus5</code> from above even though we’re now using a new operation on its result!</p>
-<p>So we can add new functions over the datatype cases. To add new cases we need to extend the signature <code>Alg1</code> to <code>Alg2</code> to accomodate the new case. We then need to add classes that implement the concrete interfaces <code>Eval</code> and <code>PPrint</code> for this new cases. Furthermore, we also need new factories which implement the interface <code>Alg2&lt;Eval&gt;</code> and <code>Alg2&lt;PPrint&gt;</code>. Again, this is slightly more code than one would love to write, but it is completely extensible (note for example that we are reusing <code>make3Plus5</code> unchanged with a factory that implements <code>Alg2&lt;E&gt;</code>):</p>
-<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> Alg2&lt;E&gt; <span class="kw">extends</span> Alg1&lt;E&gt; {
-    E <span class="fu">mult</span>(E l, E r);
+}
+</code></pre>
+<p>This may look like a lot of code, but again, this roughly corresponds
+to the Haskell version. We did not need to duplicate any code (apart
+from the usual boilerplate that is required by Java). Also note that
+we were able to reuse <code>make3Plus5</code> from above even though we&#39;re now
+using a new operation on its result!</p>
+<p>So we can add new functions over the datatype cases. To add new cases
+we need to extend the signature <code>Alg1</code> to <code>Alg2</code> to accomodate the new
+case. We then need to add classes that implement the concrete
+interfaces <code>Eval</code> and <code>PPrint</code> for this new cases. Furthermore, we
+also need new factories which implement the interface <code>Alg2&lt;Eval&gt;</code> and
+<code>Alg2&lt;PPrint&gt;</code>. Again, this is slightly more code than one would love
+to write, but it is completely extensible (note for example that we
+are reusing <code>make3Plus5</code> unchanged with a factory that implements
+<code>Alg2&lt;E&gt;</code>):</p>
+<pre><code class="lang-{.Java}">interface Alg2&lt;E&gt; extends Alg1&lt;E&gt; {
+    E mult(E l, E r);
 }
 
-<span class="kw">class</span> EMult <span class="kw">implements</span> Eval {
-    <span class="kw">private</span> Eval l, r;
-    <span class="kw">public</span> <span class="fu">EMult</span>(Eval l, Eval r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
-    <span class="kw">public</span> <span class="dt">int</span> <span class="fu">eval</span>() { <span class="kw">return</span> l.<span class="fu">eval</span>() * r.<span class="fu">eval</span>(); }
+class EMult implements Eval {
+    private Eval l, r;
+    public EMult(Eval l, Eval r) { this.l = l; this.r = r; }
+    public int eval() { return l.eval() * r.eval(); }
 }
 
-<span class="kw">class</span> PMult <span class="kw">implements</span> PPrint {
-    <span class="kw">private</span> PPrint l, r;
-    <span class="kw">public</span> <span class="fu">PMult</span>(PPrint l, PPrint r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
-    <span class="kw">public</span> String <span class="fu">pprint</span>() { <span class="kw">return</span> l.<span class="fu">pprint</span>() + <span class="st">&quot; * &quot;</span> + r.<span class="fu">pprint</span>(); }
+class PMult implements PPrint {
+    private PPrint l, r;
+    public PMult(PPrint l, PPrint r) { this.l = l; this.r = r; }
+    public String pprint() { return l.pprint() + &quot; * &quot; + r.pprint(); }
 }
 
-<span class="kw">class</span> Alg2EvalFactory <span class="kw">extends</span> Alg1EvalFactory <span class="kw">implements</span> Alg2&lt;Eval&gt; {
-    <span class="kw">public</span> Eval <span class="fu">mult</span>(Eval l, Eval r) { <span class="kw">return</span> <span class="kw">new</span> <span class="fu">EMult</span>(l, r); }
+class Alg2EvalFactory extends Alg1EvalFactory implements Alg2&lt;Eval&gt; {
+    public Eval mult(Eval l, Eval r) { return new EMult(l, r); }
 }
 
-<span class="kw">class</span> Alg2PPrintFactory <span class="kw">extends</span> Alg1PPrintFactory <span class="kw">implements</span> Alg2&lt;PPrint&gt; {
-    <span class="kw">public</span> PPrint <span class="fu">mult</span>(PPrint l, PPrint r) { <span class="kw">return</span> <span class="kw">new</span> <span class="fu">PMult</span>(l, r); }
+class Alg2PPrintFactory extends Alg1PPrintFactory implements Alg2&lt;PPrint&gt; {
+    public PPrint mult(PPrint l, PPrint r) { return new PMult(l, r); }
 }
 
-<span class="kw">class</span> Impl4&lt;E&gt; {
-    <span class="co">// a client program using Alg2 (which uses a function using Alg1!)</span>
-    <span class="kw">public</span> <span class="dt">static</span> &lt;E&gt; E <span class="fu">make3Plus5Times7</span>(Alg2&lt;E&gt; f) {
-        <span class="kw">return</span> f.<span class="fu">mult</span>(Impl1.<span class="fu">make3Plus5</span>(f), f.<span class="fu">lit</span>(<span class="dv">7</span>));
+class Impl4&lt;E&gt; {
+    // a client program using Alg2 (which uses a function using Alg1!)
+    public static &lt;E&gt; E make3Plus5Times7(Alg2&lt;E&gt; f) {
+        return f.mult(Impl1.make3Plus5(f), f.lit(7));
     }
 
-    <span class="kw">public</span> <span class="dt">static</span> <span class="dt">int</span> <span class="fu">eval3Plus5Times7</span>() {
-        <span class="kw">return</span> <span class="fu">make3Plus5Times7</span>(<span class="kw">new</span> <span class="fu">Alg2EvalFactory</span>()).<span class="fu">eval</span>();
+    public static int eval3Plus5Times7() {
+        return make3Plus5Times7(new Alg2EvalFactory()).eval();
     }
 
-    <span class="kw">public</span> <span class="dt">static</span> String <span class="fu">pprint3Plus5Times7</span>() {
-        <span class="kw">return</span> <span class="fu">make3Plus5Times7</span>(<span class="kw">new</span> <span class="fu">Alg2PPrintFactory</span>()).<span class="fu">pprint</span>();
+    public static String pprint3Plus5Times7() {
+        return make3Plus5Times7(new Alg2PPrintFactory()).pprint();
     }
-}</code></pre></div>
-<p>For completeness, here is a main method which uses the above and gives the same output as the Haskell version. The full code can be found at this <a href="https://gist.github.com/paulkoerbitz/106277417325fd43a64c">gist</a>.</p>
-<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">public</span> <span class="kw">class</span> Main {
-    <span class="kw">public</span> <span class="dt">static</span> <span class="dt">void</span> <span class="fu">main</span>(String[] args)
+}
+</code></pre>
+<p>For completeness, here is a main method which uses the above and gives
+the same output as the Haskell version. The full code can be found at
+this <a href="https://gist.github.com/paulkoerbitz/106277417325fd43a64c">gist</a>.</p>
+<pre><code class="lang-{.Java}">public class Main {
+    public static void main(String[] args)
     {
-        System.<span class="fu">out</span>.<span class="fu">println</span>(Impl3.<span class="fu">pprint3Plus5</span>() + <span class="st">&quot; = &quot;</span>
-                           + Integer.<span class="fu">valueOf</span>(Impl2.<span class="fu">eval3Plus5</span>()).<span class="fu">toString</span>());
-        System.<span class="fu">out</span>.<span class="fu">println</span>(Impl4.<span class="fu">pprint3Plus5Times7</span>() + <span class="st">&quot; = &quot;</span>
-                           + Integer.<span class="fu">valueOf</span>(Impl4.<span class="fu">eval3Plus5Times7</span>()).<span class="fu">toString</span>());
+        System.out.println(Impl3.pprint3Plus5() + &quot; = &quot;
+                           + Integer.valueOf(Impl2.eval3Plus5()).toString());
+        System.out.println(Impl4.pprint3Plus5Times7() + &quot; = &quot;
+                           + Integer.valueOf(Impl4.eval3Plus5Times7()).toString());
     }
-}</code></pre></div>
+}
+</code></pre>
 <h2 id="conclusion">Conclusion</h2>
-<p>So this post gave a quick demonstration of how the Expression Problem can be solved both in Haskell and Java. I think it is pretty cool that the Expression Problem is actually solvable in a language like Java because I first thought that that wasn’t the case. On the one hand the Java version seems pretty heavyweight in terms of additional complexity. I therefore doubt that I would reach for this solution in practice unless I was certain in advance that solving the Expression Problem is important for a particular application and that it would justify the conceptual overhead. On the other hand this solution doesn’t feel conceptually much heavier than the visitor pattern and this solution solves both sides of the Expression Problem while the visitor pattern only solves one.</p>
+<p>So this post gave a quick demonstration of how the Expression Problem
+can be solved both in Haskell and Java. I think it is pretty cool that
+the Expression Problem is actually solvable in a language like Java
+because I first thought that that wasn&#39;t the case. On the one hand the
+Java version seems pretty heavyweight in terms of additional
+complexity. I therefore doubt that I would reach for this solution in
+practice unless I was certain in advance that solving the Expression
+Problem is important for a particular application and that it would
+justify the conceptual overhead. On the other hand this solution
+doesn&#39;t feel conceptually much heavier than the visitor pattern and
+this solution solves both sides of the Expression Problem while the
+visitor pattern only solves one.</p>
 <p>In the end I just wish I could use Haskell ;).</p>
-<div class="footnotes">
-<hr />
-<ol>
-<li id="fn1"><p>Easy here means that no code needs to be changed / dublicated and type-safety is maintained.<a href="#fnref1">↩</a></p></li>
-<li id="fn2"><p>Note the similarity to type classes!<a href="#fnref2">↩</a></p></li>
-<li id="fn3"><p>The paper calls such interfaces <em>object algebras</em> and goes a bit into the category theoretical motivations for these terms which I’m ignoring here.<a href="#fnref3">↩</a></p></li>
-<li id="fn4"><p>Clearly the Haskell code is considerably easier to understand and - I would argue - also more elegant, but let’s not get into that.<a href="#fnref4">↩</a></p></li>
-</ol>
-</div>
+
+
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-      </div>
-      <div class="footer">
-        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
-        <p>
-          Contact me via
-          <a href="http://twitter.com/paulkoer">twitter</a> or
-          <a href="http://github.com/paulkoerbitz">github</a>.
-        </p>
-        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
-        <p><a href="../impressum.html">Impressum</a></p>
-      </div>
-    </div>
-    <script type="text/javascript">
-      var _gaq = _gaq || [];
-      _gaq.push(['_setAccount', 'UA-20755947-1']);
-      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
-      _gaq.push(['_setAllowLinker', true]);
-      _gaq.push(['_trackPageview']);
-      _gaq.push(['anonymizeIp']);
-      (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-      })();
-    </script>
-  </body>
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>

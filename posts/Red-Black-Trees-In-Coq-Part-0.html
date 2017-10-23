@@ -1,162 +1,168 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <title>Types and Tailcalls - Certified Red-Black Trees in Coq -- Part 0</title>
-    <link rel="stylesheet" href="../css/default.css" type="text/css">
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="../">Types and Tailcalls</a>
-      </div>
-      <div class="navigation">
-        <ul>
-          <li><a href="../">blog</a></li>
-          <li><a href="../til.html">til</a></li>
-          <li><a href="../archive.html">archive</a></li>
-          <li><a href="../about.html">about</a></li>
-          <li><a href="../rss.xml">rss</a></li>
-          <!--
-          <li><a href="/notes.html">notes</a></li>
-          <li><a href="/projects.html">projects</a></li>
-          -->
-        </ul>
-      </div>
-      <div class="body">
-        <h1 class="title">Certified Red-Black Trees in Coq -- Part 0</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>Certified Red-Black Trees in Coq -- Part 0</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
 
-<p class="date">published on October 24, 2013</p>
+<h1 class="title">Certified Red-Black Trees in Coq -- Part 0</h1>
+<p class="date">published on October 24th, 2013</p>
 
-<p>Now that I’ve learned about Coq <a href="../notes/Software-Foundations.html">for a while</a>, I’ve wondered if I could actually used it to prove something useful yet. One thing I thought would be interesting but not to hard was to prove that insert and delete operations on red-black trees are sound.</p>
-<p>Alas, I’ve discovered that comming up with structures and proves myself was a lot harder than just doing the exercises in software foundations. But I’ve kept at it and I now sort-a kind-a proved that the insert operations maintains the order of a red-black tree, one of its three defining properties (the others are perfect black balance, and non-consequitive left-leaning red nodes).</p>
-<p>The proofs are still full of holes, but they are holes that I am confident I can fix given a little more time (they should not be complicated). It ain’t pretty, but I am glad I got this far:</p>
-<div class="sourceCode"><pre class="sourceCode ocaml"><code class="sourceCode ocaml">
-<span class="dt">Require</span> <span class="dt">Export</span> SfLib<span class="kw">.</span>
-<span class="dt">Module</span> RbTrees<span class="kw">.</span>
+<p>Now that I&#39;ve learned about Coq <a href="/notes/Software-Foundations.html">for a while</a>,
+I&#39;ve wondered if I could actually used it to prove something useful yet. One thing
+I thought would be interesting but not to hard was to prove that insert and
+delete operations on red-black trees are sound.</p>
+<p>Alas, I&#39;ve discovered that comming up with structures and proves myself was a lot
+harder than just doing the exercises in software foundations. But I&#39;ve kept
+at it and I now sort-a kind-a proved that the insert operations maintains the
+order of a red-black tree, one of its three defining properties (the others are
+perfect black balance, and non-consequitive left-leaning red nodes).</p>
+<p>The proofs are still full of holes, but they are holes that I am confident I
+can fix given a little more time (they should not be complicated). It ain&#39;t pretty,
+but I am glad I got this far:</p>
+<pre><code class="lang-{.ocaml}">
+Require Export SfLib.
+Module RbTrees.
 
-<span class="dt">Inductive</span> <span class="dt">RbColor</span> : <span class="dt">Type</span> :=
-  | <span class="dt">RbRed</span>
-  | RbBlack<span class="kw">.</span>
+Inductive RbColor : Type :=
+  | RbRed
+  | RbBlack.
 
-<span class="dt">Definition</span> flipColor (c:<span class="dt">RbColor</span>) : <span class="dt">RbColor</span> :=
-  <span class="kw">match</span> c <span class="kw">with</span>
-    | <span class="dt">RbRed</span> =&gt; <span class="dt">RbBlack</span>
-    | <span class="dt">RbBlack</span> =&gt; <span class="dt">RbRed</span>
+Definition flipColor (c:RbColor) : RbColor :=
+  match c with
+    | RbRed =&gt; RbBlack
+    | RbBlack =&gt; RbRed
   end.
 
-<span class="dt">Inductive</span> <span class="dt">RbTree</span> : <span class="dt">Type</span> :=
-  | tip : <span class="dt">RbTree</span>
-  | node : <span class="dt">RbColor</span> -&gt; nat -&gt; <span class="dt">RbTree</span> -&gt; <span class="dt">RbTree</span> -&gt; RbTree<span class="kw">.</span>
+Inductive RbTree : Type :=
+  | tip : RbTree
+  | node : RbColor -&gt; nat -&gt; RbTree -&gt; RbTree -&gt; RbTree.
 
-<span class="dt">Fixpoint</span> rotLeft (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
+Fixpoint rotLeft (t:RbTree) : RbTree :=
+  match t with
     | tip =&gt; tip
     | node c n l r =&gt;
-      <span class="kw">match</span> r <span class="kw">with</span>
+      match r with
         | tip =&gt; node c n l r
-        | node rc rn rl rr =&gt; node rc rn (node <span class="dt">RbRed</span> n l rl) rr
+        | node rc rn rl rr =&gt; node rc rn (node RbRed n l rl) rr
       end
   end.
 
-<span class="dt">Fixpoint</span> rotRight (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
+Fixpoint rotRight (t:RbTree) : RbTree :=
+  match t with
     | tip =&gt; tip
     | node c n l r =&gt;
-      <span class="kw">match</span> l <span class="kw">with</span>
+      match l with
         | tip =&gt; node c n l r
-        | node lc ln ll lr =&gt; node lc ln ll (node <span class="dt">RbRed</span> n lr r)
+        | node lc ln ll lr =&gt; node lc ln ll (node RbRed n lr r)
       end
   end.
 
-<span class="dt">Definition</span> rightIsRed (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | node _ _ _ (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
-    | _ =&gt; <span class="kw">false</span>
+Definition rightIsRed (t:RbTree) : bool :=
+  match t with
+    | node _ _ _ (node RbRed _ _ _) =&gt; true
+    | _ =&gt; false
   end.
 
-<span class="dt">Definition</span> twoRedsOnLeft (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | node _ _ (node <span class="dt">RbRed</span> _ (node <span class="dt">RbRed</span> _ _ _) _) _ =&gt; <span class="kw">true</span>
-    | _ =&gt; <span class="kw">false</span>
+Definition twoRedsOnLeft (t:RbTree) : bool :=
+  match t with
+    | node _ _ (node RbRed _ (node RbRed _ _ _) _) _ =&gt; true
+    | _ =&gt; false
   end.
 
-<span class="dt">Definition</span> balanceR (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">if</span> twoRedsOnLeft t <span class="kw">then</span> rotRight t <span class="kw">else</span> t.
+Definition balanceR (t:RbTree) : RbTree :=
+  if twoRedsOnLeft t then rotRight t else t.
 
-<span class="dt">Definition</span> balanceL (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">if</span> rightIsRed t <span class="kw">then</span> rotLeft t <span class="kw">else</span> t.
+Definition balanceL (t:RbTree) : RbTree :=
+  if rightIsRed t then rotLeft t else t.
 
-<span class="dt">Definition</span> bothLeftAndRightAreRed (t:<span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | node _ _ (node <span class="dt">RbRed</span> _ _ _) (node <span class="dt">RbRed</span> _ _ _) =&gt; <span class="kw">true</span>
-    | _ =&gt; <span class="kw">false</span>
+Definition bothLeftAndRightAreRed (t:RbTree) : bool :=
+  match t with
+    | node _ _ (node RbRed _ _ _) (node RbRed _ _ _) =&gt; true
+    | _ =&gt; false
   end.
 
-<span class="co">(* these evidence carrying booleans would be nice here *)</span>
-<span class="dt">Definition</span> flipColors (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> ln ll lr) (node <span class="dt">RbRed</span> rn rl rr) =&gt; node <span class="dt">RbRed</span> n (node <span class="dt">RbBlack</span> ln ll lr) (node <span class="dt">RbBlack</span> rn rl rr)
+(* these evidence carrying booleans would be nice here *)
+Definition flipColors (t:RbTree) : RbTree :=
+  match t with
+    | node RbBlack n (node RbRed ln ll lr) (node RbRed rn rl rr) =&gt; node RbRed n (node RbBlack ln ll lr) (node RbBlack rn rl rr)
     | _ =&gt; t
   end.
 
-<span class="dt">Inductive</span> flipable : <span class="dt">RbTree</span> -&gt; <span class="dt">Prop</span> :=
-  | flip_intro : forall (n ln rn:nat) (ll lr rl rr : <span class="dt">RbTree</span>),
-                   flipable (node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> ln ll lr) (node <span class="dt">RbRed</span> rn rl rr)).
+Inductive flipable : RbTree -&gt; Prop :=
+  | flip_intro : forall (n ln rn:nat) (ll lr rl rr : RbTree),
+                   flipable (node RbBlack n (node RbRed ln ll lr) (node RbRed rn rl rr)).
 
-<span class="dt">Inductive</span> <span class="dt">Cmp</span> : <span class="dt">Type</span> :=
-  | <span class="dt">LT</span>
-  | <span class="dt">EQ</span>
-  | GT<span class="kw">.</span>
+Inductive Cmp : Type :=
+  | LT
+  | EQ
+  | GT.
 
-<span class="dt">Fixpoint</span> cmp (n m:nat) : <span class="dt">Cmp</span> :=
-  <span class="kw">if</span> beq_nat n m <span class="kw">then</span> <span class="dt">EQ</span> <span class="kw">else</span>
-    <span class="kw">if</span> ble_nat n m <span class="kw">then</span> <span class="dt">LT</span> <span class="kw">else</span> GT<span class="kw">.</span>
+Fixpoint cmp (n m:nat) : Cmp :=
+  if beq_nat n m then EQ else
+    if ble_nat n m then LT else GT.
 
-<span class="dt">Fixpoint</span> insert (nn:nat) (t:<span class="dt">RbTree</span>) : <span class="dt">RbTree</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | tip =&gt; node <span class="dt">RbBlack</span> nn tip tip
+Fixpoint insert (nn:nat) (t:RbTree) : RbTree :=
+  match t with
+    | tip =&gt; node RbBlack nn tip tip
     | node c n l r =&gt;
-      <span class="kw">match</span> cmp nn n <span class="kw">with</span>
-        | <span class="dt">EQ</span> =&gt; t
-        | <span class="dt">LT</span> =&gt; flipColors (balanceR (node c n (insert nn l) r))
-        | <span class="dt">GT</span> =&gt; flipColors (balanceL (node c n l (insert nn r)))
+      match cmp nn n with
+        | EQ =&gt; t
+        | LT =&gt; flipColors (balanceR (node c n (insert nn l) r))
+        | GT =&gt; flipColors (balanceL (node c n l (insert nn r)))
       end
   end.
 
-<span class="dt">Fixpoint</span> blt_nat (n m:nat) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> n <span class="kw">with</span>
-    | <span class="dt">O</span>      =&gt; <span class="kw">match</span> m <span class="kw">with</span>
-                  | <span class="dt">O</span> =&gt; <span class="kw">false</span>
-                  | <span class="dt">S</span> m' =&gt; <span class="kw">true</span>
+Fixpoint blt_nat (n m:nat) : bool :=
+  match n with
+    | O      =&gt; match m with
+                  | O =&gt; false
+                  | S m&#39; =&gt; true
                 end
-    | (<span class="dt">S</span> n') =&gt; ble_nat n' m
+    | (S n&#39;) =&gt; ble_nat n&#39; m
   end.
 
-<span class="dt">Definition</span> bgt_nat (n m:nat) : <span class="dt">bool</span> :=
+Definition bgt_nat (n m:nat) : bool :=
   blt_nat m n.
 
-<span class="dt">Fixpoint</span> rbForall (f : nat -&gt; <span class="dt">bool</span>) (t : <span class="dt">RbTree</span>) : <span class="dt">bool</span> :=
-  <span class="kw">match</span> t <span class="kw">with</span>
-    | tip =&gt; <span class="kw">true</span>
+Fixpoint rbForall (f : nat -&gt; bool) (t : RbTree) : bool :=
+  match t with
+    | tip =&gt; true
     | node _ n l r =&gt; andb (andb (rbForall f l) (f n)) (rbForall f r)
   end.
 
-<span class="dt">Definition</span> gtTree (t:<span class="dt">RbTree</span>) (m:nat)  : <span class="dt">bool</span> :=
+Definition gtTree (t:RbTree) (m:nat)  : bool :=
   rbForall (bgt_nat m) t.
 
-<span class="dt">Definition</span> ltTree (t:<span class="dt">RbTree</span>) (m:nat) : <span class="dt">bool</span> :=
+Definition ltTree (t:RbTree) (m:nat) : bool :=
   rbForall (blt_nat m) t.
 
-<span class="dt">Theorem</span> excluded_middle :
-  forall <span class="dt">P</span>:<span class="dt">Prop</span>, <span class="dt">P</span> \/ ~ P<span class="kw">.</span>
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
+Theorem excluded_middle :
+  forall P:Prop, P \/ ~ P.
+Proof.
+Admitted.
 
-<span class="dt">Lemma</span> unflipable : forall (t:<span class="dt">RbTree</span>),
+Lemma unflipable : forall (t:RbTree),
   ~flipable t -&gt; flipColors t = t.
-Proof<span class="kw">.</span>
+Proof.
   intros.
   destruct t.
   simpl. reflexivity.
@@ -164,147 +170,150 @@ Proof<span class="kw">.</span>
   destruct t1. simpl. reflexivity.
   destruct r.
   destruct t2. simpl. reflexivity.
-  destruct r. unfold not <span class="kw">in</span> H<span class="kw">.</span>
-  <span class="kw">assert</span> (flipable (node <span class="dt">RbBlack</span> n (node <span class="dt">RbRed</span> n0 t1_1 t1_2) (node <span class="dt">RbRed</span> n1 t2_1 t2_2))).
-  apply flip_intro. apply <span class="dt">H</span> <span class="kw">in</span> H0<span class="kw">.</span> inversion H0<span class="kw">.</span>
+  destruct r. unfold not in H.
+  assert (flipable (node RbBlack n (node RbRed n0 t1_1 t1_2) (node RbRed n1 t2_1 t2_2))).
+  apply flip_intro. apply H in H0. inversion H0.
   simpl. reflexivity.
   simpl. reflexivity.
-Qed<span class="kw">.</span>
+Qed.
 
-<span class="dt">Lemma</span> rbForall_flipColors : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
-  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (flipColors t) = <span class="kw">true</span>.
-Proof<span class="kw">.</span>
+Lemma rbForall_flipColors : forall (f : nat -&gt; bool) (t:RbTree),
+  rbForall f t = true -&gt; rbForall f (flipColors t) = true.
+Proof.
   intros. induction t.
-  <span class="dt">Case</span> <span class="st">&quot;t=tip&quot;</span>. simpl. assumption.
-  <span class="dt">Case</span> <span class="st">&quot;t=cons&quot;</span>.  remember (node r n t1 t2) <span class="kw">as</span> t.
-    <span class="kw">assert</span> (flipable t \/ ~ (flipable t)). apply excluded_middle.
-    inversion H0<span class="kw">.</span> destruct H1<span class="kw">.</span> simpl. simpl <span class="kw">in</span> H<span class="kw">.</span> apply H<span class="kw">.</span> <span class="kw">assert</span> (flipColors t = t).
-    apply unflipable. apply H1<span class="kw">.</span> rewrite H2<span class="kw">.</span> apply H<span class="kw">.</span>
-Qed<span class="kw">.</span>
+  Case &quot;t=tip&quot;. simpl. assumption.
+  Case &quot;t=cons&quot;.  remember (node r n t1 t2) as t.
+    assert (flipable t \/ ~ (flipable t)). apply excluded_middle.
+    inversion H0. destruct H1. simpl. simpl in H. apply H. assert (flipColors t = t).
+    apply unflipable. apply H1. rewrite H2. apply H.
+Qed.
 
-<span class="dt">Lemma</span> rbForall_balanceR : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
-  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceR t) = <span class="kw">true</span>.
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
+Lemma rbForall_balanceR : forall (f : nat -&gt; bool) (t:RbTree),
+  rbForall f t = true -&gt; rbForall f (balanceR t) = true.
+Proof.
+Admitted.
 
-<span class="dt">Lemma</span> rbForall_balanceL : forall (f : nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
-  rbForall f t = <span class="kw">true</span> -&gt; rbForall f (balanceL t) = <span class="kw">true</span>.
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
+Lemma rbForall_balanceL : forall (f : nat -&gt; bool) (t:RbTree),
+  rbForall f t = true -&gt; rbForall f (balanceL t) = true.
+Proof.
+Admitted.
 
-<span class="dt">Lemma</span> rbForall_insert : forall (n m:nat) (f : nat -&gt; nat -&gt; <span class="dt">bool</span>) (t:<span class="dt">RbTree</span>),
-  rbForall (f n) t = <span class="kw">true</span> -&gt; f n m = <span class="kw">true</span> -&gt; rbForall (f n) (insert m t) = <span class="kw">true</span>.
-Proof<span class="kw">.</span>
+Lemma rbForall_insert : forall (n m:nat) (f : nat -&gt; nat -&gt; bool) (t:RbTree),
+  rbForall (f n) t = true -&gt; f n m = true -&gt; rbForall (f n) (insert m t) = true.
+Proof.
   intros. induction t.
-  <span class="dt">Case</span> <span class="st">&quot;t=tip&quot;</span>. simpl. unfold rbForall. unfold rbfold. rewrite H0<span class="kw">.</span> simpl. reflexivity.
-  <span class="dt">Case</span> <span class="st">&quot;t=cons&quot;</span>. remember (cmp m n0) <span class="kw">as</span> cmpEq. destruct cmpEq.
-    <span class="dt">SCase</span> <span class="st">&quot;m &lt; n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> apply rbForall_flipColors. apply rbForall_balanceR. admit.
-    <span class="dt">SCase</span> <span class="st">&quot;m = n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> assumption.
-    <span class="dt">SCase</span> <span class="st">&quot;m &gt; n0&quot;</span>. simpl. rewrite &lt;- HeqcmpEq<span class="kw">.</span> apply rbForall_flipColors. apply rbForall_balanceL. admit.
-Qed<span class="kw">.</span>
+  Case &quot;t=tip&quot;. simpl. unfold rbForall. unfold rbfold. rewrite H0. simpl. reflexivity.
+  Case &quot;t=cons&quot;. remember (cmp m n0) as cmpEq. destruct cmpEq.
+    SCase &quot;m &lt; n0&quot;. simpl. rewrite &lt;- HeqcmpEq. apply rbForall_flipColors. apply rbForall_balanceR. admit.
+    SCase &quot;m = n0&quot;. simpl. rewrite &lt;- HeqcmpEq. assumption.
+    SCase &quot;m &gt; n0&quot;. simpl. rewrite &lt;- HeqcmpEq. apply rbForall_flipColors. apply rbForall_balanceL. admit.
+Qed.
 
-<span class="dt">Inductive</span> rbOrdered : <span class="dt">RbTree</span> -&gt; <span class="dt">Prop</span> :=
-  | <span class="dt">O_Tip</span> : rbOrdered tip
-  | <span class="dt">O_Cons</span> : forall (n:nat) (c : <span class="dt">RbColor</span>) (l r : <span class="dt">RbTree</span>),
+Inductive rbOrdered : RbTree -&gt; Prop :=
+  | O_Tip : rbOrdered tip
+  | O_Cons : forall (n:nat) (c : RbColor) (l r : RbTree),
                rbOrdered l -&gt; rbOrdered r -&gt;
-               gtTree l n = <span class="kw">true</span> -&gt; ltTree r n = <span class="kw">true</span> -&gt;
+               gtTree l n = true -&gt; ltTree r n = true -&gt;
                rbOrdered (node c n l r).
 
-<span class="dt">Lemma</span> flipColor_keeps_order : forall (n:nat) (c:<span class="dt">RbColor</span>) (l r : <span class="dt">RbTree</span>),
+Lemma flipColor_keeps_order : forall (n:nat) (c:RbColor) (l r : RbTree),
   rbOrdered (node c n l r) -&gt; rbOrdered (node (flipColor c) n l r).
-Proof<span class="kw">.</span>
-  intros. inversion H<span class="kw">.</span> apply O_Cons<span class="kw">.</span> assumption. assumption. assumption. assumption.
-Qed<span class="kw">.</span>
+Proof.
+  intros. inversion H. apply O_Cons. assumption. assumption. assumption. assumption.
+Qed.
 
-<span class="dt">Lemma</span> flipColors_keeps_order : forall (t : <span class="dt">RbTree</span>),
+Lemma flipColors_keeps_order : forall (t : RbTree),
   rbOrdered t -&gt; rbOrdered (flipColors t).
-Proof<span class="kw">.</span>
-  intros. remember t <span class="kw">as</span> tt. induction H<span class="kw">.</span>
-  <span class="dt">Case</span> <span class="st">&quot;t = tip&quot;</span>.
-    simpl. apply O_Tip<span class="kw">.</span>
-  <span class="dt">Case</span> <span class="st">&quot;t = node ...&quot;</span>.
-    <span class="kw">assert</span> (flipable t \/ ~ (flipable t)). apply excluded_middle.
-    inversion H3<span class="kw">.</span> rewrite &lt;- <span class="dt">Heqtt</span> <span class="kw">in</span> H4<span class="kw">.</span> inversion H4<span class="kw">.</span> simpl.
+Proof.
+  intros. remember t as tt. induction H.
+  Case &quot;t = tip&quot;.
+    simpl. apply O_Tip.
+  Case &quot;t = node ...&quot;.
+    assert (flipable t \/ ~ (flipable t)). apply excluded_middle.
+    inversion H3. rewrite &lt;- Heqtt in H4. inversion H4. simpl.
     constructor.
-    rewrite &lt;- <span class="dt">H8</span> <span class="kw">in</span> H<span class="kw">.</span> apply flipColor_keeps_order <span class="kw">in</span> H<span class="kw">.</span> simpl <span class="kw">in</span> H<span class="kw">.</span> apply H<span class="kw">.</span>
-    rewrite &lt;- <span class="dt">H9</span> <span class="kw">in</span> H0<span class="kw">.</span> apply flipColor_keeps_order <span class="kw">in</span> H0<span class="kw">.</span> simpl <span class="kw">in</span> H0<span class="kw">.</span> apply H0<span class="kw">.</span>
-    rewrite &lt;- <span class="dt">H8</span> <span class="kw">in</span> H1<span class="kw">.</span> unfold gtTree <span class="kw">in</span> H1<span class="kw">.</span> simpl <span class="kw">in</span> H1<span class="kw">.</span> unfold gtTree. simpl. apply H1<span class="kw">.</span>
-    rewrite &lt;- <span class="dt">H9</span> <span class="kw">in</span> H2<span class="kw">.</span> unfold ltTree <span class="kw">in</span> H2<span class="kw">.</span> simpl <span class="kw">in</span> H2<span class="kw">.</span> unfold ltTree. simpl. apply H2<span class="kw">.</span>
-    <span class="kw">assert</span> (flipColors t = t). apply unflipable. apply H4<span class="kw">.</span>
-    rewrite Heqtt<span class="kw">.</span> rewrite H5<span class="kw">.</span> rewrite &lt;- Heqtt<span class="kw">.</span> constructor; assumption.
-Qed<span class="kw">.</span>
+    rewrite &lt;- H8 in H. apply flipColor_keeps_order in H. simpl in H. apply H.
+    rewrite &lt;- H9 in H0. apply flipColor_keeps_order in H0. simpl in H0. apply H0.
+    rewrite &lt;- H8 in H1. unfold gtTree in H1. simpl in H1. unfold gtTree. simpl. apply H1.
+    rewrite &lt;- H9 in H2. unfold ltTree in H2. simpl in H2. unfold ltTree. simpl. apply H2.
+    assert (flipColors t = t). apply unflipable. apply H4.
+    rewrite Heqtt. rewrite H5. rewrite &lt;- Heqtt. constructor; assumption.
+Qed.
 
-<span class="dt">Lemma</span> balanceL_keeps_order : forall (t : <span class="dt">RbTree</span>),
+Lemma balanceL_keeps_order : forall (t : RbTree),
   rbOrdered t -&gt; rbOrdered (balanceL t).
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
+Proof.
+Admitted.
 
-<span class="dt">Lemma</span> balanceR_keeps_order : forall (t : <span class="dt">RbTree</span>),
+Lemma balanceR_keeps_order : forall (t : RbTree),
   rbOrdered t -&gt; rbOrdered (balanceR t).
-Proof<span class="kw">.</span>
-Admitted<span class="kw">.</span>
+Proof.
+Admitted.
 
-<span class="dt">Theorem</span> insert_keeps_order : forall (n:nat) (t : <span class="dt">RbTree</span>),
+Theorem insert_keeps_order : forall (n:nat) (t : RbTree),
   rbOrdered t -&gt; rbOrdered (insert n t).
-Proof<span class="kw">.</span>
-  intros. induction H<span class="kw">.</span>
-  <span class="dt">Case</span> <span class="st">&quot;O_Tip&quot;</span>. simpl. repeat constructor.
-  <span class="dt">Case</span> <span class="st">&quot;O_Cons&quot;</span>.
-    remember (cmp n n0) <span class="kw">as</span> Hcmp<span class="kw">.</span>
-    destruct Hcmp<span class="kw">.</span>
-    <span class="dt">SCase</span> <span class="st">&quot;n &lt; n0&quot;</span>.
-      simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span>
+Proof.
+  intros. induction H.
+  Case &quot;O_Tip&quot;. simpl. repeat constructor.
+  Case &quot;O_Cons&quot;.
+    remember (cmp n n0) as Hcmp.
+    destruct Hcmp.
+    SCase &quot;n &lt; n0&quot;.
+      simpl. rewrite &lt;- HeqHcmp.
       apply flipColors_keeps_order. apply balanceR_keeps_order. constructor. assumption. assumption.
       unfold gtTree.
-      <span class="co">(*   rbForall (f n) t = true -&gt; f n m = true -&gt; rbForall (f n) (insert m t) = true. *)</span>
-      apply rbForall_insert. apply H1<span class="kw">.</span>
-      <span class="co">(* cmp n n0 = LT -&gt; bgt_nat n0 n = true *)</span> admit.
+      (*   rbForall (f n) t = true -&gt; f n m = true -&gt; rbForall (f n) (insert m t) = true. *)
+      apply rbForall_insert. apply H1.
+      (* cmp n n0 = LT -&gt; bgt_nat n0 n = true *) admit.
       assumption.
-    <span class="dt">SCase</span> <span class="st">&quot;n = n0&quot;</span>. simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span> apply <span class="dt">O_Cons</span>; assumption.
-    <span class="dt">SCase</span> <span class="st">&quot;n &gt; n0&quot;</span>.
-      simpl. rewrite &lt;- HeqHcmp<span class="kw">.</span>
-      apply flipColors_keeps_order. apply balanceL_keeps_order. apply O_Cons<span class="kw">.</span> assumption. assumption. assumption.
-      unfold ltTree. apply rbForall_insert. apply H2<span class="kw">.</span>
-      <span class="co">(* cmp n n0 = GT -&gt; blt_nat n0 n = true *)</span> admit.
-Qed<span class="kw">.</span></code></pre></div>
-<p>This is all quite rough of course, I think I can learn a lot but iterating upon it until I have a nice solution. Dependent types are not easy!</p>
+    SCase &quot;n = n0&quot;. simpl. rewrite &lt;- HeqHcmp. apply O_Cons; assumption.
+    SCase &quot;n &gt; n0&quot;.
+      simpl. rewrite &lt;- HeqHcmp.
+      apply flipColors_keeps_order. apply balanceL_keeps_order. apply O_Cons. assumption. assumption. assumption.
+      unfold ltTree. apply rbForall_insert. apply H2.
+      (* cmp n n0 = GT -&gt; blt_nat n0 n = true *) admit.
+Qed.
+</code></pre>
+<p>This is all quite rough of course, I think I can learn a lot but iterating upon it until I have
+a nice solution. Dependent types are not easy!</p>
+
+
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-      </div>
-      <div class="footer">
-        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
-        <p>
-          Contact me via
-          <a href="http://twitter.com/paulkoer">twitter</a> or
-          <a href="http://github.com/paulkoerbitz">github</a>.
-        </p>
-        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
-        <p><a href="../impressum.html">Impressum</a></p>
-      </div>
-    </div>
-    <script type="text/javascript">
-      var _gaq = _gaq || [];
-      _gaq.push(['_setAccount', 'UA-20755947-1']);
-      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
-      _gaq.push(['_setAllowLinker', true]);
-      _gaq.push(['_trackPageview']);
-      _gaq.push(['anonymizeIp']);
-      (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-      })();
-    </script>
-  </body>
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>

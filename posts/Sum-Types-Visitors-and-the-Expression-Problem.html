@@ -1,166 +1,226 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <title>Types and Tailcalls - Sum Types, Visitors, and the Expression Problem</title>
-    <link rel="stylesheet" href="../css/default.css" type="text/css">
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <a href="../">Types and Tailcalls</a>
-      </div>
-      <div class="navigation">
-        <ul>
-          <li><a href="../">blog</a></li>
-          <li><a href="../til.html">til</a></li>
-          <li><a href="../archive.html">archive</a></li>
-          <li><a href="../about.html">about</a></li>
-          <li><a href="../rss.xml">rss</a></li>
-          <!--
-          <li><a href="/notes.html">notes</a></li>
-          <li><a href="/projects.html">projects</a></li>
-          -->
-        </ul>
-      </div>
-      <div class="body">
-        <h1 class="title">Sum Types, Visitors, and the Expression Problem</h1>
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>Sum Types, Visitors, and the Expression Problem</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
 
-<p class="date">published on January 10, 2014</p>
+<h1 class="title">Sum Types, Visitors, and the Expression Problem</h1>
+<p class="date">published on January 10th, 2014</p>
 
-<p>I’ve heard that <em>the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> is just a poor way of getting the benefit of sum types</em><a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> in functional programming circles several times. I must admit that I never had completely thought this through, but I was nevertheless a bit surprised when I saw that walking the AST in Rust was implemented by what looks like a use of the visitor pattern. Languages with sum types usually use pattern matching to achieve the same effect and I had always considered this a superior approach. In this blog post I try to understand the differences and similarities of the two approaches a little better.</p>
-<p>To set the stage, both pattern matching and the visitor pattern solve one side of the <a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">expression problem</a>, which is the problem of adding both variants of a data type and functions that act on those variants without changing or recompiling old code and without loosing type safety.</p>
-<p>To make this a bit more concrete, consider a very simple expression languages consisting of numbers and addition as an example (no post on this topic can do without one!). We have two variants of expressions, (1) numbers and (2) addition. Let’s assume that we want to compute the values represented by an expression as a first operation.</p>
+<p>I&#39;ve heard that <em>the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> is just a poor way of getting the
+benefit of sum types</em>^[These are also known as disjoint union or
+variant types.] in functional programming circles several times. I
+must admit that I never had completely thought this through, but I was
+nevertheless a bit surprised when I saw that walking the AST in Rust
+was implemented by what looks like a use of the visitor pattern.
+Languages with sum types usually use pattern matching to achieve the
+same effect and I had always considered this a superior approach. In
+this blog post I try to understand the differences and similarities of
+the two approaches a little better.</p>
+<p>To set the stage, both pattern matching and the visitor pattern solve
+one side of the <a href="http://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt">expression problem</a>, which is the problem of adding
+both variants of a data type and functions that act on those variants
+without changing or recompiling old code and without loosing type
+safety.</p>
+<p>To make this a bit more concrete, consider a very simple expression
+languages consisting of numbers and addition as an example (no post on
+this topic can do without one!). We have two variants of expressions,
+(1) numbers and (2) addition. Let&#39;s assume that we want to compute the
+values represented by an expression as a first operation.</p>
 <p>In Haskell a straightforward way of solving this problem is as follows</p>
-<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Expr</span> <span class="fu">=</span> <span class="dt">Val</span> <span class="dt">Int</span> <span class="fu">|</span> <span class="dt">Add</span> <span class="dt">Expr</span> <span class="dt">Expr</span>
+<pre><code class="lang-Haskell">data Expr = Val Int | Add Expr Expr
 
-<span class="ot">eval ::</span> <span class="dt">Expr</span> <span class="ot">-&gt;</span> <span class="dt">Int</span>
-eval (<span class="dt">Val</span> i)     <span class="fu">=</span> i
-eval (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> eval e1 <span class="fu">+</span> eval e2</code></pre></div>
-<p>If you’re not familiar with Haskell, the first line defines a data type with two variants, it can either be a <code>Val</code>, which holds an <code>Int</code>, or it is an <code>Add</code> which holds two expressions. <code>Val</code> and <code>Add</code> are called constructors of <code>Expr</code>. The <code>eval</code> function pattern-matches and handles each case.</p>
-<p>Now imagine that we do not only want to evaluate expressions but also pretty-print them. Adding operations is easy in Haskell, we just write a new function:</p>
-<div class="sourceCode"><pre class="sourceCode Haskell"><code class="sourceCode haskell"><span class="ot">pprint ::</span> <span class="dt">Expr</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
-pprint (<span class="dt">Val</span> i)     <span class="fu">=</span> show i
-pprint (<span class="dt">Add</span> e1 e2) <span class="fu">=</span> pprint e1 <span class="fu">++</span> <span class="st">&quot; + &quot;</span> <span class="fu">++</span> pprint e2</code></pre></div>
-<p>In Java we might achieve something similar by introducing an <code>Expr</code> class:</p>
-<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> Expr {
-    <span class="kw">public</span> <span class="dt">int</span> <span class="fu">eval</span>();
+eval :: Expr -&gt; Int
+eval (Val i)     = i
+eval (Add e1 e2) = eval e1 + eval e2
+</code></pre>
+<p>If you&#39;re not familiar with Haskell, the first line defines a data
+type with two variants, it can either be a <code>Val</code>, which holds an
+<code>Int</code>, or it is an <code>Add</code> which holds two expressions. <code>Val</code> and <code>Add</code>
+are called constructors of <code>Expr</code>. The <code>eval</code> function pattern-matches
+and handles each case.</p>
+<p>Now imagine that we do not only want to evaluate expressions but also
+pretty-print them. Adding operations is easy in Haskell, we just
+write a new function:</p>
+<pre><code class="lang-Haskell">pprint :: Expr -&gt; String
+pprint (Val i)     = show i
+pprint (Add e1 e2) = pprint e1 ++ &quot; + &quot; ++ pprint e2
+</code></pre>
+<p>In Java we might achieve something similar by introducing an <code>Expr</code>
+class:</p>
+<pre><code class="lang-Java">interface Expr {
+    public int eval();
 }
 
-<span class="kw">class</span> Val <span class="kw">implements</span> Expr {
-    <span class="kw">private</span> <span class="dt">final</span> <span class="dt">int</span> v;
-    <span class="kw">public</span> <span class="fu">Val</span>(<span class="dt">int</span> v) { <span class="kw">this</span>.<span class="fu">v</span> = v; }
-    <span class="kw">public</span> <span class="dt">int</span> eval { <span class="kw">return</span> v; }
+class Val implements Expr {
+    private final int v;
+    public Val(int v) { this.v = v; }
+    public int eval { return v; }
 }
 
-<span class="kw">class</span> Add <span class="kw">implements</span> Expr {
-    <span class="kw">private</span> <span class="dt">final</span> Expr l;
-    <span class="kw">private</span> <span class="dt">final</span> Expr r;
-    <span class="kw">public</span> <span class="fu">Add</span>(Expr l, Expr r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
-    <span class="kw">public</span> <span class="dt">int</span> eval { <span class="kw">return</span> l.<span class="fu">eval</span>() + r.<span class="fu">eval</span>(); }
-}</code></pre></div>
-<p>But now, if we want to add the <code>pprint</code> operation, we have to touch every class. This is the side of the expression problem that functional languages tend to solve better than object oriented languages. However, the object oriented programming community has devised the visitor pattern as a way to solve this problem:</p>
-<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">interface</span> ExprVisitor {
-    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Val v);
-    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Add a);
+class Add implements Expr {
+    private final Expr l;
+    private final Expr r;
+    public Add(Expr l, Expr r) { this.l = l; this.r = r; }
+    public int eval { return l.eval() + r.eval(); }
+}
+</code></pre>
+<p>But now, if we want to add the <code>pprint</code> operation, we have to touch
+every class. This is the side of the expression problem that
+functional languages tend to solve better than object oriented
+languages. However, the object oriented programming community has
+devised the visitor pattern as a way to solve this problem:</p>
+<pre><code class="lang-Java">interface ExprVisitor {
+    public void visit(Val v);
+    public void visit(Add a);
 }
 
-<span class="kw">interface</span> Expr {
-    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">accept</span>(ExprVisitor visitor);
+interface Expr {
+    public void accept(ExprVisitor visitor);
 }
 
-<span class="kw">class</span> Val <span class="kw">implements</span> Expr {
-    <span class="kw">private</span> <span class="dt">int</span> v;
-    <span class="kw">public</span> <span class="fu">Val</span>(<span class="dt">int</span> v) { <span class="kw">this</span>.<span class="fu">v</span> = v; }
-    <span class="kw">public</span> <span class="dt">int</span> <span class="fu">val</span>()  { <span class="kw">return</span> v; }
-    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">accept</span>(ExprVisitor visitor) { visitor.<span class="fu">visit</span>(<span class="kw">this</span>); }
+class Val implements Expr {
+    private int v;
+    public Val(int v) { this.v = v; }
+    public int val()  { return v; }
+    public void accept(ExprVisitor visitor) { visitor.visit(this); }
 }
 
-<span class="kw">class</span> Add : <span class="kw">public</span> Expr {
-    <span class="kw">private</span> Expr l;
-    <span class="kw">private</span> Expr r;
-    <span class="kw">public</span> <span class="fu">Add</span>(Expr l, Expr r) { <span class="kw">this</span>.<span class="fu">l</span> = l; <span class="kw">this</span>.<span class="fu">r</span> = r; }
-    <span class="kw">public</span> Expr <span class="fu">l</span>() { <span class="kw">return</span> l; }
-    <span class="kw">public</span> Expr <span class="fu">r</span>() { <span class="kw">return</span> r; }
-    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">accept</span>(ExprVisitor visitor) { visitor.<span class="fu">visit</span>(*<span class="kw">this</span>); }
+class Add : public Expr {
+    private Expr l;
+    private Expr r;
+    public Add(Expr l, Expr r) { this.l = l; this.r = r; }
+    public Expr l() { return l; }
+    public Expr r() { return r; }
+    public void accept(ExprVisitor visitor) { visitor.visit(*this); }
 }
 
-<span class="kw">class</span> EvalVisitor <span class="kw">implements</span> ExprVisitor {
-   <span class="kw">private</span> <span class="dt">int</span> result = <span class="dv">0</span>;
-   <span class="kw">public</span> <span class="dt">int</span> <span class="fu">result</span>() { <span class="kw">return</span> result; }
-   <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Val val) { result = val.<span class="fu">val</span>(); }
-   <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Add add) {
-        add.<span class="fu">l</span>().<span class="fu">accept</span>(<span class="kw">this</span>);
-        <span class="dt">int</span> result_l = result;
-        add.<span class="fu">r</span>().<span class="fu">accept</span>(<span class="kw">this</span>);
+class EvalVisitor implements ExprVisitor {
+   private int result = 0;
+   public int result() { return result; }
+   public void visit(Val val) { result = val.val(); }
+   public void visit(Add add) {
+        add.l().accept(this);
+        int result_l = result;
+        add.r().accept(this);
         result += result_l;
     }
-}</code></pre></div>
-<p>Ok, this is not exactly pretty, but let’s not forget that this is the side of the problem where OO languages are not good at. At least we can pull something of. And now we are in a situation where we can add new operations pretty easily:</p>
-<div class="sourceCode"><pre class="sourceCode Java"><code class="sourceCode java"><span class="kw">class</span> PprintVisitor <span class="kw">extends</span> ExprVisitor {
-    <span class="kw">private</span> String result = <span class="st">&quot;&quot;</span>;
-    <span class="kw">public</span> String <span class="fu">result</span>() { <span class="kw">return</span> result; }
-    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Val val) override { result += val.<span class="fu">val</span>(); }
-    <span class="kw">public</span> <span class="dt">void</span> <span class="fu">visit</span>(Add add) override {
-        add.<span class="fu">l</span>().<span class="fu">visit</span>(<span class="kw">this</span>);
-        result += <span class="st">&quot; + &quot;</span>;
-        add.<span class="fu">r</span>().<span class="fu">visit</span>(<span class="kw">this</span>);
+}
+</code></pre>
+<p>Ok, this is not exactly pretty, but let&#39;s not forget that this is the
+side of the problem where OO languages are not good at. At least we
+can pull something of. And now we are in a situation where we can add
+new operations pretty easily:</p>
+<pre><code class="lang-Java">class PprintVisitor extends ExprVisitor {
+    private String result = &quot;&quot;;
+    public String result() { return result; }
+    public void visit(Val val) override { result += val.val(); }
+    public void visit(Add add) override {
+        add.l().visit(this);
+        result += &quot; + &quot;;
+        add.r().visit(this);
     }
-}</code></pre></div>
-<p>This works, but the Haskell solution is clearly more elegant. Does the visitor pattern have any additional advantages? Well, neither approach solves the expression problem: if we want to add a new variant, say a <code>Mult</code>, then we have to change existing code in both cases.</p>
-<p>I can’t really think of an advantage for the visitor pattern. I’ve thought of two possibilities, <em>default implementations</em> and <em>almost-but-not-quite-solving-the-expression-problem</em>. But then I realized that the first problem is also similarly solvable in the pattern matching approach and that the second problem doesn’t work without loosing type safety or duplicating code:<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
-<ol style="list-style-type: decimal">
-<li><p><em>Default implementations</em> are easy to implement with both approaches: in the visitor pattern defaults can be achieved by inherenting from a visitor with default implementations and overriding only certain methods. In the pattern-matching approach we would match all the constructors where we want to override the defaults and insert a wildcard match for the rest and call the default implementaiton on the bound variable.</p></li>
-<li><p><em>Almost-but-not-quite-solving-the-expression-problem</em>: I first thought that we could use some inheritance based trickery to solve the expression problem at least for new code. But none of these seems to work: If we add a new variant, say <code>Mult</code>, it can’t derive from <code>Expr</code> because then it would have to implement <code>Expr</code>’s accept method, which it can’t sensibly do (because there is no right <code>visit</code> method in <code>ExprVisitor</code>).</p>
-<p>Thus we must introduce a new interface <code>Expr2</code>. <code>Expr2</code> cannot derive from <code>Expr</code>, lest we have the same problem as before. But the old variants don’t derive from <code>Expr2</code>, so this is of limited use. Whichever way we twist or turn it, there is no easy way to solve the expression problem with this pattern.</p></li>
-</ol>
-<p>So, as it stands, I can’t really come up with an advantage for the visitor pattern over pattern matching. If you work in a language without sum types then it is certainly a great workaround, but in a language that does pattern matching seems much both more concise and more efficient.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a></p>
-<div class="footnotes">
-<hr />
+}
+</code></pre>
+<p>This works, but the Haskell solution is clearly more elegant. Does the visitor
+pattern have any additional advantages? Well, neither approach solves the
+expression problem: if we want to add a new variant, say a <code>Mult</code>, then we
+have to change existing code in both cases.</p>
+<p>I can&#39;t really think of an advantage for the visitor pattern. I&#39;ve
+thought of two possibilities, <em>default implementations</em> and
+<em>almost-but-not-quite-solving-the-expression-problem</em>. But then
+I realized that the first problem is also similarly solvable in the
+pattern matching approach and that the second problem doesn&#39;t work
+without loosing type safety or duplicating code:^[Both maintaining
+type safety and not duplicating code are requirements in the expression
+problem.]</p>
 <ol>
-<li id="fn1"><p>These are also known as disjoint union or variant types.<a href="#fnref1">↩</a></p></li>
-<li id="fn2"><p>Both maintaining type safety and not duplicating code are requirements in the expression problem.<a href="#fnref2">↩</a></p></li>
-<li id="fn3"><p>Due to the virtual method calls, which prevent inlining, I would expect the visitor pattern to be much slower than a direct function call.<a href="#fnref3">↩</a></p></li>
+<li><p><em>Default implementations</em> are easy to implement with both
+approaches: in the visitor pattern defaults can be achieved by
+inherenting from a visitor with default implementations and
+overriding only certain methods. In the pattern-matching approach
+we would match all the constructors where we want to override the
+defaults and insert a wildcard match for the rest and call the
+default implementaiton on the bound variable.</p>
+</li>
+<li><p><em>Almost-but-not-quite-solving-the-expression-problem</em>: I first
+thought that we could use some inheritance based trickery to
+solve the expression problem at least for new code. But none
+of these seems to work: If we add a new variant, say <code>Mult</code>,
+it can&#39;t derive from <code>Expr</code> because then it would have to implement
+<code>Expr</code>&#39;s accept method, which it can&#39;t sensibly do (because there
+is no right <code>visit</code> method in <code>ExprVisitor</code>).</p>
+<p>Thus we must introduce a new interface <code>Expr2</code>. <code>Expr2</code> cannot
+derive from <code>Expr</code>, lest we have the same problem as before. But
+the old variants don&#39;t derive from <code>Expr2</code>, so this is of limited
+use. Whichever way we twist or turn it, there is no easy way to
+solve the expression problem with this pattern.</p>
+</li>
 </ol>
-</div>
+<p>So, as it stands, I can&#39;t really come up with an advantage for the
+visitor pattern over pattern matching. If you work in a language
+without sum types then it is certainly a great workaround, but in a
+language that does pattern matching seems much both more concise and
+more efficient.^[Due to the virtual method calls, which prevent
+inlining, I would expect the visitor pattern to be much slower than a
+direct function call.]</p>
+
+
 <hr />
 <div id="disqus_thread"></div>
 <script type="text/javascript">
-  var disqus_shortname = 'paulkoerbitz';
-  (function() {
-  var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-  })();
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 
-      </div>
-      <div class="footer">
-        <p>© Copyright 2013-2016 by Paul Körbitz.</p>
-        <p>
-          Contact me via
-          <a href="http://twitter.com/paulkoer">twitter</a> or
-          <a href="http://github.com/paulkoerbitz">github</a>.
-        </p>
-        <p>Site generated by the great static site generator <a href="http://jaspervdj.be/hakyll">Hakyll</a>.</p>
-        <p><a href="../impressum.html">Impressum</a></p>
-      </div>
-    </div>
-    <script type="text/javascript">
-      var _gaq = _gaq || [];
-      _gaq.push(['_setAccount', 'UA-20755947-1']);
-      _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
-      _gaq.push(['_setAllowLinker', true]);
-      _gaq.push(['_trackPageview']);
-      _gaq.push(['anonymizeIp']);
-      (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-      })();
-    </script>
-  </body>
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>
