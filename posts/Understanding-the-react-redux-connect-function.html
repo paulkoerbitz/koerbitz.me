@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>Understanding the react-redux connection function</title>
     </head>
@@ -26,140 +27,140 @@
 <h1 class="title">Understanding the react-redux connection function</h1>
 <p class="date">published on December 1st, 2016</p>
 
-<p>As described in the <a href="http://koerbitz.me/posts/Trying-and-failing-to-make-redux-connect-type-safe.html">last post</a>, I tried and failed to write a type
+<p class="lang-highlight">As described in the <a href="http://koerbitz.me/posts/Trying-and-failing-to-make-redux-connect-type-safe.html">last post</a>, I tried and failed to write a type
 safe wrapper for the <a href="https://github.com/reactjs/react-redux/blob/master/src/components/connect.js">react-redux</a> connect function. In this post, I
 want to examine this function with a view towards writing a type safe
-replacement in the future. To do so I&#39;m examining the <code>connect.js</code>
+replacement in the future. To do so I'm examining the <code class="hljs arduino"><span class="hljs-built_in">connect</span>.js</code>
 module of react-redux version 4.4.32.</p>
-<p>The first 33 lines are prelude, defining some helper functions and
-objects, nothing too special. I&#39;m not really sure how <code>nextVersion</code>
-helps with code reloading, we&#39;ll hopefully figure this out as we&#39;ll
+<p class="lang-highlight">The first 33 lines are prelude, defining some helper functions and
+objects, nothing too special. I'm not really sure how <code class="hljs ebnf"><span class="hljs-attribute">nextVersion</span></code>
+helps with code reloading, we'll hopefully figure this out as we'll
 move along.</p>
-<pre><code class="lang-{.javascript}">import { Component, createElement } from &#39;react&#39;
-import storeShape from &#39;../utils/storeShape&#39;
-import shallowEqual from &#39;../utils/shallowEqual&#39;
-import wrapActionCreators from &#39;../utils/wrapActionCreators&#39;
-import warning from &#39;../utils/warning&#39;
-import isPlainObject from &#39;lodash/isPlainObject&#39;
-import hoistStatics from &#39;hoist-non-react-statics&#39;
-import invariant from &#39;invariant&#39;
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs"><span class="hljs-keyword">import</span> { Component, createElement } <span class="hljs-keyword">from</span> <span class="hljs-string">'react'</span>
+<span class="hljs-keyword">import</span> storeShape <span class="hljs-keyword">from</span> <span class="hljs-string">'../utils/storeShape'</span>
+<span class="hljs-keyword">import</span> shallowEqual <span class="hljs-keyword">from</span> <span class="hljs-string">'../utils/shallowEqual'</span>
+<span class="hljs-keyword">import</span> wrapActionCreators <span class="hljs-keyword">from</span> <span class="hljs-string">'../utils/wrapActionCreators'</span>
+<span class="hljs-keyword">import</span> warning <span class="hljs-keyword">from</span> <span class="hljs-string">'../utils/warning'</span>
+<span class="hljs-keyword">import</span> isPlainObject <span class="hljs-keyword">from</span> <span class="hljs-string">'lodash/isPlainObject'</span>
+<span class="hljs-keyword">import</span> hoistStatics <span class="hljs-keyword">from</span> <span class="hljs-string">'hoist-non-react-statics'</span>
+<span class="hljs-keyword">import</span> invariant <span class="hljs-keyword">from</span> <span class="hljs-string">'invariant'</span>
 
-const defaultMapStateToProps = state =&gt; ({}) // eslint-disable-line no-unused-vars
-const defaultMapDispatchToProps = dispatch =&gt; ({ dispatch })
-const defaultMergeProps = (stateProps, dispatchProps, parentProps) =&gt; ({
+<span class="hljs-keyword">const</span> defaultMapStateToProps = <span class="hljs-function"><span class="hljs-params">state</span> =&gt;</span> ({}) <span class="hljs-comment">// eslint-disable-line no-unused-vars</span>
+<span class="hljs-keyword">const</span> defaultMapDispatchToProps = <span class="hljs-function"><span class="hljs-params">dispatch</span> =&gt;</span> ({ dispatch })
+<span class="hljs-keyword">const</span> defaultMergeProps = <span class="hljs-function">(<span class="hljs-params">stateProps, dispatchProps, parentProps</span>) =&gt;</span> ({
   ...parentProps,
   ...stateProps,
   ...dispatchProps
 })
 
-function getDisplayName(WrappedComponent) {
-  return WrappedComponent.displayName || WrappedComponent.name || &#39;Component&#39;
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">getDisplayName</span>(<span class="hljs-params">WrappedComponent</span>) </span>{
+  <span class="hljs-keyword">return</span> WrappedComponent.displayName || WrappedComponent.name || <span class="hljs-string">'Component'</span>
 }
 
-let errorObject = { value: null }
-function tryCatch(fn, ctx) {
-  try {
-    return fn.apply(ctx)
-  } catch (e) {
+<span class="hljs-keyword">let</span> errorObject = { <span class="hljs-attr">value</span>: <span class="hljs-literal">null</span> }
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">tryCatch</span>(<span class="hljs-params">fn, ctx</span>) </span>{
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">return</span> fn.apply(ctx)
+  } <span class="hljs-keyword">catch</span> (e) {
     errorObject.value = e
-    return errorObject
+    <span class="hljs-keyword">return</span> errorObject
   }
 }
 
-// Helps track hot reloading.
-let nextVersion = 0
+<span class="hljs-comment">// Helps track hot reloading.</span>
+<span class="hljs-keyword">let</span> nextVersion = <span class="hljs-number">0</span>
 </code></pre>
-<p>Next, we&#39;ll move on to define the <code>connect</code> function, which is
+<p class="lang-highlight">Next, we'll move on to define the <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> function, which is
 obviously the heart of this module. The start of this function
 is again some prelude, where we figure out which parameters
 are passed and assign default values for the ones not present.
 One interesting part is maybe that the presence of <code>mapStateToProps</code>
 determines (via <code>shouldSubscribe</code>) if the new component subscribes
 to store changes or not.</p>
-<pre><code class="lang-{.javascript}">export default function connect(mapStateToProps, mapDispatchToProps, mergeProps, options = {}) {
-  const shouldSubscribe = Boolean(mapStateToProps)
-  const mapState = mapStateToProps || defaultMapStateToProps
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs"><span class="hljs-keyword">export</span> <span class="hljs-keyword">default</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">connect</span>(<span class="hljs-params">mapStateToProps, mapDispatchToProps, mergeProps, options = {}</span>) </span>{
+  <span class="hljs-keyword">const</span> shouldSubscribe = <span class="hljs-built_in">Boolean</span>(mapStateToProps)
+  <span class="hljs-keyword">const</span> mapState = mapStateToProps || defaultMapStateToProps
 
-  let mapDispatch
-  if (typeof mapDispatchToProps === &#39;function&#39;) {
+  <span class="hljs-keyword">let</span> mapDispatch
+  <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> mapDispatchToProps === <span class="hljs-string">'function'</span>) {
     mapDispatch = mapDispatchToProps
-  } else if (!mapDispatchToProps) {
+  } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!mapDispatchToProps) {
     mapDispatch = defaultMapDispatchToProps
-  } else {
+  } <span class="hljs-keyword">else</span> {
     mapDispatch = wrapActionCreators(mapDispatchToProps)
   }
 
-  const finalMergeProps = mergeProps || defaultMergeProps
-  const { pure = true, withRef = false } = options
-  const checkMergedEquals = pure &amp;&amp; finalMergeProps !== defaultMergeProps
+  <span class="hljs-keyword">const</span> finalMergeProps = mergeProps || defaultMergeProps
+  <span class="hljs-keyword">const</span> { pure = <span class="hljs-literal">true</span>, withRef = <span class="hljs-literal">false</span> } = options
+  <span class="hljs-keyword">const</span> checkMergedEquals = pure &amp;&amp; finalMergeProps !== defaultMergeProps
 
-  // Helps track hot reloading.
-  const version = nextVersion++
+  <span class="hljs-comment">// Helps track hot reloading.</span>
+  <span class="hljs-keyword">const</span> version = nextVersion++
 </code></pre>
-<p>The way the <code>connect</code> function should be called is
+<p class="lang-highlight">The way the <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> function should be called is
 <code>connect(mapStateToProps, mapDispatchToProps)(Component)</code>, so it
 must return a function which receives the component which we want
 to wrap. This is what happens on line 55. <code>connectDisplayName</code>
 and <code>checkStateShape</code> are helper variables / functions for
 error messages.</p>
-<p>The <code>computeMergedProps</code> function is basically a wrapper around
+<p class="lang-highlight">The <code class="hljs ebnf"><span class="hljs-attribute">computeMergedProps</span></code> function is basically a wrapper around
 the mergeProps function which is the user defined merged props
 or a default version. The only difference is that it checks in
 non-production environments if the final props object has the
 right shape.</p>
-<pre><code class="lang-{.javascript}">  return function wrapWithConnect(WrappedComponent) {
-    const connectDisplayName = `Connect(${getDisplayName(WrappedComponent)})`
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs">  <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">wrapWithConnect</span>(<span class="hljs-params">WrappedComponent</span>) </span>{
+    <span class="hljs-keyword">const</span> connectDisplayName = <span class="hljs-string">`Connect(<span class="hljs-subst">${getDisplayName(WrappedComponent)}</span>)`</span>
 
-    function checkStateShape(props, methodName) {
-      if (!isPlainObject(props)) {
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">checkStateShape</span>(<span class="hljs-params">props, methodName</span>) </span>{
+      <span class="hljs-keyword">if</span> (!isPlainObject(props)) {
         warning(
-          `${methodName}() in ${connectDisplayName} must return a plain object. ` +
-          `Instead received ${props}.`
+          <span class="hljs-string">`<span class="hljs-subst">${methodName}</span>() in <span class="hljs-subst">${connectDisplayName}</span> must return a plain object. `</span> +
+          <span class="hljs-string">`Instead received <span class="hljs-subst">${props}</span>.`</span>
         )
       }
     }
 
-    function computeMergedProps(stateProps, dispatchProps, parentProps) {
-      const mergedProps = finalMergeProps(stateProps, dispatchProps, parentProps)
-      if (process.env.NODE_ENV !== &#39;production&#39;) {
-        checkStateShape(mergedProps, &#39;mergeProps&#39;)
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">computeMergedProps</span>(<span class="hljs-params">stateProps, dispatchProps, parentProps</span>) </span>{
+      <span class="hljs-keyword">const</span> mergedProps = finalMergeProps(stateProps, dispatchProps, parentProps)
+      <span class="hljs-keyword">if</span> (process.env.NODE_ENV !== <span class="hljs-string">'production'</span>) {
+        checkStateShape(mergedProps, <span class="hljs-string">'mergeProps'</span>)
       }
-      return mergedProps
+      <span class="hljs-keyword">return</span> mergedProps
     }
 </code></pre>
-<p>Now we get into the heart of the matter - creating the new react
-component which we&#39;ll return from the <code>wrapWithConnect</code> function.
+<p class="lang-highlight">Now we get into the heart of the matter - creating the new react
+component which we'll return from the <code class="hljs ebnf"><span class="hljs-attribute">wrapWithConnect</span></code> function.
 The <code>shouldComponentUpdate</code> method already reveals some key information
-about the optimizations that this container performs - we&#39;ll update
-if we&#39;re either not pure, some of our properties have changed or
+about the optimizations that this container performs - we'll update
+if we're either not pure, some of our properties have changed or
 if the store state has changed. Looks sensible ;)</p>
-<pre><code class="lang-{.javascript}">    class Connect extends Component {
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">    <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Connect</span> <span class="hljs-title">extends</span> <span class="hljs-title">Component</span> </span>{
       shouldComponentUpdate() {
-        return !pure || this.haveOwnPropsChanged || this.hasStoreStateChanged
+        <span class="hljs-keyword">return</span> !pure || <span class="hljs-keyword">this</span>.haveOwnPropsChanged || <span class="hljs-keyword">this</span>.hasStoreStateChanged
       }
 
-      constructor(props, context) {
-        super(props, context)
-        this.version = version
-        this.store = props.store || context.store
+      <span class="hljs-keyword">constructor</span>(props, context) {
+        <span class="hljs-keyword">super</span>(props, context)
+        <span class="hljs-keyword">this</span>.version = version
+        <span class="hljs-keyword">this</span>.store = props.store || context.store
 
-        invariant(this.store,
-          `Could not find &quot;store&quot; in either the context or ` +
-          `props of &quot;${connectDisplayName}&quot;. ` +
-          `Either wrap the root component in a &lt;Provider&gt;, ` +
-          `or explicitly pass &quot;store&quot; as a prop to &quot;${connectDisplayName}&quot;.`
+        invariant(<span class="hljs-keyword">this</span>.store,
+          `Could not find <span class="hljs-string">"store"</span> <span class="hljs-keyword">in</span> either the context or ` +
+          `props of <span class="hljs-string">"<span class="hljs-subst">${connectDisplayName}</span>"</span>. ` +
+          `Either wrap the root component <span class="hljs-keyword">in</span> a &lt;Provider&gt;, ` +
+          `or explicitly pass <span class="hljs-string">"store"</span> <span class="hljs-keyword">as</span> a prop to <span class="hljs-string">"<span class="hljs-subst">${connectDisplayName}</span>"</span>.`
         )
 
-        const storeState = this.store.getState()
-        this.state = { storeState }
-        this.clearCache()
+        const storeState = <span class="hljs-keyword">this</span>.store.getState()
+        <span class="hljs-keyword">this</span>.state = { storeState }
+        <span class="hljs-keyword">this</span>.clearCache()
       }
 </code></pre>
-<p>This class contains a lot of methods which are concerned with figuring
-out how to compute the right state from the <code>mapStateToProps</code> and
-<code>mapDispatchToProps</code> methods. Let&#39;s first take a look at <code>computeStateProps</code>
+<p class="lang-highlight">This class contains a lot of methods which are concerned with figuring
+out how to compute the right state from the <code class="hljs ebnf"><span class="hljs-attribute">mapStateToProps</span></code> and
+<code>mapDispatchToProps</code> methods. Let's first take a look at <code>computeStateProps</code>
 and <code>configureFinalMapState</code> as there seems to be a lot going on here.</p>
-<p>The <code>configureFinalMapState</code> method is used to install the
+<p class="lang-highlight">The <code class="hljs ebnf"><span class="hljs-attribute">configureFinalMapState</span></code> method is used to install the
 <code>finalMapStateToProps</code> method and is called from <code>computeStateProps</code>
 if it is not already present. It calls <code>mapState</code> on the state and the
 props, if this returns a function^[This is where I would prefer the
@@ -174,44 +175,44 @@ first call to <code>mapStateToProps</code> is returned. It helps that
 so it is really an initialization method that should run at most
 once. I am not sure if the <em>optimization</em> of only installing the
 <code>finalMapStateToProps</code> property in the <code>computeStateProps</code> method, or
-the different magic cases are really needed, but that&#39;s what we have.</p>
-<p>The only place where <code>computeStateProps</code> is called from is the
+the different magic cases are really needed, but that's what we have.</p>
+<p class="lang-highlight">The only place where <code class="hljs ebnf"><span class="hljs-attribute">computeStateProps</span></code> is called from is the
 <code>updateStatePropsIfNeeded</code> method, we will look at this functions
 purpose in a minute.</p>
-<pre><code class="lang-{.javascript}">      computeStateProps(store, props) {
-        if (!this.finalMapStateToProps) {
-          return this.configureFinalMapState(store, props)
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">      computeStateProps(store, props) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.finalMapStateToProps) {
+          <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.configureFinalMapState(store, props)
         }
 
         const state = store.getState()
-        const stateProps = this.doStatePropsDependOnOwnProps ?
-          this.finalMapStateToProps(state, props) :
-          this.finalMapStateToProps(state)
+        const stateProps = <span class="hljs-keyword">this</span>.doStatePropsDependOnOwnProps ?
+          <span class="hljs-keyword">this</span>.finalMapStateToProps(state, props) :
+          <span class="hljs-keyword">this</span>.finalMapStateToProps(state)
 
-        if (process.env.NODE_ENV !== &#39;production&#39;) {
-          checkStateShape(stateProps, &#39;mapStateToProps&#39;)
+        <span class="hljs-keyword">if</span> (process.env.NODE_ENV !== <span class="hljs-string">'production'</span>) {
+          checkStateShape(stateProps, <span class="hljs-string">'mapStateToProps'</span>)
         }
-        return stateProps
+        <span class="hljs-keyword">return</span> stateProps
       }
 
       configureFinalMapState(store, props) {
         const mappedState = mapState(store.getState(), props)
-        const isFactory = typeof mappedState === &#39;function&#39;
+        const isFactory = typeof mappedState === <span class="hljs-string">'function'</span>
 
-        this.finalMapStateToProps = isFactory ? mappedState : mapState
-        this.doStatePropsDependOnOwnProps = this.finalMapStateToProps.length !== 1
+        <span class="hljs-keyword">this</span>.finalMapStateToProps = isFactory ? mappedState : mapState
+        <span class="hljs-keyword">this</span>.doStatePropsDependOnOwnProps = <span class="hljs-keyword">this</span>.finalMapStateToProps.length !== <span class="hljs-number">1</span>
 
-        if (isFactory) {
-          return this.computeStateProps(store, props)
+        <span class="hljs-keyword">if</span> (isFactory) {
+          <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.computeStateProps(store, props)
         }
 
-        if (process.env.NODE_ENV !== &#39;production&#39;) {
-          checkStateShape(mappedState, &#39;mapStateToProps&#39;)
+        <span class="hljs-keyword">if</span> (process.env.NODE_ENV !== <span class="hljs-string">'production'</span>) {
+          checkStateShape(mappedState, <span class="hljs-string">'mapStateToProps'</span>)
         }
-        return mappedState
+        <span class="hljs-keyword">return</span> mappedState
       }
 </code></pre>
-<p>The <code>computeDispatchProps</code> and <code>configureFinalMapDispatch</code> methods
+<p class="lang-highlight">The <code class="hljs ebnf"><span class="hljs-attribute">computeDispatchProps</span></code> and <code>configureFinalMapDispatch</code> methods
 follow the same pattern as the <code>computeStateProps</code> and
 <code>configureFinalMapStat</code> methods above. In fact, they could almost
 be copied-and-pasted. <code>computeDispatchProps</code> first installs the
@@ -221,138 +222,138 @@ above, the <code>configureFinalMapDispatch</code> method checks if <code>mapDisp
 returns a function and in this case installs that or <code>mapDispatch</code>
 as the <code>finalMapDispatchToProps</code> property. Again, <code>computeDispatchProps</code>
 is only ever called from the <code>updateDispatchPropsIfNeeded</code> method.</p>
-<pre><code class="lang-{.javascript}">      computeDispatchProps(store, props) {
-        if (!this.finalMapDispatchToProps) {
-          return this.configureFinalMapDispatch(store, props)
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">      computeDispatchProps(store, props) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.finalMapDispatchToProps) {
+          <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.configureFinalMapDispatch(store, props)
         }
 
         const { dispatch } = store
-        const dispatchProps = this.doDispatchPropsDependOnOwnProps ?
-          this.finalMapDispatchToProps(dispatch, props) :
-          this.finalMapDispatchToProps(dispatch)
+        const dispatchProps = <span class="hljs-keyword">this</span>.doDispatchPropsDependOnOwnProps ?
+          <span class="hljs-keyword">this</span>.finalMapDispatchToProps(dispatch, props) :
+          <span class="hljs-keyword">this</span>.finalMapDispatchToProps(dispatch)
 
-        if (process.env.NODE_ENV !== &#39;production&#39;) {
-          checkStateShape(dispatchProps, &#39;mapDispatchToProps&#39;)
+        <span class="hljs-keyword">if</span> (process.env.NODE_ENV !== <span class="hljs-string">'production'</span>) {
+          checkStateShape(dispatchProps, <span class="hljs-string">'mapDispatchToProps'</span>)
         }
-        return dispatchProps
+        <span class="hljs-keyword">return</span> dispatchProps
       }
 
       configureFinalMapDispatch(store, props) {
         const mappedDispatch = mapDispatch(store.dispatch, props)
-        const isFactory = typeof mappedDispatch === &#39;function&#39;
+        const isFactory = typeof mappedDispatch === <span class="hljs-string">'function'</span>
 
-        this.finalMapDispatchToProps = isFactory ? mappedDispatch : mapDispatch
-        this.doDispatchPropsDependOnOwnProps = this.finalMapDispatchToProps.length !== 1
+        <span class="hljs-keyword">this</span>.finalMapDispatchToProps = isFactory ? mappedDispatch : mapDispatch
+        <span class="hljs-keyword">this</span>.doDispatchPropsDependOnOwnProps = <span class="hljs-keyword">this</span>.finalMapDispatchToProps.length !== <span class="hljs-number">1</span>
 
-        if (isFactory) {
-          return this.computeDispatchProps(store, props)
+        <span class="hljs-keyword">if</span> (isFactory) {
+          <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.computeDispatchProps(store, props)
         }
 
-        if (process.env.NODE_ENV !== &#39;production&#39;) {
-          checkStateShape(mappedDispatch, &#39;mapDispatchToProps&#39;)
+        <span class="hljs-keyword">if</span> (process.env.NODE_ENV !== <span class="hljs-string">'production'</span>) {
+          checkStateShape(mappedDispatch, <span class="hljs-string">'mapDispatchToProps'</span>)
         }
-        return mappedDispatch
+        <span class="hljs-keyword">return</span> mappedDispatch
       }
 </code></pre>
-<p>Next up are three <code>updateXYZPropsIfNeeded</code> methods, where <code>XYZ</code> is
+<p class="lang-highlight">Next up are three <code class="hljs ebnf"><span class="hljs-attribute">updateXYZPropsIfNeeded</span></code> methods, where <code>XYZ</code> is
 either <code>State</code>, <code>Dispatch</code> or <code>Merge</code>. These always compute the new
 part of the properties, but only update the cached version on the
 object, if they are not <code>shallowEqual</code> to the currently cached
 version.  If no update is performed, they return false, otherwise they
 return true.</p>
-<pre><code class="lang-{.javascript}">      updateStatePropsIfNeeded() {
-        const nextStateProps = this.computeStateProps(this.store, this.props)
-        if (this.stateProps &amp;&amp; shallowEqual(nextStateProps, this.stateProps)) {
-          return false
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">      updateStatePropsIfNeeded() {
+        const nextStateProps = <span class="hljs-keyword">this</span>.computeStateProps(<span class="hljs-keyword">this</span>.store, <span class="hljs-keyword">this</span>.props)
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.stateProps &amp;&amp; shallowEqual(nextStateProps, <span class="hljs-keyword">this</span>.stateProps)) {
+          <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
         }
 
-        this.stateProps = nextStateProps
-        return true
+        <span class="hljs-keyword">this</span>.stateProps = nextStateProps
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
       }
 
       updateDispatchPropsIfNeeded() {
-        const nextDispatchProps = this.computeDispatchProps(this.store, this.props)
-        if (this.dispatchProps &amp;&amp; shallowEqual(nextDispatchProps, this.dispatchProps)) {
-          return false
+        const nextDispatchProps = <span class="hljs-keyword">this</span>.computeDispatchProps(<span class="hljs-keyword">this</span>.store, <span class="hljs-keyword">this</span>.props)
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.dispatchProps &amp;&amp; shallowEqual(nextDispatchProps, <span class="hljs-keyword">this</span>.dispatchProps)) {
+          <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
         }
 
-        this.dispatchProps = nextDispatchProps
-        return true
+        <span class="hljs-keyword">this</span>.dispatchProps = nextDispatchProps
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
       }
 
       updateMergedPropsIfNeeded() {
-        const nextMergedProps = computeMergedProps(this.stateProps, this.dispatchProps, this.props)
-        if (this.mergedProps &amp;&amp; checkMergedEquals &amp;&amp; shallowEqual(nextMergedProps, this.mergedProps)) {
-          return false
+        const nextMergedProps = computeMergedProps(<span class="hljs-keyword">this</span>.stateProps, <span class="hljs-keyword">this</span>.dispatchProps, <span class="hljs-keyword">this</span>.props)
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.mergedProps &amp;&amp; checkMergedEquals &amp;&amp; shallowEqual(nextMergedProps, <span class="hljs-keyword">this</span>.mergedProps)) {
+          <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
         }
 
-        this.mergedProps = nextMergedProps
-        return true
+        <span class="hljs-keyword">this</span>.mergedProps = nextMergedProps
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
       }
 </code></pre>
-<p>The other large block of methods are methods for
-managing subscriptions and the lifecycle <code>componentDidMount</code>,
+<p class="lang-highlight">The other large block of methods are methods for
+managing subscriptions and the lifecycle <code class="hljs ebnf"><span class="hljs-attribute">componentDidMount</span></code>,
 <code>componentWillUnmount</code> and <code>componentWillReceiveProps</code> methods.
 In the later <code>haveOwnPropsChanged</code> is set to true if the
 component is either marked as not pure of if the new props are
 not shallow equal to the old ones.</p>
-<pre><code class="lang-{.javascript}">      isSubscribed() {
-        return typeof this.unsubscribe === &#39;function&#39;
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">      isSubscribed() {
+        <span class="hljs-keyword">return</span> typeof <span class="hljs-keyword">this</span>.unsubscribe === <span class="hljs-string">'function'</span>
       }
 
       trySubscribe() {
-        if (shouldSubscribe &amp;&amp; !this.unsubscribe) {
-          this.unsubscribe = this.store.subscribe(this.handleChange.bind(this))
-          this.handleChange()
+        <span class="hljs-keyword">if</span> (shouldSubscribe &amp;&amp; !<span class="hljs-keyword">this</span>.unsubscribe) {
+          <span class="hljs-keyword">this</span>.unsubscribe = <span class="hljs-keyword">this</span>.store.subscribe(<span class="hljs-keyword">this</span>.handleChange.bind(<span class="hljs-keyword">this</span>))
+          <span class="hljs-keyword">this</span>.handleChange()
         }
       }
 
       tryUnsubscribe() {
-        if (this.unsubscribe) {
-          this.unsubscribe()
-          this.unsubscribe = null
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.unsubscribe) {
+          <span class="hljs-keyword">this</span>.unsubscribe()
+          <span class="hljs-keyword">this</span>.unsubscribe = <span class="hljs-literal">null</span>
         }
       }
 
       componentDidMount() {
-        this.trySubscribe()
+        <span class="hljs-keyword">this</span>.trySubscribe()
       }
 
       componentWillReceiveProps(nextProps) {
-        if (!pure || !shallowEqual(nextProps, this.props)) {
-          this.haveOwnPropsChanged = true
+        <span class="hljs-keyword">if</span> (!pure || !shallowEqual(nextProps, <span class="hljs-keyword">this</span>.props)) {
+          <span class="hljs-keyword">this</span>.haveOwnPropsChanged = <span class="hljs-literal">true</span>
         }
       }
 
       componentWillUnmount() {
-        this.tryUnsubscribe()
-        this.clearCache()
+        <span class="hljs-keyword">this</span>.tryUnsubscribe()
+        <span class="hljs-keyword">this</span>.clearCache()
       }
 </code></pre>
-<p>Net up is the clear cache method, which shows us what is all cached on
+<p class="lang-highlight">Net up is the clear cache method, which shows us what is all cached on
 the new component, there are the three prop types (state, dispatch and
-merge), the final methods to compute them (<code>finalMapDispatchToProps</code>,
+merge), the final methods to compute them (<code class="hljs ebnf"><span class="hljs-attribute">finalMapDispatchToProps</span></code>,
 <code>finalMapStateToProps</code>), the rendered wrapped element
 (<code>renderedElement</code>) and flags indicating if the stateProps or the
-storeProps have changed. I don&#39;t quite understand what
+storeProps have changed. I don't quite understand what
 <code>haveStatePropsBeenPrecalculated</code> and <code>statePropsPrecalculationError</code> do
 quite yet.</p>
-<pre><code class="lang-{.javascript}">      clearCache() {
-        this.dispatchProps = null
-        this.stateProps = null
-        this.mergedProps = null
-        this.haveOwnPropsChanged = true
-        this.hasStoreStateChanged = true
-        this.haveStatePropsBeenPrecalculated = false
-        this.statePropsPrecalculationError = null
-        this.renderedElement = null
-        this.finalMapDispatchToProps = null
-        this.finalMapStateToProps = null
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">      clearCache() {
+        <span class="hljs-keyword">this</span>.dispatchProps = <span class="hljs-literal">null</span>
+        <span class="hljs-keyword">this</span>.stateProps = <span class="hljs-literal">null</span>
+        <span class="hljs-keyword">this</span>.mergedProps = <span class="hljs-literal">null</span>
+        <span class="hljs-keyword">this</span>.haveOwnPropsChanged = <span class="hljs-literal">true</span>
+        <span class="hljs-keyword">this</span>.hasStoreStateChanged = <span class="hljs-literal">true</span>
+        <span class="hljs-keyword">this</span>.haveStatePropsBeenPrecalculated = <span class="hljs-literal">false</span>
+        <span class="hljs-keyword">this</span>.statePropsPrecalculationError = <span class="hljs-literal">null</span>
+        <span class="hljs-keyword">this</span>.renderedElement = <span class="hljs-literal">null</span>
+        <span class="hljs-keyword">this</span>.finalMapDispatchToProps = <span class="hljs-literal">null</span>
+        <span class="hljs-keyword">this</span>.finalMapStateToProps = <span class="hljs-literal">null</span>
       }
 </code></pre>
-<p>The handleChange method is the one that is subscribed to the store,
+<p class="lang-highlight">The handleChange method is the one that is subscribed to the store,
 thus it is being called when the store has changed. When there is not
-<code>this.unsubscribe</code> method, we&#39;re not yet subscribed, so we just
+<code class="hljs kotlin"><span class="hljs-keyword">this</span>.unsubscribe</code> method, we're not yet subscribed, so we just
 return. If the component is <code>pure</code> and the new store state is
 shallowEqual to the old one, we also return. Otherwise, there is
 another optimization if the <code>stateProps</code> do not depend on the
@@ -360,87 +361,87 @@ another optimization if the <code>stateProps</code> do not depend on the
 there is an exception thrown and remember that the state props have
 been precalculated. In any case we set the <code>hasStoreStateChanged</code> flag
 to true and store the new state.</p>
-<pre><code class="lang-{.javascript}">      handleChange() {
-        if (!this.unsubscribe) {
-          return
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">      handleChange() {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.unsubscribe) {
+          <span class="hljs-keyword">return</span>
         }
 
-        const storeState = this.store.getState()
-        const prevStoreState = this.state.storeState
-        if (pure &amp;&amp; prevStoreState === storeState) {
-          return
+        const storeState = <span class="hljs-keyword">this</span>.store.getState()
+        const prevStoreState = <span class="hljs-keyword">this</span>.state.storeState
+        <span class="hljs-keyword">if</span> (pure &amp;&amp; prevStoreState === storeState) {
+          <span class="hljs-keyword">return</span>
         }
 
-        if (pure &amp;&amp; !this.doStatePropsDependOnOwnProps) {
-          const haveStatePropsChanged = tryCatch(this.updateStatePropsIfNeeded, this)
-          if (!haveStatePropsChanged) {
-            return
+        <span class="hljs-keyword">if</span> (pure &amp;&amp; !<span class="hljs-keyword">this</span>.doStatePropsDependOnOwnProps) {
+          const haveStatePropsChanged = tryCatch(<span class="hljs-keyword">this</span>.updateStatePropsIfNeeded, <span class="hljs-keyword">this</span>)
+          <span class="hljs-keyword">if</span> (!haveStatePropsChanged) {
+            <span class="hljs-keyword">return</span>
           }
-          if (haveStatePropsChanged === errorObject) {
-            this.statePropsPrecalculationError = errorObject.value
+          <span class="hljs-keyword">if</span> (haveStatePropsChanged === errorObject) {
+            <span class="hljs-keyword">this</span>.statePropsPrecalculationError = errorObject.value
           }
-          this.haveStatePropsBeenPrecalculated = true
+          <span class="hljs-keyword">this</span>.haveStatePropsBeenPrecalculated = <span class="hljs-literal">true</span>
         }
 
-        this.hasStoreStateChanged = true
-        this.setState({ storeState })
+        <span class="hljs-keyword">this</span>.hasStoreStateChanged = <span class="hljs-literal">true</span>
+        <span class="hljs-keyword">this</span>.setState({ storeState })
       }
 </code></pre>
-<p>Finally, there is a <code>getWrappedInstance</code> convenience method.</p>
-<pre><code class="lang-{.javascript}">      getWrappedInstance() {
+<p class="lang-highlight">Finally, there is a <code class="hljs ebnf"><span class="hljs-attribute">getWrappedInstance</span></code> convenience method.</p>
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs clean">      getWrappedInstance() {
         invariant(withRef,
-          `To access the wrapped instance, you need to specify ` +
-          `{ withRef: true } as the fourth argument of the connect() call.`
+          `To access the wrapped <span class="hljs-keyword">instance</span>, you need to specify ` +
+          `{ withRef: true } <span class="hljs-keyword">as</span> the fourth argument <span class="hljs-keyword">of</span> the connect() call.`
         )
 
         return this.refs.wrappedInstance
       }
 </code></pre>
 <h3 id="the-render-method">The render method</h3>
-<p>Finally the <code>render</code> method is pretty involved, it does far more than
+<p class="lang-highlight">Finally the <code class="hljs ebnf"><span class="hljs-attribute">render</span></code> method is pretty involved, it does far more than
 just rendering the wrapped compoent, it is where all the caching and
 precomputing mechanisms come into play.</p>
-<p>There is a bit (too much(?)) logic in this function, fortunately the
-variable names are really good. I&#39;ve found it the easiest to work my
-way from the bottom up. At the very end, the <code>this.renderedElement</code> is
+<p class="lang-highlight">There is a bit (too much(?)) logic in this function, fortunately the
+variable names are really good. I've found it the easiest to work my
+way from the bottom up. At the very end, the <code class="hljs kotlin"><span class="hljs-keyword">this</span>.renderedElement</code> is
 returned, which is an instance of the wrapped element (with or without
 a ref).</p>
-<pre><code class="lang-{.javascript}">        if (withRef) {
-          this.renderedElement = createElement(WrappedComponent, {
-            ...this.mergedProps,
-            ref: &#39;wrappedInstance&#39;
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">        <span class="hljs-keyword">if</span> (withRef) {
+          <span class="hljs-keyword">this</span>.renderedElement = createElement(WrappedComponent, {
+            ...<span class="hljs-keyword">this</span>.mergedProps,
+            ref: <span class="hljs-string">'wrappedInstance'</span>
           })
-        } else {
-          this.renderedElement = createElement(WrappedComponent,
-            this.mergedProps
+        } <span class="hljs-keyword">else</span> {
+          <span class="hljs-keyword">this</span>.renderedElement = createElement(WrappedComponent,
+            <span class="hljs-keyword">this</span>.mergedProps
           )
         }
 
-        return this.renderedElement
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.renderedElement
 </code></pre>
-<p>However, <code>this.renderedElement</code> is only computed if (a)
+<p class="lang-highlight">However, <code class="hljs kotlin"><span class="hljs-keyword">this</span>.renderedElement</code> is only computed if (a)
 <code>haveMergedPropsChanged</code> is true or (b) <code>renderedElement</code> is falsy (so
 probably undefined).</p>
-<pre><code class="lang-{.javascript}">        if (!haveMergedPropsChanged &amp;&amp; renderedElement) {
-          return renderedElement
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">        <span class="hljs-keyword">if</span> (!haveMergedPropsChanged &amp;&amp; renderedElement) {
+          <span class="hljs-keyword">return</span> renderedElement
         }
 </code></pre>
-<p>Now <code>haveMergedPropsChanged</code> is either false if all of
+<p class="lang-highlight">Now <code class="hljs ebnf"><span class="hljs-attribute">haveMergedPropsChanged</span></code> is either false if all of
 <code>haveStatePropsChanged</code>, <code>haveDispatchPropsChanged</code>
 and<code>haveOwnPropsChanged</code> are false (so no props have changed), or the
 result of the <code>this.updateMergedPropsIfNeeded()</code> method.</p>
-<pre><code class="lang-{.javascript}">        let haveMergedPropsChanged = true
-        if (
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs nix">        <span class="hljs-keyword">let</span> <span class="hljs-attr">haveMergedPropsChanged</span> = <span class="hljs-literal">true</span>
+        <span class="hljs-keyword">if</span> (
           haveStatePropsChanged ||
           haveDispatchPropsChanged ||
           haveOwnPropsChanged
         ) {
-          haveMergedPropsChanged = this.updateMergedPropsIfNeeded()
-        } else {
-          haveMergedPropsChanged = false
+          <span class="hljs-attr">haveMergedPropsChanged</span> = this.updateMergedPropsIfNeeded()
+        } <span class="hljs-keyword">else</span> {
+          <span class="hljs-attr">haveMergedPropsChanged</span> = <span class="hljs-literal">false</span>
         }
 </code></pre>
-<p><code>haveStatePropsChanged</code> is true if either
+<p class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">haveStatePropsChanged</span></code> is true if either
 <code>haveStatePropsBeenPrecalculated</code> is true or if
 <code>shouldUpdateStateProps</code> is true and <code>this.updateStatePropsIfNeeded()</code>
 returns true. <code>shouldUpdateStateProps</code> is true if either (a) the
@@ -449,89 +450,89 @@ component is not pure or there is not rendered element yet, (b)
 and <code>this.doStatePropsDependOnOwnProps</code> is. Similar conditions apply
 to <code>shouldUpdateDispatchProps</code>, except that the <code>hasStoreStateChanged</code>
 condition is not checked.</p>
-<p>Now, another interesting thing that is going on in the render method is
+<p class="lang-highlight">Now, another interesting thing that is going on in the render method is
 that it sets a number of instance variables which control the caching
-behavior, namely <code>haveOwnPropsChanged</code>, <code>hasStoreStateChanged</code>,
+behavior, namely <code class="hljs ebnf"><span class="hljs-attribute">haveOwnPropsChanged</span></code>, <code>hasStoreStateChanged</code>,
 <code>haveStatePropsBeenPrecalculated</code>.  After render has run, these are
 set to <code>false</code>, so that the respective components would not be
 recalculated on a second run of <code>render</code>. Other life cycle
 methods turn these instance variables to true again, this
 is essential for only recomputing the parts of the properties
 which are acutally needed.</p>
-<p>Now that we have examined the full render method, let&#39;s see
+<p>Now that we have examined the full render method, let's see
 it once more from top to bottom in all of its glory:</p>
-<pre><code class="lang-{.javascript}">      render() {
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">      render() {
         const {
           haveOwnPropsChanged,
           hasStoreStateChanged,
           haveStatePropsBeenPrecalculated,
           statePropsPrecalculationError,
           renderedElement
-        } = this
+        } = <span class="hljs-keyword">this</span>
 
-        this.haveOwnPropsChanged = false
-        this.hasStoreStateChanged = false
-        this.haveStatePropsBeenPrecalculated = false
-        this.statePropsPrecalculationError = null
+        <span class="hljs-keyword">this</span>.haveOwnPropsChanged = <span class="hljs-literal">false</span>
+        <span class="hljs-keyword">this</span>.hasStoreStateChanged = <span class="hljs-literal">false</span>
+        <span class="hljs-keyword">this</span>.haveStatePropsBeenPrecalculated = <span class="hljs-literal">false</span>
+        <span class="hljs-keyword">this</span>.statePropsPrecalculationError = <span class="hljs-literal">null</span>
 
-        if (statePropsPrecalculationError) {
-          throw statePropsPrecalculationError
+        <span class="hljs-keyword">if</span> (statePropsPrecalculationError) {
+          <span class="hljs-keyword">throw</span> statePropsPrecalculationError
         }
 
-        let shouldUpdateStateProps = true
-        let shouldUpdateDispatchProps = true
-        if (pure &amp;&amp; renderedElement) {
+        let shouldUpdateStateProps = <span class="hljs-literal">true</span>
+        let shouldUpdateDispatchProps = <span class="hljs-literal">true</span>
+        <span class="hljs-keyword">if</span> (pure &amp;&amp; renderedElement) {
           shouldUpdateStateProps = hasStoreStateChanged || (
-            haveOwnPropsChanged &amp;&amp; this.doStatePropsDependOnOwnProps
+            haveOwnPropsChanged &amp;&amp; <span class="hljs-keyword">this</span>.doStatePropsDependOnOwnProps
           )
           shouldUpdateDispatchProps =
-            haveOwnPropsChanged &amp;&amp; this.doDispatchPropsDependOnOwnProps
+            haveOwnPropsChanged &amp;&amp; <span class="hljs-keyword">this</span>.doDispatchPropsDependOnOwnProps
         }
 
-        let haveStatePropsChanged = false
-        let haveDispatchPropsChanged = false
-        if (haveStatePropsBeenPrecalculated) {
-          haveStatePropsChanged = true
-        } else if (shouldUpdateStateProps) {
-          haveStatePropsChanged = this.updateStatePropsIfNeeded()
+        let haveStatePropsChanged = <span class="hljs-literal">false</span>
+        let haveDispatchPropsChanged = <span class="hljs-literal">false</span>
+        <span class="hljs-keyword">if</span> (haveStatePropsBeenPrecalculated) {
+          haveStatePropsChanged = <span class="hljs-literal">true</span>
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (shouldUpdateStateProps) {
+          haveStatePropsChanged = <span class="hljs-keyword">this</span>.updateStatePropsIfNeeded()
         }
-        if (shouldUpdateDispatchProps) {
-          haveDispatchPropsChanged = this.updateDispatchPropsIfNeeded()
+        <span class="hljs-keyword">if</span> (shouldUpdateDispatchProps) {
+          haveDispatchPropsChanged = <span class="hljs-keyword">this</span>.updateDispatchPropsIfNeeded()
         }
 
-        let haveMergedPropsChanged = true
-        if (
+        let haveMergedPropsChanged = <span class="hljs-literal">true</span>
+        <span class="hljs-keyword">if</span> (
           haveStatePropsChanged ||
           haveDispatchPropsChanged ||
           haveOwnPropsChanged
         ) {
-          haveMergedPropsChanged = this.updateMergedPropsIfNeeded()
-        } else {
-          haveMergedPropsChanged = false
+          haveMergedPropsChanged = <span class="hljs-keyword">this</span>.updateMergedPropsIfNeeded()
+        } <span class="hljs-keyword">else</span> {
+          haveMergedPropsChanged = <span class="hljs-literal">false</span>
         }
 
-        if (!haveMergedPropsChanged &amp;&amp; renderedElement) {
-          return renderedElement
+        <span class="hljs-keyword">if</span> (!haveMergedPropsChanged &amp;&amp; renderedElement) {
+          <span class="hljs-keyword">return</span> renderedElement
         }
 
-        if (withRef) {
-          this.renderedElement = createElement(WrappedComponent, {
-            ...this.mergedProps,
-            ref: &#39;wrappedInstance&#39;
+        <span class="hljs-keyword">if</span> (withRef) {
+          <span class="hljs-keyword">this</span>.renderedElement = createElement(WrappedComponent, {
+            ...<span class="hljs-keyword">this</span>.mergedProps,
+            ref: <span class="hljs-string">'wrappedInstance'</span>
           })
-        } else {
-          this.renderedElement = createElement(WrappedComponent,
-            this.mergedProps
+        } <span class="hljs-keyword">else</span> {
+          <span class="hljs-keyword">this</span>.renderedElement = createElement(WrappedComponent,
+            <span class="hljs-keyword">this</span>.mergedProps
           )
         }
 
-        return this.renderedElement
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.renderedElement
       }
     }
 </code></pre>
-<p>Finally, we have some additional properties installed on the
-Connect class (<code>static</code> properties in OO terms)</p>
-<pre><code class="lang-{.javascript}">    Connect.displayName = connectDisplayName
+<p class="lang-highlight">Finally, we have some additional properties installed on the
+Connect class (<code class="hljs actionscript"><span class="hljs-keyword">static</span></code> properties in OO terms)</p>
+<pre class="lang-highlight"><code class="lang-{.javascript} hljs kotlin">    Connect.displayName = connectDisplayName
     Connect.WrappedComponent = WrappedComponent
     Connect.contextTypes = {
       store: storeShape
@@ -540,24 +541,24 @@ Connect class (<code>static</code> properties in OO terms)</p>
       store: storeShape
     }
 
-    if (process.env.NODE_ENV !== &#39;production&#39;) {
+    <span class="hljs-keyword">if</span> (process.env.NODE_ENV !== <span class="hljs-string">'production'</span>) {
       Connect.prototype.componentWillUpdate = function componentWillUpdate() {
-        if (this.version === version) {
-          return
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.version === version) {
+          <span class="hljs-keyword">return</span>
         }
 
-        // We are hot reloading!
-        this.version = version
-        this.trySubscribe()
-        this.clearCache()
+        <span class="hljs-comment">// We are hot reloading!</span>
+        <span class="hljs-keyword">this</span>.version = version
+        <span class="hljs-keyword">this</span>.trySubscribe()
+        <span class="hljs-keyword">this</span>.clearCache()
       }
     }
 
-    return hoistStatics(Connect, WrappedComponent)
+    <span class="hljs-keyword">return</span> hoistStatics(Connect, WrappedComponent)
   }
 </code></pre>
 <h2 id="conclusion-next-steps">Conclusion &amp; next steps</h2>
-<p>OK, we&#39;ve seen that the generated component is somewhat involved and
+<p>OK, we've seen that the generated component is somewhat involved and
 has some fancy optimizations going on. Splitting the creation of the
 properties of the wrapped component into external props, properties
 computed from the state and properties computed from the dispatch

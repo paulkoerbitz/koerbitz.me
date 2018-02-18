@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>A Clojure Macro to Generate Functions</title>
     </head>
@@ -28,16 +29,16 @@
 
 <p>Prompted by <a href="&quot;http://stackoverflow.com/q/7852351/346587&quot;">this question</a>
 on Stackoverflow I thought a little bit about macros that generate functions. Here is what I came up with:</p>
-<pre><code class="lang-{.Clojure}">(defmacro make-placeholders [n]
-  `(map eval
-        &#39;~(for [cntr (range 0 n)]
-           `(defn ~(symbol (str &quot;_&quot; cntr))
-               {:placeholder true} [&amp; args] (nth args ~cntr)))))
+<pre class="lang-highlight"><code class="lang-{.Clojure} hljs clojure">(<span class="hljs-name"><span class="hljs-builtin-name">defmacro</span></span> make-placeholders [n]
+  `(<span class="hljs-name"><span class="hljs-builtin-name">map</span></span> eval
+        '~(<span class="hljs-name"><span class="hljs-builtin-name">for</span></span> [cntr (<span class="hljs-name"><span class="hljs-builtin-name">range</span></span> <span class="hljs-number">0</span> n)]
+           `(<span class="hljs-name"><span class="hljs-builtin-name">defn</span></span> ~(<span class="hljs-name"><span class="hljs-builtin-name">symbol</span></span> (<span class="hljs-name"><span class="hljs-builtin-name">str</span></span> <span class="hljs-string">"_"</span> cntr))
+               {<span class="hljs-symbol">:placeholder</span> <span class="hljs-literal">true</span>} [&amp; args] (<span class="hljs-name"><span class="hljs-builtin-name">nth</span></span> args ~cntr)))))
 </code></pre>
-<p>This is macro generates functions <code>_0 .. _n-1</code> that calls nth on the list
+<p class="lang-highlight">This is macro generates functions <code class="hljs clean">_0 .. _n<span class="hljs-number">-1</span></code> that calls nth on the list
 of the arguments following it, so <code>(_2 1 2 3 4)</code> returns 3. I have not
-made up my mind if it is really a good idea to do this, but for now it&#39;s
- a clever hack - maybe I&#39;ll use it until I discover why it&#39;s a bad
+made up my mind if it is really a good idea to do this, but for now it's
+ a clever hack - maybe I'll use it until I discover why it's a bad
 idea...</p>
 
 

@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>Sum Types, Visitors, and the Expression Problem</title>
     </head>
@@ -26,7 +27,7 @@
 <h1 class="title">Sum Types, Visitors, and the Expression Problem</h1>
 <p class="date">published on January 10th, 2014</p>
 
-<p>I&#39;ve heard that <em>the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> is just a poor way of getting the
+<p>I've heard that <em>the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> is just a poor way of getting the
 benefit of sum types</em>^[These are also known as disjoint union or
 variant types.] in functional programming circles several times. I
 must admit that I never had completely thought this through, but I was
@@ -44,112 +45,112 @@ safety.</p>
 <p>To make this a bit more concrete, consider a very simple expression
 languages consisting of numbers and addition as an example (no post on
 this topic can do without one!). We have two variants of expressions,
-(1) numbers and (2) addition. Let&#39;s assume that we want to compute the
+(1) numbers and (2) addition. Let's assume that we want to compute the
 values represented by an expression as a first operation.</p>
 <p>In Haskell a straightforward way of solving this problem is as follows</p>
-<pre><code class="lang-Haskell">data Expr = Val Int | Add Expr Expr
+<pre class="lang-highlight"><code class="lang-Haskell hljs"><span class="hljs-class"><span class="hljs-keyword">data</span> <span class="hljs-type">Expr</span> = <span class="hljs-type">Val</span> <span class="hljs-type">Int</span> | <span class="hljs-type">Add</span> <span class="hljs-type">Expr</span> <span class="hljs-type">Expr</span></span>
 
-eval :: Expr -&gt; Int
-eval (Val i)     = i
-eval (Add e1 e2) = eval e1 + eval e2
+<span class="hljs-title">eval</span> :: <span class="hljs-type">Expr</span> -&gt; <span class="hljs-type">Int</span>
+<span class="hljs-title">eval</span> (<span class="hljs-type">Val</span> i)     = i
+<span class="hljs-title">eval</span> (<span class="hljs-type">Add</span> e1 e2) = eval e1 + eval e2
 </code></pre>
-<p>If you&#39;re not familiar with Haskell, the first line defines a data
-type with two variants, it can either be a <code>Val</code>, which holds an
+<p class="lang-highlight">If you're not familiar with Haskell, the first line defines a data
+type with two variants, it can either be a <code class="hljs ebnf"><span class="hljs-attribute">Val</span></code>, which holds an
 <code>Int</code>, or it is an <code>Add</code> which holds two expressions. <code>Val</code> and <code>Add</code>
 are called constructors of <code>Expr</code>. The <code>eval</code> function pattern-matches
 and handles each case.</p>
 <p>Now imagine that we do not only want to evaluate expressions but also
 pretty-print them. Adding operations is easy in Haskell, we just
 write a new function:</p>
-<pre><code class="lang-Haskell">pprint :: Expr -&gt; String
-pprint (Val i)     = show i
-pprint (Add e1 e2) = pprint e1 ++ &quot; + &quot; ++ pprint e2
+<pre class="lang-highlight"><code class="lang-Haskell hljs"><span class="hljs-title">pprint</span> :: <span class="hljs-type">Expr</span> -&gt; <span class="hljs-type">String</span>
+<span class="hljs-title">pprint</span> (<span class="hljs-type">Val</span> i)     = show i
+<span class="hljs-title">pprint</span> (<span class="hljs-type">Add</span> e1 e2) = pprint e1 ++ <span class="hljs-string">" + "</span> ++ pprint e2
 </code></pre>
-<p>In Java we might achieve something similar by introducing an <code>Expr</code>
+<p class="lang-highlight">In Java we might achieve something similar by introducing an <code class="hljs ebnf"><span class="hljs-attribute">Expr</span></code>
 class:</p>
-<pre><code class="lang-Java">interface Expr {
-    public int eval();
+<pre class="lang-highlight"><code class="lang-Java hljs"><span class="hljs-class"><span class="hljs-keyword">interface</span> <span class="hljs-title">Expr</span> </span>{
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">int</span> <span class="hljs-title">eval</span><span class="hljs-params">()</span></span>;
 }
 
-class Val implements Expr {
-    private final int v;
-    public Val(int v) { this.v = v; }
-    public int eval { return v; }
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Val</span> <span class="hljs-keyword">implements</span> <span class="hljs-title">Expr</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> <span class="hljs-keyword">int</span> v;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">Val</span><span class="hljs-params">(<span class="hljs-keyword">int</span> v)</span> </span>{ <span class="hljs-keyword">this</span>.v = v; }
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">int</span> eval { <span class="hljs-keyword">return</span> v; }
 }
 
-class Add implements Expr {
-    private final Expr l;
-    private final Expr r;
-    public Add(Expr l, Expr r) { this.l = l; this.r = r; }
-    public int eval { return l.eval() + r.eval(); }
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Add</span> <span class="hljs-keyword">implements</span> <span class="hljs-title">Expr</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> Expr l;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> Expr r;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">Add</span><span class="hljs-params">(Expr l, Expr r)</span> </span>{ <span class="hljs-keyword">this</span>.l = l; <span class="hljs-keyword">this</span>.r = r; }
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">int</span> eval { <span class="hljs-keyword">return</span> l.eval() + r.eval(); }
 }
 </code></pre>
-<p>But now, if we want to add the <code>pprint</code> operation, we have to touch
+<p class="lang-highlight">But now, if we want to add the <code class="hljs ebnf"><span class="hljs-attribute">pprint</span></code> operation, we have to touch
 every class. This is the side of the expression problem that
 functional languages tend to solve better than object oriented
 languages. However, the object oriented programming community has
 devised the visitor pattern as a way to solve this problem:</p>
-<pre><code class="lang-Java">interface ExprVisitor {
-    public void visit(Val v);
-    public void visit(Add a);
+<pre class="lang-highlight"><code class="lang-Java hljs"><span class="hljs-class"><span class="hljs-keyword">interface</span> <span class="hljs-title">ExprVisitor</span> </span>{
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">visit</span><span class="hljs-params">(Val v)</span></span>;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">visit</span><span class="hljs-params">(Add a)</span></span>;
 }
 
-interface Expr {
-    public void accept(ExprVisitor visitor);
+<span class="hljs-class"><span class="hljs-keyword">interface</span> <span class="hljs-title">Expr</span> </span>{
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">accept</span><span class="hljs-params">(ExprVisitor visitor)</span></span>;
 }
 
-class Val implements Expr {
-    private int v;
-    public Val(int v) { this.v = v; }
-    public int val()  { return v; }
-    public void accept(ExprVisitor visitor) { visitor.visit(this); }
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Val</span> <span class="hljs-keyword">implements</span> <span class="hljs-title">Expr</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">int</span> v;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">Val</span><span class="hljs-params">(<span class="hljs-keyword">int</span> v)</span> </span>{ <span class="hljs-keyword">this</span>.v = v; }
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">int</span> <span class="hljs-title">val</span><span class="hljs-params">()</span>  </span>{ <span class="hljs-keyword">return</span> v; }
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">accept</span><span class="hljs-params">(ExprVisitor visitor)</span> </span>{ visitor.visit(<span class="hljs-keyword">this</span>); }
 }
 
-class Add : public Expr {
-    private Expr l;
-    private Expr r;
-    public Add(Expr l, Expr r) { this.l = l; this.r = r; }
-    public Expr l() { return l; }
-    public Expr r() { return r; }
-    public void accept(ExprVisitor visitor) { visitor.visit(*this); }
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Add</span> : <span class="hljs-title">public</span> <span class="hljs-title">Expr</span> </span>{
+    <span class="hljs-keyword">private</span> Expr l;
+    <span class="hljs-keyword">private</span> Expr r;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">Add</span><span class="hljs-params">(Expr l, Expr r)</span> </span>{ <span class="hljs-keyword">this</span>.l = l; <span class="hljs-keyword">this</span>.r = r; }
+    <span class="hljs-function"><span class="hljs-keyword">public</span> Expr <span class="hljs-title">l</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> l; }
+    <span class="hljs-function"><span class="hljs-keyword">public</span> Expr <span class="hljs-title">r</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> r; }
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">accept</span><span class="hljs-params">(ExprVisitor visitor)</span> </span>{ visitor.visit(*<span class="hljs-keyword">this</span>); }
 }
 
-class EvalVisitor implements ExprVisitor {
-   private int result = 0;
-   public int result() { return result; }
-   public void visit(Val val) { result = val.val(); }
-   public void visit(Add add) {
-        add.l().accept(this);
-        int result_l = result;
-        add.r().accept(this);
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">EvalVisitor</span> <span class="hljs-keyword">implements</span> <span class="hljs-title">ExprVisitor</span> </span>{
+   <span class="hljs-keyword">private</span> <span class="hljs-keyword">int</span> result = <span class="hljs-number">0</span>;
+   <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">int</span> <span class="hljs-title">result</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> result; }
+   <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">visit</span><span class="hljs-params">(Val val)</span> </span>{ result = val.val(); }
+   <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">visit</span><span class="hljs-params">(Add add)</span> </span>{
+        add.l().accept(<span class="hljs-keyword">this</span>);
+        <span class="hljs-keyword">int</span> result_l = result;
+        add.r().accept(<span class="hljs-keyword">this</span>);
         result += result_l;
     }
 }
 </code></pre>
-<p>Ok, this is not exactly pretty, but let&#39;s not forget that this is the
+<p>Ok, this is not exactly pretty, but let's not forget that this is the
 side of the problem where OO languages are not good at. At least we
 can pull something of. And now we are in a situation where we can add
 new operations pretty easily:</p>
-<pre><code class="lang-Java">class PprintVisitor extends ExprVisitor {
-    private String result = &quot;&quot;;
-    public String result() { return result; }
-    public void visit(Val val) override { result += val.val(); }
-    public void visit(Add add) override {
-        add.l().visit(this);
-        result += &quot; + &quot;;
-        add.r().visit(this);
+<pre class="lang-highlight"><code class="lang-Java hljs"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">PprintVisitor</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">ExprVisitor</span> </span>{
+    <span class="hljs-keyword">private</span> String result = <span class="hljs-string">""</span>;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> String <span class="hljs-title">result</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> result; }
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">visit</span><span class="hljs-params">(Val val)</span> override </span>{ result += val.val(); }
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">visit</span><span class="hljs-params">(Add add)</span> override </span>{
+        add.l().visit(<span class="hljs-keyword">this</span>);
+        result += <span class="hljs-string">" + "</span>;
+        add.r().visit(<span class="hljs-keyword">this</span>);
     }
 }
 </code></pre>
-<p>This works, but the Haskell solution is clearly more elegant. Does the visitor
+<p class="lang-highlight">This works, but the Haskell solution is clearly more elegant. Does the visitor
 pattern have any additional advantages? Well, neither approach solves the
-expression problem: if we want to add a new variant, say a <code>Mult</code>, then we
+expression problem: if we want to add a new variant, say a <code class="hljs ebnf"><span class="hljs-attribute">Mult</span></code>, then we
 have to change existing code in both cases.</p>
-<p>I can&#39;t really think of an advantage for the visitor pattern. I&#39;ve
+<p>I can't really think of an advantage for the visitor pattern. I've
 thought of two possibilities, <em>default implementations</em> and
 <em>almost-but-not-quite-solving-the-expression-problem</em>. But then
 I realized that the first problem is also similarly solvable in the
-pattern matching approach and that the second problem doesn&#39;t work
+pattern matching approach and that the second problem doesn't work
 without loosing type safety or duplicating code:^[Both maintaining
 type safety and not duplicating code are requirements in the expression
 problem.]</p>
@@ -162,21 +163,21 @@ we would match all the constructors where we want to override the
 defaults and insert a wildcard match for the rest and call the
 default implementaiton on the bound variable.</p>
 </li>
-<li><p><em>Almost-but-not-quite-solving-the-expression-problem</em>: I first
+<li><p class="lang-highlight"><em>Almost-but-not-quite-solving-the-expression-problem</em>: I first
 thought that we could use some inheritance based trickery to
 solve the expression problem at least for new code. But none
-of these seems to work: If we add a new variant, say <code>Mult</code>,
-it can&#39;t derive from <code>Expr</code> because then it would have to implement
-<code>Expr</code>&#39;s accept method, which it can&#39;t sensibly do (because there
+of these seems to work: If we add a new variant, say <code class="hljs ebnf"><span class="hljs-attribute">Mult</span></code>,
+it can't derive from <code>Expr</code> because then it would have to implement
+<code>Expr</code>'s accept method, which it can't sensibly do (because there
 is no right <code>visit</code> method in <code>ExprVisitor</code>).</p>
-<p>Thus we must introduce a new interface <code>Expr2</code>. <code>Expr2</code> cannot
+<p class="lang-highlight">Thus we must introduce a new interface <code class="hljs">Expr2</code>. <code>Expr2</code> cannot
 derive from <code>Expr</code>, lest we have the same problem as before. But
-the old variants don&#39;t derive from <code>Expr2</code>, so this is of limited
+the old variants don't derive from <code>Expr2</code>, so this is of limited
 use. Whichever way we twist or turn it, there is no easy way to
 solve the expression problem with this pattern.</p>
 </li>
 </ol>
-<p>So, as it stands, I can&#39;t really come up with an advantage for the
+<p>So, as it stands, I can't really come up with an advantage for the
 visitor pattern over pattern matching. If you work in a language
 without sum types then it is certainly a great workaround, but in a
 language that does pattern matching seems much both more concise and

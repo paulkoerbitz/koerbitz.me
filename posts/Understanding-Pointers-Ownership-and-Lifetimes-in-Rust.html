@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>Understanding Pointers, Ownership, and Lifetimes in Rust</title>
     </head>
@@ -43,7 +44,7 @@ managed manually (D, Nimrod) or do not offer this possibility at all
 (Go). Therefore, these languages are not well equiped for applications
 which require full control over memory, which is the use case
 where C++ shines.</p>
-<p>I think it&#39;s great that C++ finally gets some real competition. Even
+<p>I think it's great that C++ finally gets some real competition. Even
 among C++ fans, few will deny that compatibility with C, decades of
 language evolution, and accidental language features have created a
 very complex language that is extremely difficult to master. I think
@@ -55,7 +56,7 @@ that language.</p>
 to heap (well deserved) praise onto the Rust designers and
 implementers. I want to talk about the ownership semantics in Rust and
 how they interact with the different type of pointers in Rust.</p>
-<h2 id="rust-s-guiding-principles">Rust&#39;s Guiding Principles</h2>
+<h2 id="rust-s-guiding-principles">Rust's Guiding Principles</h2>
 <p>To me, understanding something means discovering and understanding the
 reasons and guiding principles behind the things on the surface. From
 these, it should be easy to reason about other things and quickly
@@ -85,60 +86,60 @@ sane ownership semantics through a number of different pointers.
 There are several types of pointers in Rust: the most important are
 <em>boxes or owned pointers</em> and <em>references or borrowed pointers</em>.
 There are also different kinds of reference counted pointers, but
-these are for more complicated situations which I won&#39;t get into in
+these are for more complicated situations which I won't get into in
 this post.  Therefore, this post will focus on owned and borrowed
 pointers.</p>
 <h3 id="-boxes-owned-pointers-"><em>Boxes</em> / <em>Owned Pointers</em></h3>
-<p>A <em>box</em> or <em>owned pointer</em> in Rust has ownership over a certain part
+<p class="lang-highlight">A <em>box</em> or <em>owned pointer</em> in Rust has ownership over a certain part
 of the heap. When it goes out of scope it deletes that part of the
 heap.  This achieves <em>manual memory management</em>: the programmer has
 control over when memory is released by controlling when an owned
 pointer goes out of scope. A box is a datatype, parameterized by the
-type that it boxes, so <code>Box&lt;i32&gt;</code> is the type of an owned pointer to
+type that it boxes, so <code class="hljs rust"><span class="hljs-built_in">Box</span>&lt;<span class="hljs-built_in">i32</span>&gt;</code> is the type of an owned pointer to
 an <code>i32</code> and <code>Box::new(3)</code> is the literal notation for allocating
 space on the heap for an i32, putting 3 into it and handling back an
 owned pointer. Like all pointers, boxes are derferenced by prefixing
 them with <code>*</code>. Here is a bit of a contrived example:</p>
-<pre><code class="lang-{.rust}">// The type annotations in the let statements in this example
-// (e.g. &#39;: Box&lt;int&gt;&#39;) are not necessary and only for clarity
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-comment">// The type annotations in the let statements in this example</span>
+<span class="hljs-comment">// (e.g. ': Box&lt;int&gt;') are not necessary and only for clarity</span>
 
-fn owned_seven() -&gt; Box&lt;i32&gt; {
-    // Allocate an i32 with value &#39;3&#39; on the heap, &#39;three&#39; points to it
-    let three : Box&lt;i32&gt; = Box::new(3);
-    // The same for four
-    let four : Box&lt;i32&gt; = Box::new(4);
-    // Dereference both &#39;three&#39; and &#39;four&#39;, add them, store the result
-    // in a newly allocated variable on the heap
-    Box::new(*three + *four)
-}   // &lt;-- &#39;three&#39; and &#39;four&#39; go out of scope, so the memory they own
-    //     is released. The memory of the return value is owned by the
-    //     return value so it survives the function call.
-    // Note: returning a pointer from a function is considered an anti-
-    // pattern in rust. It is prefered to return a value so the caller
-    // can decide what he wants to do with it. This is done for illustration
-    // purposes here.
+<span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">owned_seven</span></span>() -&gt; <span class="hljs-built_in">Box</span>&lt;<span class="hljs-built_in">i32</span>&gt; {
+    <span class="hljs-comment">// Allocate an i32 with value '3' on the heap, 'three' points to it</span>
+    <span class="hljs-keyword">let</span> three : <span class="hljs-built_in">Box</span>&lt;<span class="hljs-built_in">i32</span>&gt; = <span class="hljs-built_in">Box</span>::new(<span class="hljs-number">3</span>);
+    <span class="hljs-comment">// The same for four</span>
+    <span class="hljs-keyword">let</span> four : <span class="hljs-built_in">Box</span>&lt;<span class="hljs-built_in">i32</span>&gt; = <span class="hljs-built_in">Box</span>::new(<span class="hljs-number">4</span>);
+    <span class="hljs-comment">// Dereference both 'three' and 'four', add them, store the result</span>
+    <span class="hljs-comment">// in a newly allocated variable on the heap</span>
+    <span class="hljs-built_in">Box</span>::new(*three + *four)
+}   <span class="hljs-comment">// &lt;-- 'three' and 'four' go out of scope, so the memory they own</span>
+    <span class="hljs-comment">//     is released. The memory of the return value is owned by the</span>
+    <span class="hljs-comment">//     return value so it survives the function call.</span>
+    <span class="hljs-comment">// Note: returning a pointer from a function is considered an anti-</span>
+    <span class="hljs-comment">// pattern in rust. It is prefered to return a value so the caller</span>
+    <span class="hljs-comment">// can decide what he wants to do with it. This is done for illustration</span>
+    <span class="hljs-comment">// purposes here.</span>
 
 
-fn main() {
-    let seven : Box&lt;i32&gt; = owned_seven();
-    println!(&quot;3 + 4 = {}&quot;, *seven);
-}   // &lt;-- seven goes out of scope and the memory it points to is
-    //     deallocated here
+<span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">main</span></span>() {
+    <span class="hljs-keyword">let</span> seven : <span class="hljs-built_in">Box</span>&lt;<span class="hljs-built_in">i32</span>&gt; = owned_seven();
+    <span class="hljs-built_in">println!</span>(<span class="hljs-string">"3 + 4 = {}"</span>, *seven);
+}   <span class="hljs-comment">// &lt;-- seven goes out of scope and the memory it points to is</span>
+    <span class="hljs-comment">//     deallocated here</span>
 </code></pre>
 <h3 id="-referneces-borrowed-pointers-"><em>Referneces</em> / <em>Borrowed Pointers</em></h3>
-<p>Having only owned pointers would make writing many programs difficult:
+<p class="lang-highlight">Having only owned pointers would make writing many programs difficult:
 there could only ever be one reference to every <em>thing</em>. Fortunately,
 Rust offers another type of pointer called a <em>reference</em> or <em>borrowed
 pointer</em>. References do not imply ownership and they can point to
 objects both on the heap and the stack, so they are quite flexible.
 We can create a reference by taking the address of something with the
-<em>address-of</em> operator <code>&amp;</code>. In a slight abuse of notation, the types of
+<em>address-of</em> operator <code class="hljs 1c"><span class="hljs-meta">&amp;</span></code>. In a slight abuse of notation, the types of
 references are also denoted by prefixing the type of the variable it
 points to by <code>&amp;</code>, so <code>&amp;i32</code> is a borrowed pointer to an <code>i32</code>.</p>
-<pre><code class="lang-{.rust}">fn main() {
-    let three : &amp;i32 = &amp;3;
-    let four : &amp;i32 = &amp;4;
-    println!(&quot;3 + 4 = {}&quot;, *three + *four);
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">main</span></span>() {
+    <span class="hljs-keyword">let</span> three : &amp;<span class="hljs-built_in">i32</span> = &amp;<span class="hljs-number">3</span>;
+    <span class="hljs-keyword">let</span> four : &amp;<span class="hljs-built_in">i32</span> = &amp;<span class="hljs-number">4</span>;
+    <span class="hljs-built_in">println!</span>(<span class="hljs-string">"3 + 4 = {}"</span>, *three + *four);
 }
 </code></pre>
 <p>References in Rust are a lot like references and pass-by-reference
@@ -150,13 +151,13 @@ sense to treat them similarly in terms of syntax. References in Rust
 also have a number of safety mechanisms that C/C++ references lack,
 but more on that later.</p>
 <h2 id="move-semantics">Move Semantics</h2>
-<p><em>Memory safety</em> implies that owned pointers <em>cannot be copied or
+<p class="lang-highlight"><em>Memory safety</em> implies that owned pointers <em>cannot be copied or
 cloned</em>. Otherwise, two such pointers could point to the same block of
 memory and that memory would be deleted twice. Therefore, owned
 pointers have move semantics:^[The other alternative would be that
 owned pointers can never be reassigned, they would be non-copiable and
-non-moveable. This seems pretty cumbersome, fortunately Rust&#39;s owned
-pointers have move semantics.] when owned pointer <code>o2</code> is initialized
+non-moveable. This seems pretty cumbersome, fortunately Rust's owned
+pointers have move semantics.] when owned pointer <code class="hljs gcode"><span class="hljs-meta">o2</span></code> is initialized
 from owned pointer <code>o1</code>, <code>o1</code> is no longer valid. By guiding principle
 number four, we would perfer to ensure this at compile time, and Rust
 indeed does this.^[Ensuring the validity of owned pointers at compile
@@ -168,131 +169,131 @@ major achievement of the Rust language: tracking such moves at compile
 time requires an advanced type-system feature called <a href="http://en.wikipedia.org/wiki/Type_system">affine
 types</a>. As far as I know
 Rust is the only mainstreamy language which has such a feature.]</p>
-<pre><code class="lang-{.rust}">fn main() {
-   let o1 = Box::new(&quot;world&quot;);
-   let o2 = o1;                // &lt;-- o1 is &#39;moved&#39; into o2 and now invalid
-   println!(&quot;Hello, {}!&quot;, o1); // &lt;-- this is a compile time error
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">main</span></span>() {
+   <span class="hljs-keyword">let</span> o1 = <span class="hljs-built_in">Box</span>::new(<span class="hljs-string">"world"</span>);
+   <span class="hljs-keyword">let</span> o2 = o1;                <span class="hljs-comment">// &lt;-- o1 is 'moved' into o2 and now invalid</span>
+   <span class="hljs-built_in">println!</span>(<span class="hljs-string">"Hello, {}!"</span>, o1); <span class="hljs-comment">// &lt;-- this is a compile time error</span>
 }
 </code></pre>
 <p>Indeed the Rust compiler reports:</p>
-<pre><code>move.rs:4:27: 4:29 error: use of moved value: `o1`
-move.rs:4    println!(&quot;Hello, {}!&quot;, o1); // &lt;-- this is a compile time error
+<pre class="lang-highlight"><code class="hljs less"><span class="hljs-selector-tag">move</span><span class="hljs-selector-class">.rs</span><span class="hljs-selector-pseudo">:4</span><span class="hljs-selector-pseudo">:27</span>: <span class="hljs-selector-tag">4</span><span class="hljs-selector-pseudo">:29</span> <span class="hljs-selector-tag">error</span>: <span class="hljs-selector-tag">use</span> <span class="hljs-selector-tag">of</span> <span class="hljs-selector-tag">moved</span> <span class="hljs-selector-tag">value</span>: `<span class="hljs-selector-tag">o1</span>`
+<span class="hljs-selector-tag">move</span><span class="hljs-selector-class">.rs</span><span class="hljs-selector-pseudo">:4</span>    <span class="hljs-selector-tag">println</span>!(<span class="hljs-string">"Hello, {}!"</span>, o1); <span class="hljs-comment">// &lt;-- this is a compile time error</span>
                                     ^~
 </code></pre><h3 id="structs-and-enums">Structs and Enums</h3>
-<p>In general Rust has move semantics. When an object is initialized via
+<p class="lang-highlight">In general Rust has move semantics. When an object is initialized via
 assignment its memory is moved to the newly assigned
-variable. However, structs can implement the <code>Copy</code> trait, which means
+variable. However, structs can implement the <code class="hljs dockerfile"><span class="hljs-keyword">Copy</span><span class="bash"></span></code> trait, which means
 they will have copy semantics instead: When assigned the new object
 gets a bitwise copy of the object used to assign it.</p>
-<p>The <code>Copy</code> trait cannot be implemented when an object contains a box:
-the box does not implement the copy trait, so we can&#39;t copy it when
+<p class="lang-highlight">The <code class="hljs dockerfile"><span class="hljs-keyword">Copy</span><span class="bash"></span></code> trait cannot be implemented when an object contains a box:
+the box does not implement the copy trait, so we can't copy it when
 copying the object containing it. This makes sense because the box has
 move semantics, the object containing it must also have move
 semantics, otherwise we would again incur two independent owning
 copies.</p>
-<pre><code class="lang-{.rust}">// Derive the Copy trait so objects of this type have copy semantics
-#[derive(Show,Copy)]
-struct Pod {x: i32, y: u32}
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-comment">// Derive the Copy trait so objects of this type have copy semantics</span>
+<span class="hljs-meta">#[derive(Show,Copy)]</span>
+<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">Pod</span></span> {x: <span class="hljs-built_in">i32</span>, y: <span class="hljs-built_in">u32</span>}
 
-// Can&#39;t derive the Copy trait because Box&lt;T&gt; does not have the Copy trait
-#[derive(Show)]
-struct WithBox {x: i32, p: Box&lt;i32&gt;}
+<span class="hljs-comment">// Can't derive the Copy trait because Box&lt;T&gt; does not have the Copy trait</span>
+<span class="hljs-meta">#[derive(Show)]</span>
+<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">WithBox</span></span> {x: <span class="hljs-built_in">i32</span>, p: <span class="hljs-built_in">Box</span>&lt;<span class="hljs-built_in">i32</span>&gt;}
 
-fn main() {
-   let a1 = Pod {x: 3, y: 4};
-   let a2 = a1;
-   println!(&quot;{:?}&quot;, a1);                   // &lt;-- OK, a1 has been copied
-   let b1 = WithBox {x: 3, p: Box::new(4)};
-   let b2 = b1;
-   println!(&quot;{:?}&quot;, b1);                   // &lt;-- Compile time error, b1 has been moved
+<span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">main</span></span>() {
+   <span class="hljs-keyword">let</span> a1 = Pod {x: <span class="hljs-number">3</span>, y: <span class="hljs-number">4</span>};
+   <span class="hljs-keyword">let</span> a2 = a1;
+   <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{:?}"</span>, a1);                   <span class="hljs-comment">// &lt;-- OK, a1 has been copied</span>
+   <span class="hljs-keyword">let</span> b1 = WithBox {x: <span class="hljs-number">3</span>, p: <span class="hljs-built_in">Box</span>::new(<span class="hljs-number">4</span>)};
+   <span class="hljs-keyword">let</span> b2 = b1;
+   <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{:?}"</span>, b1);                   <span class="hljs-comment">// &lt;-- Compile time error, b1 has been moved</span>
 }
 </code></pre>
 <p>The same rules apply to enums, but here the error messages can be a bit
 more confusing.</p>
-<pre><code class="lang-{.rust}">enum MyEnum {
-     X(i32),
-     Y(Box&lt;i32&gt;)
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-class"><span class="hljs-keyword">enum</span> <span class="hljs-title">MyEnum</span></span> {
+     X(<span class="hljs-built_in">i32</span>),
+     Y(<span class="hljs-built_in">Box</span>&lt;<span class="hljs-built_in">i32</span>&gt;)
 }
 
-fn match_and_print(e: &amp;MyEnum) {
-    match e {
-        &amp;MyEnum::X(x) =&gt; println!(&quot;{}&quot;, x),  // &lt;-- OK, x can be copied
-        &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
+<span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">match_and_print</span></span>(e: &amp;MyEnum) {
+    <span class="hljs-keyword">match</span> e {
+        &amp;MyEnum::X(x) =&gt; <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, x),  <span class="hljs-comment">// &lt;-- OK, x can be copied</span>
+        &amp;MyEnum::Y(y) =&gt; <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, *y)  <span class="hljs-comment">// &lt;-- Error, y cannot be moved out of a reference</span>
     }
 }
 
-fn main() {
-   let x = MyEnum::X(3);
-   let y = MyEnum::Y(Box::new(4));
+<span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">main</span></span>() {
+   <span class="hljs-keyword">let</span> x = MyEnum::X(<span class="hljs-number">3</span>);
+   <span class="hljs-keyword">let</span> y = MyEnum::Y(<span class="hljs-built_in">Box</span>::new(<span class="hljs-number">4</span>));
    match_and_print(&amp;x);
    match_and_print(&amp;y);
 }
 </code></pre>
 <p>In this case the compiler reports</p>
-<pre><code>move.rs:9:9: 9:22 error: cannot move out of borrowed content
-move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)  // &lt;-- Error, y cannot be moved out of a reference
+<pre class="lang-highlight"><code class="hljs stata"><span class="hljs-keyword">move</span>.rs:9:9: 9:22 <span class="hljs-keyword">error</span>: cannot <span class="hljs-keyword">move</span> <span class="hljs-keyword">out</span> of borrowed content
+<span class="hljs-keyword">move</span>.rs:9         &amp;MyEnum::<span class="hljs-built_in">Y</span>(y) =&gt; println!(<span class="hljs-string">"{}"</span>, *y)  <span class="hljs-comment">// &lt;-- Error, y cannot be moved out of a reference</span>
                   ^~~~~~~~~~
 </code></pre><p>move.rs:9:20: 9:21 note: attempting to move value to here
-move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, <em>y)  // &lt;-- Error, y cannot be moved out of a reference
+move.rs:9         &amp;MyEnum::Y(y) =&gt; println!("{}", <em class="lang-highlight">y)  // &lt;-- Error, y cannot be moved out of a reference
                              ^
-move.rs:9:20: 9:21 help: to prevent the move, use <code>ref y</code> or <code>ref mut y</code> to capture value by reference
-move.rs:9         &amp;MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, </em>y)  // &lt;-- Error, y cannot be moved out of a reference
+move.rs:9:20: 9:21 help: to prevent the move, use <code class="hljs applescript"><span class="hljs-keyword">ref</span> y</code> or <code>ref mut y</code> to capture value by reference
+move.rs:9         &amp;MyEnum::Y(y) =&gt; println!("{}", </em>y)  // &lt;-- Error, y cannot be moved out of a reference
                              ^</p>
-<pre><code>
+<pre class="lang-highlight"><code class="hljs rust">
 Standard pattern matches are pass-by-value, meaning that the contents
-of the enum is moved. However, this can only be done when we have
-ownership over the values to be moved. When we apply `match` to a
-dereferenced borrowed pointer, we cannot move because we don&#39;t have
+of the <span class="hljs-class"><span class="hljs-keyword">enum</span> <span class="hljs-title">is</span></span> moved. However, this can only <span class="hljs-keyword">be</span> done when we have
+ownership over the values to <span class="hljs-keyword">be</span> moved. When we apply `<span class="hljs-keyword">match</span>` to a
+dereferenced borrowed pointer, we cannot <span class="hljs-keyword">move</span> because we don<span class="hljs-symbol">'t</span> have
 ownership. Changing the `match_and_print` function to take a value
 would work again.
 
 ~~~{.rust}
-fn match_and_print(e: MyEnum) {
-    match e {
-        MyEnum::X(x) =&gt; println!(&quot;{}&quot;, x),
-        MyEnum::Y(y) =&gt; println!(&quot;{}&quot;, *y)
+<span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">match_and_print</span></span>(e: MyEnum) {
+    <span class="hljs-keyword">match</span> e {
+        MyEnum::X(x) =&gt; <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, x),
+        MyEnum::Y(y) =&gt; <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, *y)
     }
 }
-</code></pre><h3 id="the-ref-keyword">The <code>ref</code> Keyword</h3>
-<p>Moving values in pattern matches is not always what we want.
+</code></pre><h3 id="the-ref-keyword" class="lang-highlight">The <code class="hljs applescript"><span class="hljs-keyword">ref</span></code> Keyword</h3>
+<p class="lang-highlight">Moving values in pattern matches is not always what we want.
 Sometimes we just want to take a reference. This way we can pattern
 match on values which we have obtained via borrowed pointers or we can
-simply avoid a move. This is where the <code>ref</code> keyword comes into play:
+simply avoid a move. This is where the <code class="hljs applescript"><span class="hljs-keyword">ref</span></code> keyword comes into play:
 It changes the pass-by-value semantics of a pattern match to
 pass-by-borrowed-pointer semantics:</p>
-<pre><code class="lang-{.rust}">fn match_and_print(e: &amp;MyEnum) {
-    match e {
-        &amp;MyEnum::X(x) =&gt; println!(&quot;{}&quot;, x),
-        &amp;MyEnum::Y(ref y) =&gt;                 // OK, y is a borrowed ptr to Box&lt;int&gt;
-            println!(&quot;{}&quot;, **y)     // y has type &amp;Box&lt;int&gt; and must be dereferenced twice
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">match_and_print</span></span>(e: &amp;MyEnum) {
+    <span class="hljs-keyword">match</span> e {
+        &amp;MyEnum::X(x) =&gt; <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, x),
+        &amp;MyEnum::Y(<span class="hljs-keyword">ref</span> y) =&gt;                 <span class="hljs-comment">// OK, y is a borrowed ptr to Box&lt;int&gt;</span>
+            <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, **y)     <span class="hljs-comment">// y has type &amp;Box&lt;int&gt; and must be dereferenced twice</span>
     }
 }
 </code></pre>
-<p>To bind mutable references there is also the <code>ref mut</code> version which
+<p class="lang-highlight">To bind mutable references there is also the <code class="hljs rust"><span class="hljs-keyword">ref</span> <span class="hljs-keyword">mut</span></code> version which
 allows modifying:</p>
-<pre><code class="lang-{.rust}">fn match_and_print(e: &amp;mut MyEnum) {
-    match e {
-        &amp;mut MyEnum::X(x) =&gt; println!(&quot;{}&quot;, x),
-        &amp;mut MyEnum::Y(ref mut y) =&gt; {
-            **y = 5;
-            println!(&quot;{}&quot;, **y)
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">match_and_print</span></span>(e: &amp;<span class="hljs-keyword">mut</span> MyEnum) {
+    <span class="hljs-keyword">match</span> e {
+        &amp;<span class="hljs-keyword">mut</span> MyEnum::X(x) =&gt; <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, x),
+        &amp;<span class="hljs-keyword">mut</span> MyEnum::Y(<span class="hljs-keyword">ref</span> <span class="hljs-keyword">mut</span> y) =&gt; {
+            **y = <span class="hljs-number">5</span>;
+            <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, **y)
         }
     }
 }
 
-fn main() {
-   let mut x = MyEnum::X(3);
-   let mut y = MyEnum::Y(Box::new(4));
-   match_and_print(&amp;mut x);
-   match_and_print(&amp;mut y);
+<span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">main</span></span>() {
+   <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut</span> x = MyEnum::X(<span class="hljs-number">3</span>);
+   <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut</span> y = MyEnum::Y(<span class="hljs-built_in">Box</span>::new(<span class="hljs-number">4</span>));
+   match_and_print(&amp;<span class="hljs-keyword">mut</span> x);
+   match_and_print(&amp;<span class="hljs-keyword">mut</span> y);
 }
 </code></pre>
-<p>The <code>ref</code> keyword and its <code>ref mut</code> variant also work in <code>let</code> bindings:</p>
-<pre><code class="lang-{.rust}">fn main() {
-   let mut x = 3;
-   let ref mut y = x;
-   *y = 4;
-   println!(&quot;{}&quot;, *y);
+<p class="lang-highlight">The <code class="hljs applescript"><span class="hljs-keyword">ref</span></code> keyword and its <code>ref mut</code> variant also work in <code>let</code> bindings:</p>
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">main</span></span>() {
+   <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut</span> x = <span class="hljs-number">3</span>;
+   <span class="hljs-keyword">let</span> <span class="hljs-keyword">ref</span> <span class="hljs-keyword">mut</span> y = x;
+   *y = <span class="hljs-number">4</span>;
+   <span class="hljs-built_in">println!</span>(<span class="hljs-string">"{}"</span>, *y);
 }
 </code></pre>
 <h2 id="lifetimes">Lifetimes</h2>
@@ -310,99 +311,99 @@ points to must not be freed during that borrowed pointers
 is borrowed.</p>
 <p>The first requirement leads us to the concept of <strong><strong>lifetimes</strong></strong>,
 the amount of time that some object is guaranteed to exist.</p>
-<pre><code class="lang-{.rust}">fn lifetimes1() {
-    let name = Box::new(&quot;world&quot;);      //                 &lt;--+
-    if 3 &lt; 5 {                         //                    |
-        let bname = &amp;name;             // &lt;--+               | name&#39;s
-        println!(&quot;Hello, {}!&quot;, name);  //    | bname&#39;s       | lifetime
-        println!(&quot;Hello, {}!&quot;, bname); //    | lifetime      |
-    }                                  // &lt;--+               |
-}                                      //                 &lt;--+
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">lifetimes1</span></span>() {
+    <span class="hljs-keyword">let</span> name = <span class="hljs-built_in">Box</span>::new(<span class="hljs-string">"world"</span>);      <span class="hljs-comment">//                 &lt;--+</span>
+    <span class="hljs-keyword">if</span> <span class="hljs-number">3</span> &lt; <span class="hljs-number">5</span> {                         <span class="hljs-comment">//                    |</span>
+        <span class="hljs-keyword">let</span> bname = &amp;name;             <span class="hljs-comment">// &lt;--+               | name's</span>
+        <span class="hljs-built_in">println!</span>(<span class="hljs-string">"Hello, {}!"</span>, name);  <span class="hljs-comment">//    | bname's       | lifetime</span>
+        <span class="hljs-built_in">println!</span>(<span class="hljs-string">"Hello, {}!"</span>, bname); <span class="hljs-comment">//    | lifetime      |</span>
+    }                                  <span class="hljs-comment">// &lt;--+               |</span>
+}                                      <span class="hljs-comment">//                 &lt;--+</span>
 </code></pre>
-<p>In this example, it is quite clear that the lifetime of <code>bname</code> will
+<p class="lang-highlight">In this example, it is quite clear that the lifetime of <code class="hljs ebnf"><span class="hljs-attribute">bname</span></code> will
 be shorter than that of <code>name</code> and thus the compiler needs no help in
 figuring this out. However, things need not always be this simple,
 consider the following example:</p>
-<pre><code class="lang-{.rust}">fn lifetimes2() {
-    let mut x_ref = &amp;3;       //                 &lt;--+
-    if true {                 //                    |
-        let mut y_ref = &amp;4;   // &lt;--+ y_ref&#39;s       | x_ref&#39;s
-        x_ref = y_ref;        //    | lifetime      | lifetime
-    }                         // &lt;--+               |
-}                             //                 &lt;--+
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">lifetimes2</span></span>() {
+    <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut</span> x_ref = &amp;<span class="hljs-number">3</span>;       <span class="hljs-comment">//                 &lt;--+</span>
+    <span class="hljs-keyword">if</span> <span class="hljs-literal">true</span> {                 <span class="hljs-comment">//                    |</span>
+        <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut</span> y_ref = &amp;<span class="hljs-number">4</span>;   <span class="hljs-comment">// &lt;--+ y_ref's       | x_ref's</span>
+        x_ref = y_ref;        <span class="hljs-comment">//    | lifetime      | lifetime</span>
+    }                         <span class="hljs-comment">// &lt;--+               |</span>
+}                             <span class="hljs-comment">//                 &lt;--+</span>
 </code></pre>
-<p>Here we have a problem: <code>x_ref</code> is reassigned to point to the same
-memory location as <code>y_ref</code>, but <code>y_ref</code>&#39;s lifetime is shorter than
-<code>x_ref</code>&#39;s. To ensure memory safety, the compiler must rejetct this
+<p class="lang-highlight">Here we have a problem: <code class="hljs">x_ref</code> is reassigned to point to the same
+memory location as <code>y_ref</code>, but <code>y_ref</code>'s lifetime is shorter than
+<code>x_ref</code>'s. To ensure memory safety, the compiler must rejetct this
 program, which it does:</p>
-<pre><code>lifetimes.rs:21:24: 21:26 error: borrowed value does not live long enough
-lifetimes.rs:18:16: 24:1 note: borrowed pointer must be valid for the block at 18:16...
-lifetimes.rs:20:12: 23:5 note: ...but borrowed value is only valid for the block at 20:12
+<pre class="lang-highlight"><code class="hljs css"><span class="hljs-selector-tag">lifetimes</span><span class="hljs-selector-class">.rs</span><span class="hljs-selector-pseudo">:21</span><span class="hljs-selector-pseudo">:24</span>: 21<span class="hljs-selector-pseudo">:26</span> <span class="hljs-selector-tag">error</span>: <span class="hljs-selector-tag">borrowed</span> <span class="hljs-selector-tag">value</span> <span class="hljs-selector-tag">does</span> <span class="hljs-selector-tag">not</span> <span class="hljs-selector-tag">live</span> <span class="hljs-selector-tag">long</span> <span class="hljs-selector-tag">enough</span>
+<span class="hljs-selector-tag">lifetimes</span><span class="hljs-selector-class">.rs</span><span class="hljs-selector-pseudo">:18</span><span class="hljs-selector-pseudo">:16</span>: 24<span class="hljs-selector-pseudo">:1</span> <span class="hljs-selector-tag">note</span>: <span class="hljs-selector-tag">borrowed</span> <span class="hljs-selector-tag">pointer</span> <span class="hljs-selector-tag">must</span> <span class="hljs-selector-tag">be</span> <span class="hljs-selector-tag">valid</span> <span class="hljs-selector-tag">for</span> <span class="hljs-selector-tag">the</span> <span class="hljs-selector-tag">block</span> <span class="hljs-selector-tag">at</span> 18<span class="hljs-selector-pseudo">:16...</span>
+<span class="hljs-selector-tag">lifetimes</span><span class="hljs-selector-class">.rs</span><span class="hljs-selector-pseudo">:20</span><span class="hljs-selector-pseudo">:12</span>: 23<span class="hljs-selector-pseudo">:5</span> <span class="hljs-selector-tag">note</span>: ..<span class="hljs-selector-class">.but</span> <span class="hljs-selector-tag">borrowed</span> <span class="hljs-selector-tag">value</span> <span class="hljs-selector-tag">is</span> <span class="hljs-selector-tag">only</span> <span class="hljs-selector-tag">valid</span> <span class="hljs-selector-tag">for</span> <span class="hljs-selector-tag">the</span> <span class="hljs-selector-tag">block</span> <span class="hljs-selector-tag">at</span> 20<span class="hljs-selector-pseudo">:12</span>
 </code></pre><p>Things become even more interesting when we work with borrowed
 pointers inside of a function:</p>
-<pre><code class="lang-{.rust}">fn min_life(x: &amp;i32, y: &amp;i32) -&gt; &amp;i32 {
-    if *x &lt; *y {
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">min_life</span></span>(x: &amp;<span class="hljs-built_in">i32</span>, y: &amp;<span class="hljs-built_in">i32</span>) -&gt; &amp;<span class="hljs-built_in">i32</span> {
+    <span class="hljs-keyword">if</span> *x &lt; *y {
         x
-    } else {
+    } <span class="hljs-keyword">else</span> {
         y
     }
 }
 </code></pre>
 <p>Here the lifetime of the result depends on the condition evaluated in
 the if statement: depending on it the lifetime will either be that of
-x or that of y. Clearly, the compiler can&#39;t resolve this
+x or that of y. Clearly, the compiler can't resolve this
 automatically, it would need to know the values to which x and y
 point, which may only be known at runtime:</p>
-<pre><code>lifetimes.rs:1:33: 1:37 error: missing lifetime specifier [E0106]
-lifetimes.rs:1 fn minLife(x: &amp;i32, y: &amp;i32) -&gt; &amp;i32 {
+<pre class="lang-highlight"><code class="hljs less"><span class="hljs-selector-tag">lifetimes</span><span class="hljs-selector-class">.rs</span><span class="hljs-selector-pseudo">:1</span><span class="hljs-selector-pseudo">:33</span>: <span class="hljs-selector-tag">1</span><span class="hljs-selector-pseudo">:37</span> <span class="hljs-selector-tag">error</span>: <span class="hljs-selector-tag">missing</span> <span class="hljs-selector-tag">lifetime</span> <span class="hljs-selector-tag">specifier</span> <span class="hljs-selector-attr">[E0106]</span>
+<span class="hljs-selector-tag">lifetimes</span><span class="hljs-selector-class">.rs</span><span class="hljs-selector-pseudo">:1</span> <span class="hljs-selector-tag">fn</span> <span class="hljs-selector-tag">minLife</span>(<span class="hljs-attribute">x</span>: &amp;i32, <span class="hljs-attribute">y</span>: &amp;i32) <span class="hljs-selector-tag">-</span>&gt; <span class="hljs-selector-tag">&amp;</span><span class="hljs-selector-tag">i32</span> {
                                                ^
-</code></pre><p>lifetimes.rs:1:33: 1:37 help: this function&#39;s return type contains a borrowed value, but the signature does not say whether it is borrowed from <code>x</code> or <code>y</code>
+</code></pre><p class="lang-highlight">lifetimes.rs:1:33: 1:37 help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from <code class="hljs ebnf"><span class="hljs-attribute">x</span></code> or <code>y</code>
 lifetimes.rs:1 fn minLife(x: &amp;i32, y: &amp;i32) -&gt; &amp;i32 {
                                                ^~~~</p>
-<pre><code>
-Since the compiler can&#39;t infer the lifetimes we must annotate
-them. Alas, we too would be hard pressed to give the exact lifetime
-in this example. However, there is a trick by which we can manage this
+<pre class="lang-highlight"><code class="hljs rust">
+Since the compiler can<span class="hljs-symbol">'t</span> infer the lifetimes we must annotate
+them. Alas, we too would <span class="hljs-keyword">be</span> hard pressed to give the exact lifetime
+<span class="hljs-keyword">in</span> this example. However, there is a trick by which we can manage this
 
 ~~~{.rust}
-fn min_life&lt;&#39;a&gt;(x: &amp;&#39;a i32, y: &amp;&#39;a i32) -&gt; &amp;&#39;a i32 {
-    if *x &lt; *y {
+<span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">min_life</span></span>&lt;<span class="hljs-symbol">'a</span>&gt;(x: &amp;<span class="hljs-symbol">'a</span> <span class="hljs-built_in">i32</span>, y: &amp;<span class="hljs-symbol">'a</span> <span class="hljs-built_in">i32</span>) -&gt; &amp;<span class="hljs-symbol">'a</span> <span class="hljs-built_in">i32</span> {
+    <span class="hljs-keyword">if</span> *x &lt; *y {
         x
-    } else {
+    } <span class="hljs-keyword">else</span> {
         y
     }
 }
-</code></pre><p>Here we explictly annotate the lifetime of the parameters and the
-return value. Lifetime parameters are introduced by a single tick <code>&#39;</code>
+</code></pre><p class="lang-highlight">Here we explictly annotate the lifetime of the parameters and the
+return value. Lifetime parameters are introduced by a single tick <code class="hljs routeros">'</code>
 followed by an identifier. In functions these must be the first
 template parameters. As you can see we use the same parameter for the
 lifetime everywhere. If the compiler would take this information
 too literally, then this function whould be less flexible than we
 might wish: In this case we could only use it on borrowed pointers
 which have the exact same lifetime. Fortunately, the compiler
-interprets the provided lifetimes as a lower bound. Thus <code>&#39;a</code> is
+interprets the provided lifetimes as a lower bound. Thus <code>'a</code> is
 the minimum of the lifetimes of <code>x</code> and <code>y</code>.
-There is one special lifetime, which is called <code>&#39;static</code> and is for
+There is one special lifetime, which is called <code>'static</code> and is for
 objects which are allocated for the entire life of the program.</p>
 <h2 id="freezing">Freezing</h2>
 <p>Another problem with borrowed pointers is that the memory must not
 be modified while it has been borrowed out. This is achieved by freezing
 the original object when a borrowed pointer to it exists:</p>
-<pre><code class="lang-{.rust}">fn freeze() {
-    let mut x = 3;
+<pre class="lang-highlight"><code class="lang-{.rust} hljs"><span class="hljs-function"><span class="hljs-keyword">fn</span> <span class="hljs-title">freeze</span></span>() {
+    <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut</span> x = <span class="hljs-number">3</span>;
     {
-        let mut y = &amp;x;
-        x = 4;       // &lt;-- Error: x has been borrowed and is thus `frozen`
+        <span class="hljs-keyword">let</span> <span class="hljs-keyword">mut</span> y = &amp;x;
+        x = <span class="hljs-number">4</span>;       <span class="hljs-comment">// &lt;-- Error: x has been borrowed and is thus `frozen`</span>
     }
-    x = 4;           // OK
+    x = <span class="hljs-number">4</span>;           <span class="hljs-comment">// OK</span>
 }
 </code></pre>
-<p>In the block we cannot modify <code>x</code> because it is borrowed:</p>
-<pre><code>freeze.rs:5:9: 5:14 error: cannot assign to `x` because it is borrowed
-freeze.rs:5         x = 4;       // &lt;-- Error: x has been borrowed and is thus `frozen`
+<p class="lang-highlight">In the block we cannot modify <code class="hljs ebnf"><span class="hljs-attribute">x</span></code> because it is borrowed:</p>
+<pre class="lang-highlight"><code class="hljs coffeescript">freeze.rs:<span class="hljs-number">5</span>:<span class="hljs-number">9</span>: <span class="hljs-number">5</span>:<span class="hljs-number">14</span> error: cannot assign to `<span class="javascript">x</span>` because it <span class="hljs-keyword">is</span> borrowed
+freeze.rs:<span class="hljs-number">5</span>         x = <span class="hljs-number">4</span>;       <span class="hljs-regexp">//</span> &lt;-- Error: x has been borrowed <span class="hljs-keyword">and</span> <span class="hljs-keyword">is</span> thus `<span class="javascript">frozen</span>`
                     ^~
-</code></pre><p>freeze.rs:4:22: 4:23 note: borrow of <code>x</code> occurs here
-freeze.rs:4         let mut y = &x;
+</code></pre><p class="lang-highlight">freeze.rs:4:22: 4:23 note: borrow of <code class="hljs ebnf"><span class="hljs-attribute">x</span></code> occurs here
+freeze.rs:4         let mut y = &amp;x;
                                  ^
 ~~~</p>
 <p>Note that this restriction is irrespective of whether the borrowed

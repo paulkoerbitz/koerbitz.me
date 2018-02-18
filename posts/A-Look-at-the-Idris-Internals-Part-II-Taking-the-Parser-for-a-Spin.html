@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>A Look at the Idris Internals, Part II - Taking the Parser for a Spin</title>
     </head>
@@ -26,150 +27,150 @@
 <h1 class="title">A Look at the Idris Internals, Part II - Taking the Parser for a Spin</h1>
 <p class="date">published on January 17th, 2016</p>
 
-<p>After we&#39;ve looked at how the parser ends up being called in the <a href="/posts/A-look-at-the-Idris-Internals-Part-I-Overview-and-Parsing.html">last
+<p>After we've looked at how the parser ends up being called in the <a href="/posts/A-look-at-the-Idris-Internals-Part-I-Overview-and-Parsing.html">last
 post</a>,
 I thought it would be a fun little exercise to spin up the Idris parser on
 the GHCi REPL to see if we can get some expressions parsed and what kind
 of AST they produce.</p>
-<p>To spin up ghci, we need to go throught the usual <code>cabal configure &amp;&amp;
+<p class="lang-highlight">To spin up ghci, we need to go throught the usual <code class="hljs 1c">cabal configure <span class="hljs-meta">&amp;&amp;</span>
 cabal install</code> dance and then run <code>cabal repl</code>. Calling <code>ghci</code> with
-the desired target file directly (e.g. <code>Parser.hs</code>) won&#39;t work, as
-Idris generates some files during build time which won&#39;t be available
+the desired target file directly (e.g. <code>Parser.hs</code>) won't work, as
+Idris generates some files during build time which won't be available
 in this case.</p>
 <p>As briefly mentioned in the previous post, we can use the
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ParseHelpers.hs#L77"><code>runparser</code></a>
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ParseHelpers.hs#L77" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">runparser</span></code></a>
 function to actually run a specific parser, but how do we call it?
 The type signature looks a bit hairy at first:</p>
-<pre><code class="lang-{.Haskell}">runparser :: StateT st IdrisInnerParser res -&gt; st -&gt; String -&gt; String -&gt; Result res
+<pre class="lang-highlight"><code class="lang-{.Haskell} hljs xl"><span class="hljs-function"><span class="hljs-title">runparser</span> :: StateT st IdrisInnerParser res -&gt;</span> <span class="hljs-function"><span class="hljs-title">st</span> -&gt;</span> S<span class="hljs-function"><span class="hljs-title">tring</span> -&gt;</span> S<span class="hljs-function"><span class="hljs-title">tring</span> -&gt;</span> Result res
 </code></pre>
-<p>but it&#39;s actually quite simple: The <code>StateT st IdrisInnerParser res</code>
-is the type in which the different building blocks for the parser are
-defined. In fact, most of the parser building blocks have a type of
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ParseHelpers.hs#L46"><code>IdrisParser</code></a>
-and this is just defined by <code>type IdrisParser = StateT IState
+<p class="lang-highlight">but it's actually quite simple: The <code class="hljs vim">StateT <span class="hljs-keyword">st</span> IdrisInnerParser <span class="hljs-keyword">res</span></code>
+is the type in which the different building blocks for the parser are</p>
+<p class="lang-highlight">defined. In fact, most of the parser building blocks have a type of
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ParseHelpers.hs#L46" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">IdrisParser</span></code></a>
+and this is just defined by <code class="hljs ada"><span class="hljs-keyword">type</span> <span class="hljs-type">IdrisParser </span>= StateT IState
 IdrisInnerParser</code>, so <code>st</code> is specialized to
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L178"><code>IState</code></a>,
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L178" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">IState</span></code></a>,
 the big state record in Idris. There is an
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L343"><code>idrisInit</code></a>
-binding, which defines an empty IState, and we&#39;ll just use that for
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L343" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">idrisInit</span></code></a>
+binding, which defines an empty IState, and we'll just use that for
 our experiments at the REPL. All that is left is to pick an
 appropriate parser for us to start the experiments. Looking at the
 different building blocks of the parsers, we notice that many take an
 argument of type
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1443"><code>SyntaxInfo</code></a>.
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1443" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">SyntaxInfo</span></code></a>.
 Idris parses some parts of its syntax things differently depending on
 the context (for example if a
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1325"><code>DSL</code></a>
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1325" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">DSL</span></code></a>
 binding has been defined). We will not burden ourselves with such
 details right now and use the
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1463"><code>defaultSyntax</code></a>
-defined in <code>AbsSyntaxTree.hs</code> to keep things simple.</p>
-<p>Let&#39;s start with a powerful parser which allows us to parse a
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1463" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">defaultSyntax</span></code></a></p>
+<p class="lang-highlight">defined in <code class="hljs css"><span class="hljs-selector-tag">AbsSyntaxTree</span><span class="hljs-selector-class">.hs</span></code> to keep things simple.</p>
+<p>Let's start with a powerful parser which allows us to parse a
 siginficant part of the source code. The
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L153"><code>prog</code></a>
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L153" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">prog</span></code></a>
 is easily missed, but it actually allows us to parse full Idris programs.
 Here is a very simple one:</p>
-<pre><code class="lang-{.Haskell}">ghci&gt; import Idris.Parser
-ghci&gt; import Idris.AbsSyntaxTree
-ghci&gt; let myProgram = &quot;id : a -&gt; a\nid x = x&quot;;
-ghci&gt; putStrLn myProgram
+<pre class="lang-highlight"><code class="lang-{.Haskell} hljs shell"><span class="hljs-meta">ghci&gt;</span><span class="bash"> import Idris.Parser</span>
+<span class="hljs-meta">ghci&gt;</span><span class="bash"> import Idris.AbsSyntaxTree</span>
+<span class="hljs-meta">ghci&gt;</span><span class="bash"> <span class="hljs-built_in">let</span> myProgram = <span class="hljs-string">"id : a -&gt; a\nid x = x"</span>;</span>
+<span class="hljs-meta">ghci&gt;</span><span class="bash"> putStrLn myProgram</span>
 id : a -&gt; a
 id x = x
-ghci&gt; :t runparser (prog defaultSyntax) idrisInit &quot;(test)&quot; myProgram
-runparser (prog defaultSyntax) idrisInit &quot;(test)&quot; myProgram
+<span class="hljs-meta">ghci&gt;</span><span class="bash"> :t runparser (prog defaultSyntax) idrisInit <span class="hljs-string">"(test)"</span> myProgram</span>
+runparser (prog defaultSyntax) idrisInit "(test)" myProgram
   :: Text.Trifecta.Result.Result [PDecl]
-ghci&gt; runparser (prog defaultSyntax) idrisInit &quot;(test)&quot; myProgram
+<span class="hljs-meta">ghci&gt;</span><span class="bash"> runparser (prog defaultSyntax) idrisInit <span class="hljs-string">"(test)"</span> myProgram</span>
 Success [tydecl id : a -&gt; a,pat {_2}       id x  = x where []]
 </code></pre>
-<p>So we see that the result from the parse is wrapped in a
-<a href="http://hackage.haskell.org/package/trifecta-1.5.2/docs/Text-Trifecta-Result.html"><code>Result</code></a>
-datatype from the Trifecta library (this can basically be a <code>Success</code>
+<p class="lang-highlight">So we see that the result from the parse is wrapped in a
+<a href="http://hackage.haskell.org/package/trifecta-1.5.2/docs/Text-Trifecta-Result.html" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">Result</span></code></a>
+datatype from the Trifecta library (this can basically be a <code class="hljs ebnf"><span class="hljs-attribute">Success</span></code>
 with the result or a <code>Failure</code> with some information on where the
 parse went wrong and why) and returns a list of
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L637"><code>PDecl</code></a>,
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L637" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">PDecl</span></code></a>,
 which is the datastructure that represents top-level declarations of
 the idris language. These are defined in <code>AbsSyntaxTree.hs</code>.</p>
-<p>We can see that the actual <code>PDecl</code>s are pretty printed, which is too
+<p class="lang-highlight">We can see that the actual <code class="hljs ebnf"><span class="hljs-attribute">PDecl</span></code>s are pretty printed, which is too
 bad, since we wanted to figure out how the parsing result was exactly
 represented in the datastructure. My standard hacky way to work
 around this^[If there is a better way, please let me know] is to
 simply comment out the existing show instance for these datatypes and
 derive them instead. To do this we have to comment out the <code>Show</code>
 instances on lines 1582 to 1592 in
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1582"><code>AbsSyntaxTree.hs</code></a>
-and add <code>deriving Show</code> clauses to <code>PDecl&#39;</code>, <code>Directive</code>, <code>PClause</code>,
-<code>PData&#39;</code>, <code>PTerm</code>, <code>PAltTerm</code>, <code>PDo&#39;</code> and <code>PTactic&#39;</code> in the same
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1582" class="lang-highlight"><code class="hljs css"><span class="hljs-selector-tag">AbsSyntaxTree</span><span class="hljs-selector-class">.hs</span></code></a>
+and add <code>deriving Show</code> clauses to <code>PDecl'</code>, <code>Directive</code>, <code>PClause</code>,
+<code>PData'</code>, <code>PTerm</code>, <code>PAltTerm</code>, <code>PDo'</code> and <code>PTactic'</code> in the same
 file. Doing so and running the above commands at the REPL again gives
 us (slightly reformatted)</p>
-<pre><code class="lang-{.Haskell}">ghci&gt; runparser (prog defaultSyntax) idrisInit &quot;(test)&quot; myProgram
+<pre class="lang-highlight"><code class="lang-{.Haskell} hljs nix">ghci&gt; runparser (prog defaultSyntax) idrisInit <span class="hljs-string">"(test)"</span> myProgram
 Success [
-    PTy (DocString (Options { sanitize = True, allowRawHtml = False
-                            , preserveHardBreaks = True, debug = False})
+    PTy (DocString (Options { <span class="hljs-attr">sanitize</span> = True, <span class="hljs-attr">allowRawHtml</span> = False
+                            , <span class="hljs-attr">preserveHardBreaks</span> = True, <span class="hljs-attr">debug</span> = False})
                    (fromList []))
         []
-        (Syn { using = [], syn_params = [], syn_namespace = [], no_imp = [], imp_methods = []
-             , decoration = &lt;&lt;fn&gt;&gt;, inPattern = False, implicitAllowed = False
-             , maxline = Nothing, mut_nesting = 0
-             , dsl_info = DSL { dsl_bind = PRef (builtin) [] &gt;&gt;=
-                              , dsl_return = PRef (builtin) [] return
-                              , dsl_apply = PRef (builtin) [] &lt;*&gt;
-                              , dsl_pure = PRef (builtin) [] pure
-                              , dsl_var = Nothing
-                              , index_first = Nothing
-                              , index_next = Nothing
-                              , dsl_lambda = Nothing
-                              , dsl_let = Nothing
-                              , dsl_pi = Nothing
+        (Syn { <span class="hljs-attr">using</span> = [], <span class="hljs-attr">syn_params</span> = [], <span class="hljs-attr">syn_namespace</span> = [], <span class="hljs-attr">no_imp</span> = [], <span class="hljs-attr">imp_methods</span> = []
+             , <span class="hljs-attr">decoration</span> = &lt;&lt;fn&gt;&gt;, <span class="hljs-attr">inPattern</span> = False, <span class="hljs-attr">implicitAllowed</span> = False
+             , <span class="hljs-attr">maxline</span> = Nothing, <span class="hljs-attr">mut_nesting</span> = <span class="hljs-number">0</span>
+             , <span class="hljs-attr">dsl_info</span> = DSL { <span class="hljs-attr">dsl_bind</span> = PRef (builtin) [] &gt;&gt;=
+                              , <span class="hljs-attr">dsl_return</span> = PRef (builtin) [] return
+                              , <span class="hljs-attr">dsl_apply</span> = PRef (builtin) [] &lt;*&gt;
+                              , <span class="hljs-attr">dsl_pure</span> = PRef (builtin) [] pure
+                              , <span class="hljs-attr">dsl_var</span> = Nothing
+                              , <span class="hljs-attr">index_first</span> = Nothing
+                              , <span class="hljs-attr">index_next</span> = Nothing
+                              , <span class="hljs-attr">dsl_lambda</span> = Nothing
+                              , <span class="hljs-attr">dsl_let</span> = Nothing
+                              , <span class="hljs-attr">dsl_pi</span> = Nothing
                               }
-             , syn_in_quasiquote = 0
+             , <span class="hljs-attr">syn_in_quasiquote</span> = <span class="hljs-number">0</span>
              })
-        (test):1:4
+        (test):<span class="hljs-number">1</span>:<span class="hljs-number">4</span>
         []
         id
-        (test):1:1-3
-        (PPi (Exp {pargopts = [], pstatic = Dynamic, pparam = False})
+        (test):<span class="hljs-number">1</span>:<span class="hljs-number">1</span>-<span class="hljs-number">3</span>
+        (PPi (Exp {<span class="hljs-attr">pargopts</span> = [], <span class="hljs-attr">pstatic</span> = Dynamic, <span class="hljs-attr">pparam</span> = False})
              __pi_arg
              No location
-             (PRef (test):1:6-7 [(test):1:6-7] a)
-             (PRef (test):1:11-12 [(test):1:11-12] a))
-  , PClauses (test):2:1
+             (PRef (test):<span class="hljs-number">1</span>:<span class="hljs-number">6</span>-<span class="hljs-number">7</span> [(test):<span class="hljs-number">1</span>:<span class="hljs-number">6</span>-<span class="hljs-number">7</span>] a)
+             (PRef (test):<span class="hljs-number">1</span>:<span class="hljs-number">11</span>-<span class="hljs-number">12</span> [(test):<span class="hljs-number">1</span>:<span class="hljs-number">11</span>-<span class="hljs-number">12</span>] a))
+  , PClauses (test):<span class="hljs-number">2</span>:<span class="hljs-number">1</span>
              []
              {_2}
-             [ PClause (test):2:4
+             [ PClause (test):<span class="hljs-number">2</span>:<span class="hljs-number">4</span>
                        id
-                       (PApp (test):2:4 (PRef (test):2:1-3 [(test):2:1-3] id)
-                                              [PExp { priority = 1, argopts = []
-                                                    , pname = {arg0}
-                                                    , getTm = PRef (test):2:4-5
-                                                                   [(test):2:4-5]
+                       (PApp (test):<span class="hljs-number">2</span>:<span class="hljs-number">4</span> (PRef (test):<span class="hljs-number">2</span>:<span class="hljs-number">1</span>-<span class="hljs-number">3</span> [(test):<span class="hljs-number">2</span>:<span class="hljs-number">1</span>-<span class="hljs-number">3</span>] id)
+                                              [PExp { <span class="hljs-attr">priority</span> = <span class="hljs-number">1</span>, <span class="hljs-attr">argopts</span> = []
+                                                    , <span class="hljs-attr">pname</span> = {arg0}
+                                                    , <span class="hljs-attr">getTm</span> = PRef (test):<span class="hljs-number">2</span>:<span class="hljs-number">4</span>-<span class="hljs-number">5</span>
+                                                                   [(test):<span class="hljs-number">2</span>:<span class="hljs-number">4</span>-<span class="hljs-number">5</span>]
                                                                    x
                                                     }])
                        []
-                       (PRef (test):2:8-9 [(test):2:8-9] x)
+                       (PRef (test):<span class="hljs-number">2</span>:<span class="hljs-number">8</span>-<span class="hljs-number">9</span> [(test):<span class="hljs-number">2</span>:<span class="hljs-number">8</span>-<span class="hljs-number">9</span>] x)
                        []
              ]
 ]
 </code></pre>
-<p>This is a bit long, but going through it bit by bit and ignoring some
+<p class="lang-highlight">This is a bit long, but going through it bit by bit and ignoring some
 parts, we can hopefully make sense of it. First, there are two
-top-level declarations <code>PTy</code> and <code>PClauses</code>, which are constructors of
+top-level declarations <code class="hljs ebnf"><span class="hljs-attribute">PTy</span></code> and <code>PClauses</code>, which are constructors of
 the
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L637"><code>PDecl&#39;</code></a>
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L637" class="lang-highlight"><code class="hljs matlab">PDecl'</code></a>
 datatype. The <code>PTy</code> is a type declaration which consists of a
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Docstrings.hs#L48"><code>Docstring</code></a>, a list of
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Core/TT.hs#L452"><code>Name</code></a>-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Docstrings.hs#L48"><code>Docstring</code></a> tuples (presumably for the
-parameters), a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1443"><code>SyntaxInfo</code></a> (briefly touched on before),
-a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Core/TT.hs#L83"><code>FC</code></a> (which is a source location and here pretty-printed to
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Docstrings.hs#L48" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">Docstring</span></code></a>, a list of
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Core/TT.hs#L452" class="lang-highlight"><code class="hljs delphi"><span class="hljs-keyword">Name</span></code></a>-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Docstrings.hs#L48" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">Docstring</span></code></a> tuples (presumably for the
+parameters), a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L1443" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">SyntaxInfo</span></code></a> (briefly touched on before),
+a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Core/TT.hs#L83" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">FC</span></code></a> (which is a source location and here pretty-printed to
 <code>(test):1:4</code>, I think this is the position of the <code>:</code>), a list of
 <code>FnOpt</code> (extra info such as if a function is inlinable, total, etc.),
 a <code>Name</code>, another <code>FC</code> (source location, this is the position of the
-name) and finally a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L945"><code>PTerm</code></a>, which is here a <code>PPi</code>, a
+name) and finally a <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L945" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">PTerm</span></code></a>, which is here a <code>PPi</code>, a
 dependently-typed function type.</p>
-<p>The <code>PClauses</code> is a pattern clause, so really the list of pattern
+<p class="lang-highlight">The <code class="hljs ebnf"><span class="hljs-attribute">PClauses</span></code> is a pattern clause, so really the list of pattern
 matching definitions. It features a source location (<code>FC</code>), a list of
 function options (<code>FnOpts</code>), a name (this seems to be the <code>{_2}</code> here,
 indicating that this name was implicitly generated) and a list of
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L751"><code>PClause&#39; PTerm</code></a>, which are the actual clause definitions.</p>
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/AbsSyntaxTree.hs#L751" class="lang-highlight"><code class="hljs matlab">PClause' PTerm</code></a>, which are the actual clause definitions.</p>
 <p>We could drill down further on each of these, and of course
 there is a ton of details which I blissfully ignore, but I feel like
 that going this far has given me a fairly good superficial

@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>Release It - Summary and Review</title>
     </head>
@@ -26,7 +27,7 @@
 <h1 class="title">Release It - Summary and Review</h1>
 <p class="date">published on January 13th, 2015</p>
 
-<p>So I have finally finished reading Michael Nygard&#39;s terribly named but
+<p>So I have finally finished reading Michael Nygard's terribly named but
 quite interesting book <em>Release It</em>. It covers stability patterns and
 anti-patterns and offers some interesting ideas and concepts for
 improving stability.</p>
@@ -39,8 +40,8 @@ programming error, but some errors will inevitably occur. However,
 these errors must not bring down the entire IT infrastructure of a
 company! It is thus critical to identify how small errors can cause
 entire applications to fail and what can be done to mitigate the
-spread of such failures. The former is examined in &#39;Stability
-Antipatterns&#39;, the latter in &#39;Stability Patterns&#39;.</p>
+spread of such failures. The former is examined in 'Stability
+Antipatterns', the latter in 'Stability Patterns'.</p>
 <h3 id="stability-antipatterns">Stability Antipatterns</h3>
 <ol>
 <li><p>Integration Points</p>
@@ -216,7 +217,7 @@ e.g. limit the number of results that they are willing to process.</p>
 <ul>
 <li><p>Limit to realistic data volumes.</p>
 </li>
-<li><p>Don&#39;t rely on the producer, enforce limits yourself.</p>
+<li><p>Don't rely on the producer, enforce limits yourself.</p>
 </li>
 <li><p>Put limits into other application level protocols.</p>
 </li>
@@ -236,7 +237,7 @@ happens.</p>
 <li><p>Give up and keep moving: it may not matter if we ge a response
 eventually, time is of the essence.</p>
 </li>
-<li><p>Delay retries: Most timeouts are caused by things that don&#39;t resolve
+<li><p>Delay retries: Most timeouts are caused by things that don't resolve
 imediately, wait a little before trying again.</p>
 </li>
 </ul>
@@ -294,14 +295,14 @@ same rate that they are produced.</p>
 </ol>
 <ol>
 <li><p>Fail Fast</p>
-<p>This pattern deals with the problems caused by &#39;slow responses&#39;.
+<p>This pattern deals with the problems caused by 'slow responses'.
 An application should determine as soon as possbile if it can
 service a request and if not it should fail as quickly as
 possible. There are some trade offs with maintaining
 encapsulation here.</p>
 <ul>
 <li><p>Verify integration points early: If required resources are not
-available it&#39;s time to fail fast.</p>
+available it's time to fail fast.</p>
 </li>
 <li><p>Validate input as early as possible.</p>
 </li>
@@ -361,16 +362,16 @@ XML.</p>
 </ul>
 </li>
 </ol>
-<pre><code> Remember these:
+<pre class="lang-highlight"><code class="hljs haml"> Remember these:
 
- - Emulate out-of-spec failures
-
- - Stress the caller: Slow responses, no responses, garbage responses
-
- - Leverage a killer harness for common failures
-
- - Supplement, don&#39;t replace, other testing methods
-</code></pre><ol>
+ -<span class="ruby"> Emulate out-of-spec failures
+</span>
+ -<span class="ruby"> Stress the <span class="hljs-symbol">caller:</span> Slow responses, no responses, garbage responses
+</span>
+ -<span class="ruby"> Leverage a killer harness <span class="hljs-keyword">for</span> common failures
+</span>
+ -<span class="ruby"> Supplement, don<span class="hljs-string">'t replace, other testing methods
+</span></span></code></pre><ol>
 <li><p>Decoupling Middleware</p>
 <p>Asynchronous middleware (e.g. Pub-Sub or messaging communication
 solutions) force the programmers with the possibility of not
@@ -388,7 +389,7 @@ They are more difficult to work with than synchronous middleware
 <h2 id="part-ii-capacity">Part II: Capacity</h2>
 <p>Another case study rings in the part on capacity: This one is on an
 online retailer that re-build their system from scratch over three
-years. When entering load testing it didn&#39;t meet capacity requirements
+years. When entering load testing it didn't meet capacity requirements
 by a factor of 20, after months of testing this imporoved ten-fold.</p>
 <p>It crashed badly when it went live, because all the tests had been
 simulating <em>nice</em> users: users that used the site how it was meant
@@ -448,7 +449,7 @@ application server memory.</p>
 </ol>
 <ol>
 <li><p>Ajax Overkill</p>
-<p>Ajax can be used to hammer a server. Don&#39;t build an essantially
+<p>Ajax can be used to hammer a server. Don't build an essantially
 static homepage with 100 Ajax requests.</p>
 </li>
 </ol>
@@ -488,7 +489,7 @@ on point might not always be.</p>
 </ol>
 <ol>
 <li><p>Cookie Monsters</p>
-<p>Large cookies must be transfered back and forth a lot. Can&#39;t be
+<p>Large cookies must be transfered back and forth a lot. Can't be
 trusted.</p>
 </li>
 </ol>
@@ -507,14 +508,14 @@ makes sense. Some considerations:</p>
 </ol>
 <ol>
 <li><p>Use Caching Carefully</p>
-<p>It&#39;s a trade off, caching things that are seldomly used and
-not expensive to generate doesn&#39;t make sense.</p>
+<p>It's a trade off, caching things that are seldomly used and
+not expensive to generate doesn't make sense.</p>
 </li>
 </ol>
 <ol>
 <li><p>Precompute Content</p>
 <p>When it changes much less frequently than it is requested (and
-it&#39;s worth the effort).</p>
+it's worth the effort).</p>
 </li>
 </ol>
 <ol>
@@ -551,7 +552,7 @@ production (trade-offs ...).</p>
 <ol>
 <li><p>Gathering Availability Requirements: High availability costs
 money and the requirements must thus be balanced with the costs.
-Rule of thumb: Each additional &#39;9&#39; increases the implementation
+Rule of thumb: Each additional '9' increases the implementation
 cost by a factor of 10 and the operational cost by a factor of 2.</p>
 </li>
 <li><p>Documenting Availability Requirements: Once things go down everyone
@@ -604,7 +605,7 @@ a lot of stress).</p>
 <li><p>Clustering: Unlike in load balancing servers are aware of each. Can
 be used for load balancing (active/active) or failover. Do not
 scale linearly like load-balanced shared nothing architectures.
-Nygard considers them a band-aid for applications that don&#39;t do
+Nygard considers them a band-aid for applications that don't do
 clustering / scaling themselves.</p>
 </li>
 </ol>
@@ -612,8 +613,8 @@ clustering / scaling themselves.</p>
 <p>Easy administration leads to good uptime.</p>
 <ol>
 <li><p>Does QA match Production?</p>
-<p>Most often it doesn&#39;t. Differences in topology responsible for
-many outages. It&#39;s advantageous to maintain a similar topology
+<p>Most often it doesn't. Differences in topology responsible for
+many outages. It's advantageous to maintain a similar topology
 (e.g. seperation of services through firewalls, same multiplicty
 of connections) in QA as in production.</p>
 <p>The cost of downtime often exceeds the cost of the extra network
@@ -621,10 +622,10 @@ gear required to run the same setup in QA and in
 production. Pennywise and pound foolish?</p>
 </li>
 <li><p>Configuration Files</p>
-<p>Don&#39;t keep configuration settings that must be changed by sys admins
+<p>Don't keep configuration settings that must be changed by sys admins
 next to the essential (hard-wired) configuration for the application.</p>
 <p>Name configuration properties according to their function,
-e.g. &#39;authenticationServer&#39; instead of &#39;hostname&#39;.</p>
+e.g. 'authenticationServer' instead of 'hostname'.</p>
 </li>
 <li><p>Start-up and Shutdown</p>
 <p>Applications should start up and shut down cleanly and do some
@@ -656,7 +657,7 @@ through tools such as Excel.</p>
 </li>
 <li><p>Forecasts</p>
 <ul>
-<li><p>What&#39;s the capacity?</p>
+<li><p>What's the capacity?</p>
 </li>
 <li><p>When do we have to buy more servers?</p>
 </li>
@@ -778,11 +779,11 @@ avoided by speaking multiple protocols (or versions of) for
 a limited time.</p>
 </li>
 <li><p>Dependencies Between Systems: Databases</p>
-<p>Don&#39;t share databases between services!!!</p>
+<p>Don't share databases between services!!!</p>
 </li>
 </ul>
 </li>
-<li><p>Releases Shouldn&#39;t Hurt</p>
+<li><p>Releases Shouldn't Hurt</p>
 <p>Painful releases mean software is released seldomly, automated,
 zero downtime releases rock!</p>
 </li>
@@ -806,7 +807,7 @@ are covered on a fairly high level and can thus not provide the
 nitty-gritty detail needed when dealing with the discussed topics
 hands on, but this is inevitable when trying to cover such a broad
 range of topics.</p>
-<p>All in all I did enjoy the book and recommend it. If you&#39;re short on
+<p>All in all I did enjoy the book and recommend it. If you're short on
 time I recommend focussing on the part on stability, particularly
 chapters 3, 4 and 5 which delivered the most value for me.</p>
 

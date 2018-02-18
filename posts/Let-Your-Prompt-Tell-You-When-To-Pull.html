@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>Let Your Prompt Tell You When To Pull</title>
     </head>
@@ -29,7 +30,7 @@
 <p>During the last weeks, I have on numerous occasions simply forgotten to
 check repositories for updates. I have then often
 re-implemented functionality (after swearing that whoever was
-responsible for it hadn&#39;t done it yet) that was in fact already
+responsible for it hadn't done it yet) that was in fact already
 implemented in the remote repository.</p>
 <p>This is of course quite terrible, mostly because it makes me feel like
 an absolute idiot (rightly so?) and because it makes me waste time
@@ -38,9 +39,9 @@ would have pulled, but still). So I set out to modify my <a href="http://www.yaw
 prompt so that it will inform me when the remote repository is
 ahead of my local repository. The solution turned out to be quite
 simple, I just had to add</p>
-<pre><code>ZSH_THEME_GIT_PROMPT_BEHIND_REMOTE=&quot;%{$fg_bold[red]%}↓↓↓%{$reset_color%}&quot;
-ZSH_THEME_GIT_PROMPT_AHEAD_REMOTE=&quot;%{$fg_bold[red]%}↑↑↑%{$reset_color%}&quot;
-ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE=&quot;%{$fg_bold[red]%}↕↕↕%{$reset_color%}&quot;
+<pre class="lang-highlight"><code class="hljs routeros"><span class="hljs-attribute">ZSH_THEME_GIT_PROMPT_BEHIND_REMOTE</span>=<span class="hljs-string">"%{<span class="hljs-variable">$fg_bold</span>[red]%}↓↓↓%{<span class="hljs-variable">$reset_color</span>%}"</span>
+<span class="hljs-attribute">ZSH_THEME_GIT_PROMPT_AHEAD_REMOTE</span>=<span class="hljs-string">"%{<span class="hljs-variable">$fg_bold</span>[red]%}↑↑↑%{<span class="hljs-variable">$reset_color</span>%}"</span>
+<span class="hljs-attribute">ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE</span>=<span class="hljs-string">"%{<span class="hljs-variable">$fg_bold</span>[red]%}↕↕↕%{<span class="hljs-variable">$reset_color</span>%}"</span>
 </code></pre><p>to my current zsh scheme.</p>
 <p>Now, whenever a remote repository that I am tracking has new functionality
 my prompt informs me by showing me something along these lines:</p>

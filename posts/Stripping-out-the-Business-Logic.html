@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>Stripping out the Business Logic</title>
     </head>
@@ -35,7 +36,7 @@ One question that intrigues me is how one can seperate out the
 <p>Business logic is, as the name implies, about business first and logic
 second, and since business needs can change on a whim, the business
 logic needs to change too, usually much more often than the rest of
-the application. Furthermore, the business logic is the raison d&#39;être
+the application. Furthermore, the business logic is the raison d'être
 of the whole application, so it makes sense to have this logic in one
 place instead of intermingling it with implementation specific
 logic. Finally, when I write such programs it always seems I have to
@@ -47,8 +48,8 @@ in the business logic DSL or module, reducing the amount of work
 needed and thus speeding up development considerably.</p>
 <p>However, while there is surely some interest in this topic, I have yet
 to find the best way to achieve this. As far as I can tell there may
-be a lot of activity, but this activity doesn&#39;t result in well
-communicated solutions that are easy to comprehend. Maybe I just don&#39;t
+be a lot of activity, but this activity doesn't result in well
+communicated solutions that are easy to comprehend. Maybe I just don't
 get it, but I have yet to find somebody to tell me: this is how you do
 it. It seems that quite often business logic is simply mixed with the
 rest of the application. In this post I want to explore several
@@ -84,7 +85,7 @@ fulfill the following criteria:</p>
     it to a (support) user.</p>
 <p>Complete</p>
 <p>:   We should be able to represent everything we want to represent
-    in this representation, otherwise we&#39;ll have to work around it
+    in this representation, otherwise we'll have to work around it
     at which point we would have probably better done without it.</p>
 <h2 id="some-possible-solutions">Some Possible Solutions</h2>
 <h3 id="finite-state-machines">Finite-State Machines</h3>
@@ -120,9 +121,9 @@ YAWL language.</p>
 <p>What we have done at work is that we have basically defined an
 expression language that is a C++ DSL. With this language you
 can write expressions such as</p>
-<pre><code class="lang-{.cpp}">if_(customerHasValidEmailAddress())
-.then_(completeLogin())
-.else_(sendVerificationEmail() and showEmailVerificationPage())
+<pre class="lang-highlight"><code class="lang-{.cpp} hljs ruby"><span class="hljs-keyword">if</span><span class="hljs-number">_</span>(customerHasValidEmailAddress())
+.<span class="hljs-keyword">then</span><span class="hljs-number">_</span>(completeLogin())
+.<span class="hljs-keyword">else</span><span class="hljs-number">_</span>(sendVerificationEmail() <span class="hljs-keyword">and</span> showEmailVerificationPage())
 </code></pre>
 <p>and so on. Each of the mentioned steps has to be implemented in
 the host language to perform the desired action. This means of
@@ -150,7 +151,7 @@ an idea and I am not sure how it will work.</p>
 out the business language into a seperate representation. I hope I
 have transmitted the idea of why this is desireable and outlined a
 few of the possible approaches that I have found during my inital
-research of the topic. In future posts I hope that I&#39;ll be able to
+research of the topic. In future posts I hope that I'll be able to
 explore some of these approaches in more depth.</p>
 <p>[^1]: <a href="http://stackoverflow.com/questions/11327564/web-development-complex-processes-are-state-machines-the-only-way-to-go">My question</a> on stackoverflow about a year ago on the same topic.</p>
 <p>[^2]: Shopify technical blog: <a href="http://www.shopify.com/technology/3383012-why-developers-should-be-force-fed-state-machines">Why developers should be force-fed finite state machines</a>.</p>

@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>Connect (type) safely</title>
     </head>
@@ -26,24 +27,24 @@
 <h1 class="title">Connect (type) safely</h1>
 <p class="date">published on October 28th, 2017</p>
 
-<p>One of the challenges when trying to use redux with TypeScript in a
-type safe way is to use the <a href="https://redux.js.org/docs/basics/UsageWithReact.html">react-redux</a> <code>connect</code> function in a type
+<p class="lang-highlight">One of the challenges when trying to use redux with TypeScript in a
+type safe way is to use the <a href="https://redux.js.org/docs/basics/UsageWithReact.html">react-redux</a> <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> function in a type
 safe manner. To the best of my knowledge, it <a href="/posts/Trying-and-failing-to-make-redux-connect-type-safe.html">was previously not possible</a>
 to write a type definition for TypeScript which would catch property-related
 type errors. The main culprit was <a href="https://github.com/Microsoft/TypeScript-Handbook/blob/master/pages/Type%20Compatibility.md">TypeScripts unsound handeling of function
 argument types</a>, which were bivariant when they should have been contravariant
 instead.</p>
-<p>However, with TypeScript 2.6 a new strictness option is included called
-<code>strictFunctionTypes</code>. This option will ensure that function arguments are
+<p class="lang-highlight">However, with TypeScript 2.6 a new strictness option is included called
+<code class="hljs ebnf"><span class="hljs-attribute">strictFunctionTypes</span></code>. This option will ensure that function arguments are
 typed contravariantly, as they should be. It turns out that this is really
 all that is needed to make the existing type definition of the <code>connect</code> function
 type safe.</p>
 <h2 id="what-we-want">What we want</h2>
-<p>The redux <code>connect</code> function takes a plain react <a href="https://medium.com/@dan_abramov/smart-and-dump-components-7ca2f9a7c7d0">component</a> which only
+<p class="lang-highlight">The redux <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> function takes a plain react <a href="https://medium.com/@dan_abramov/smart-and-dump-components-7ca2f9a7c7d0">component</a> which only
 depends on its properties and <em>connects</em> it to a redux store, making it
 a <a href="https://medium.com/@dan_abramov/smart-and-dump-components-7ca2f9a7c7d0">container</a> which can depend on and modify the application state in the
 redux store.</p>
-<p>To do this, <code>connect</code> takes two functions, <code>mapStateToProps</code> and
+<p class="lang-highlight">To do this, <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> takes two functions, <code>mapStateToProps</code> and
 <code>mapDispatchToProps</code>. As the name suggests, <code>mapStateToProps</code> uses the
 current application state to produce properties and the <code>mapDispatchToProps</code>
 function uses the dispatch function to produce properties for the component
@@ -55,47 +56,47 @@ Thus, the type definition of the <code>connect</code> function should ensure tha
 the merged return values are a superset of the properties that the
 component passed to the connect function expects.</p>
 <h2 id="the-problem-with-bivariant-function-types">The problem with bivariant function types</h2>
-<p>Up to TypeScript 2.5, function arguments would always be typed bivariantely,
-which would lead to the following problem with the <code>connect</code> function:</p>
-<pre><code class="lang-TypeScript">interface OldProps {
-    oldIndex: number;
+<p class="lang-highlight">Up to TypeScript 2.5, function arguments would always be typed bivariantely,
+which would lead to the following problem with the <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> function:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">interface</span> OldProps {
+    oldIndex: <span class="hljs-built_in">number</span>;
 }
 
-const OldComp: React.SFC&lt;OldProps&gt; = props =&gt; {
-    return div(undefined, props.oldIndex.toString());
+<span class="hljs-keyword">const</span> OldComp: React.SFC&lt;OldProps&gt; = <span class="hljs-function"><span class="hljs-params">props</span> =&gt;</span> {
+    <span class="hljs-keyword">return</span> div(<span class="hljs-literal">undefined</span>, props.oldIndex.toString());
 };
 
-interface NewProps {
-    newIndex: number;
+<span class="hljs-keyword">interface</span> NewProps {
+    newIndex: <span class="hljs-built_in">number</span>;
 }
 
-interface State {}
+<span class="hljs-keyword">interface</span> State {}
 
-interface Dispatch {}
+<span class="hljs-keyword">interface</span> Dispatch {}
 
-interface PropsFromState {}
+<span class="hljs-keyword">interface</span> PropsFromState {}
 
-interface PropsFromDispatch {}
+<span class="hljs-keyword">interface</span> PropsFromDispatch {}
 
-function mapStateToProps(s: State, np: NewProps): PropsFromState {
-    return {};
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">mapStateToProps</span>(<span class="hljs-params">s: State, np: NewProps</span>): <span class="hljs-title">PropsFromState</span> </span>{
+    <span class="hljs-keyword">return</span> {};
 }
 
-function mapDispatchToProps(d: Dispatch, np: NewProps): PropsFromDispatch {
-    return {};
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">mapDispatchToProps</span>(<span class="hljs-params">d: Dispatch, np: NewProps</span>): <span class="hljs-title">PropsFromDispatch</span> </span>{
+    <span class="hljs-keyword">return</span> {};
 }
 
-// No type error in TypeScript &lt;= 2.5 - but using NewComp leads to a
-// runtime error as `oldIndex` is undefined
-const NewComp = connect(mapStateToProps, mapDispatchToProps)(OldComp);
+<span class="hljs-comment">// No type error in TypeScript &lt;= 2.5 - but using NewComp leads to a</span>
+<span class="hljs-comment">// runtime error as `oldIndex` is undefined</span>
+<span class="hljs-keyword">const</span> NewComp = connect(mapStateToProps, mapDispatchToProps)(OldComp);
 </code></pre>
-<p>The problem here is that <code>PropsFromState &amp; PropsFromDispatch = {} &amp; {} = {}</code>
+<p class="lang-highlight">The problem here is that <code class="hljs dust"><span class="xml">PropsFromState &amp; PropsFromDispatch = </span><span class="hljs-template-variable">{}</span><span class="xml"> &amp; </span><span class="hljs-template-variable">{}</span><span class="xml"> = </span><span class="hljs-template-variable">{}</span><span class="xml"></span></code>
 is clearly not a superset of <code>OldProps = { oldIndex: number; }</code>, but the
 type checker (up to 2.5) does not complain about this as it is happy if
 either <code>(PropsFromState &amp; PropsFromDispatch) extends OldProps</code> or <code>OldProps extends (PropsFromState &amp; PropsFromDispatch)</code>. This is just the unsoundness which
 is introduced by typing function arguments bivariantly.</p>
 <h2 id="strictfunctiontypes-to-the-rescue">strictFunctionTypes to the rescue</h2>
-<p>With the <code>strictFunctionTypes</code> option enabled, TypeScript 2.6 now types
+<p class="lang-highlight">With the <code class="hljs ebnf"><span class="hljs-attribute">strictFunctionTypes</span></code> option enabled, TypeScript 2.6 now types
 function arguments contravariantly. In case of the connect function this means
 that it insists that <code>(PropsFromState &amp; PropsFromDispatch) extends OldProps</code>
 must hold, the other way around is no longer enough. This fixes the problem

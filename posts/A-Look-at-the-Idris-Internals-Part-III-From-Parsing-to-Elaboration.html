@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="description" content="">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
         <link rel="stylesheet" href="/css/default.css" type="text/css">
         <title>A Look at the Idris Internals, Part III - From Parsing to Elaboration</title>
     </head>
@@ -29,42 +30,42 @@
 <p>So after looking at the parser in the <a href="/posts/A-Look-at-the-Idris-Internals-Part-II-Taking-the-Parser-for-a-Spin.html">last post</a>, this post will
 explore what happens after an Idris has been parsed, namely how
 it is desugared and elaborated to a TT program.</p>
-<p>Looking throught the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1635"><code>idrisMain</code></a> method in <code>REPL.hs</code>, it seems that
-code is actually loaded by either the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535"><code>loadInputs</code></a> function (also in
-<code>REPL.hs</code>) or the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583"><code>loadModule</code></a> from <code>Parser.hs</code>.</p>
-<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535"><code>loadInputs</code></a> <em>loads</em> a list of Idris files, meaning that it tries to
+<p class="lang-highlight">Looking throught the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1635" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">idrisMain</span></code></a> method in <code class="hljs css"><span class="hljs-selector-tag">REPL</span><span class="hljs-selector-class">.hs</span></code>, it seems that
+code is actually loaded by either the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">loadInputs</span></code></a> function (also in
+<code>REPL.hs</code>) or the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583" class="lang-highlight"><code class="hljs apache"><span class="hljs-attribute"><span class="hljs-nomarkup">loadModule</span></span></code></a> from <code>Parser.hs</code>.</p>
+<p class="lang-highlight"><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1535" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">loadInputs</span></code></a> <em>loads</em> a list of Idris files, meaning that it tries to
 completely process these files (reading, parsing, elaborating, saving
-the state in the <code>IState</code>) and all their dependencies. It uses the
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Chaser.hs#L116"><code>buildTree</code></a> function from <code>Chaser.hs</code> to retrieve the actual files
+the state in the <code class="hljs ebnf"><span class="hljs-attribute">IState</span></code>) and all their dependencies. It uses the
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Chaser.hs#L116" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">buildTree</span></code></a> function from <code>Chaser.hs</code> to retrieve the actual files
 along with modification times and indicating if a file needs to be
-re-loaded. It uses the locally defined <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1599"><code>tryLoad</code></a> function, which
-uses <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1615"><code>loadFromIFile</code></a> from <code>Parser.hs</code> which either re-loads an
-existing IBC file or processes a file via the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a>
-function. Similarly, the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583"><code>loadModule</code></a> function also checks if a
+re-loaded. It uses the locally defined <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L1599" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">tryLoad</span></code></a> function, which
+uses <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1615" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">loadFromIFile</span></code></a> from <code>Parser.hs</code> which either re-loads an
+existing IBC file or processes a file via the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">loadSource</span></code></a>
+function. Similarly, the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#L1583" class="lang-highlight"><code class="hljs apache"><span class="hljs-attribute"><span class="hljs-nomarkup">loadModule</span></span></code></a> function also checks if a
 module is already loaded, if not either loads it from an up-to-date
-IBC file or ends up loading it from source via <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a>. So
-either way <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> seems like an important part of processing
+IBC file or ends up loading it from source via <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">loadSource</span></code></a>. So
+either way <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">loadSource</span></code></a> seems like an important part of processing
 and loading source files in Idris ;).</p>
-<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639"><code>loadSource</code></a> does <em>a lot of things</em>^[I must admit I am a bit unhappy
+<p><a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1639" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">loadSource</span></code></a> does <em>a lot of things</em>^[I must admit I am a bit unhappy
 with the plethora of 150+ line monadic functions in the Idris source code,
-but that&#39;s just a newbie complaining....], such as loading all required
+but that's just a newbie complaining....], such as loading all required
 IBC files for modules required by that file (which presumably must exist
 at this point), clears the current IBC cache, parses the file with the
-<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1554"><code>parseProg</code></a> function and then (dam, dam, dam), goes on to elaborate and
-typecheck the loaded program by calling <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148"><code>elabDecls</code></a> on the parsed declarations.</p>
+<a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Parser.hs#1554" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">parseProg</span></code></a> function and then (dam, dam, dam), goes on to elaborate and
+typecheck the loaded program by calling <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">elabDecls</span></code></a> on the parsed declarations.</p>
 <p>So looking at Idris as a compiler (as opposed to say the REPL
-functionality), the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148"><code>elabDecls</code></a> seems to be the most important entry
-point into the elaborator. The <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L815"><code>process</code></a> function which seems to be
+functionality), the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/ElabDecls.hs#L148" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">elabDecls</span></code></a> seems to be the most important entry
+point into the elaborator. The <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/REPL.hs#L815" class="lang-highlight"><code class="hljs arduino"><span class="hljs-built_in">process</span></code></a> function which seems to be
 processing REPL commands is also an interesting entry point, as it is
 processing pieces of Idris code in smaller chunks. It ends up making a
-few calls to the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92"><code>elabVal</code></a> and <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L135"><code>elabREPL</code></a> (which is a wrapper with
-a catch around <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92"><code>elabVal</code></a>) functions.</p>
+few calls to the <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">elabVal</span></code></a> and <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L135" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">elabREPL</span></code></a> (which is a wrapper with
+a catch around <a href="https://github.com/idris-lang/Idris-dev/blob/76257997a9bf03d62e28cefba0d6a7d3d42eca28/src/Idris/Elab/Value.hs#L92" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">elabVal</span></code></a>) functions.</p>
 <!--
 In keeping with the spirit of the [last post], let's try to run the
 elaborator on a small piece of Idris code to see what it
 does. Spinning up a `cabal repl` as in the last post,
 -->
-<p>All in all, we&#39;ve basically looked a bit more at how the elaborator
+<p>All in all, we've basically looked a bit more at how the elaborator
 ends up being invoked, but not at how it really works. Unfortunately,
 the latter is really a bit beyond of the scope of these blog posts (at
 least for now), where I try to familiarize myself with the Idris code
