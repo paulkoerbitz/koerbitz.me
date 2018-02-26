@@ -25,11 +25,11 @@
             <div class="body">
 
 <h1 class="title">Announcing typeful-redux</h1>
-<p class="date">published on February 18th, 2018</p>
+<p class="date">published on February 26th, 2018</p>
 
 <p class="lang-highlight">I am proud to announce the publication of <a href="https://github.com/paulkoerbitz/typeful-redux">typeful-redux</a>, a fully
-type-safe, low boilerplate redux wrapper. To my knowledge, this is
-the first redux wrapper which achieves end-to-end type safety. In
+type-safe, low boilerplate redux wrapper for TypeScript. To my knowledge,
+this is the first redux wrapper which achieves end-to-end type safety. In
 particular, the <code class="hljs ebnf"><span class="hljs-attribute">dispatch</span></code> function / object is fully typed, and
 these types are maintained when using <a href="https://github.com/reactjs/react-redux">react-redux</a>'s <code>connect</code>
 function to connect a component to a redux store.</p>
@@ -56,8 +56,10 @@ calls are fully type-safe and will trigger type errors when used incorrectly.</p
     .addReducer(<span class="hljs-string">'todos'</span>, TodoReducer)
     .addMiddleware(reduxLogger) <span class="hljs-comment">// as example</span>
     .build();
-
-<span class="hljs-comment">// The result has type: { todos: TodoItem[] }</span>
+</code></pre>
+<p class="lang-highlight">Both the <code class="hljs ebnf"><span class="hljs-attribute">getState</span></code> function and all functions on the <code>dispatch</code> object
+are now fully typechecked - using them incorrectly will trigger a type error:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-comment">// The result has type: { todos: TodoItem[] }</span>
 <span class="hljs-keyword">const</span> state = store.getState();
 
 <span class="hljs-comment">// All dispatches are fully type checked</span>
@@ -66,7 +68,10 @@ calls are fully type-safe and will trigger type errors when used incorrectly.</p
 store.dispatch.todos.clear();
 
 <span class="hljs-comment">// Dispatches</span>
-<span class="hljs-comment">// { type: 'todos/add', payload: { completed: false, task: 'Provide a fully type-safe interface to redux' } }</span>
+<span class="hljs-comment">// { type: 'todos/add',</span>
+<span class="hljs-comment">//   payload: { completed: false,</span>
+<span class="hljs-comment">//              task: 'Provide a fully type-safe interface to redux' }</span>
+<span class="hljs-comment">// }</span>
 store.dispatch.todos.add({
     task: <span class="hljs-string">'Provide a fully type-safe interface to redux'</span>,
     completed: <span class="hljs-literal">false</span>
@@ -75,6 +80,10 @@ store.dispatch.todos.add({
 <span class="hljs-comment">// Dispatches { type: 'todos/toggle', payload: 0 }</span>
 store.dispatch.todos.toggle(<span class="hljs-number">0</span>);
 </code></pre>
+<p class="lang-highlight">In addition, <a href="https://github.com/paulkoerbitz/typeful-redux">typeful-redux</a> also provides a typesafe wrapper for
+<a href="https://github.com/reactjs/react-redux">react-redux</a>'s <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> method. This means that any type mismatch
+when connecting a component to a store will be detected and produce
+a type error.</p>
 <p>A very simple, runnable example app can be found <a href="https://github.com/paulkoerbitz/typeful-redux/tree/master/examples/todomvc">here</a>. A TodoMVC implementation with slightly more features is availabe <a href="https://github.com/paulkoerbitz/typeful-redux/tree/master/examples/simple-todo">here</a>.</p>
 <h2 id="motivation">Motivation</h2>
 <p><a href="http://redux.js.org">redux</a> is a fantastic approach to manage state in single page applications.
@@ -101,7 +110,7 @@ namespace is 'global'. This is non-modular, e.g. the same actions and reducers c
 </ul>
 <p>Besides these differences and different surface appearence, typeful-redux <strong>is not an alternative redux implementation</strong>, it is just a thin wrapper around reducer and store creation. The resulting runtime objects are plain redux reducers and stores equipped with the right type definitions (and sometimes some tiny convenience wrappers). All the existing redux ecosystem should be usable with this library. Please file an issue if you have trouble using a redux library with typeful-redux.</p>
 <h2 id="overview-over-the-library">Overview over the library</h2>
-<p><a href="https://github.com/paulkoerbitz/typeful-redux">typeful-redux</a> exports two functions and one class (and a few supporting type definitions). The purpose of the functions is described here. Also see the <a href="./examples/">examples</a> for example usages. If you find the documentation insufficient please file an issue or complain to me via email (see profile).</p>
+<p><a href="https://github.com/paulkoerbitz/typeful-redux">typeful-redux</a> exports two functions and one class (and a few supporting type definitions). The purpose of the functions is described here. Also see the <a href="https://github.com/paulkoerbitz/typeful-redux/tree/master/examples/">examples</a> for example usages. If you find the documentation insufficient please file an issue or complain to me via email.</p>
 <h3 id="-createreducer-" class="lang-highlight"><code class="hljs ebnf"><span class="hljs-attribute">createReducer</span></code></h3>
 <p class="lang-highlight">This function allows creating a reducer by adding action names and the code
 'reducing' the action simultaneously. While adding actions, the type of the
@@ -163,11 +172,62 @@ store.dispatch.todos.toggle(<span class="hljs-number">0</span>);
 <p class="lang-highlight">Each method dispatches the right action on the store with the passed argument
 as the payload. Actions are namespaced - so <code class="hljs stylus">store<span class="hljs-selector-class">.dispatch</span><span class="hljs-selector-class">.toggle</span>(<span class="hljs-number">0</span>)</code> dispatches
 a <code>{ type: 'todos/toggle', payload: 0 }</code> action. This means that action types no
-longer have to be globally unique - they just have to be unique for their reducer
-and enables using the same reducer for multiple parts of the store.</p>
+longer have to be globally unique - they just have to be unique for their reducer.
+This enables using the same reducer for multiple parts of the store.</p>
 <h3 id="-connect-" class="lang-highlight"><code class="hljs arduino"><span class="hljs-built_in">connect</span></code></h3>
-<p class="lang-highlight">This is a re-export of the redux connect function, with a more restricted type to ensure that the typing of the <code class="hljs ebnf"><span class="hljs-attribute">dispatch</span></code> object is known
-in the <code>mapDispatchToProps</code> function. This makes it possible to <em class="lang-highlight">propagate type errors through <code class="hljs arduino"><span class="hljs-built_in">connect</span></code></em>, which is not possible with the current type definition of <a href="https://github.com/reactjs/react-redux">react-redux</a>'s <code>connect</code>.</p>
+<p class="lang-highlight">This is a re-export of the redux connect function, with a more restricted type to ensure that the typing of the <code class="hljs ebnf"><span class="hljs-attribute">dispatch</span></code> object is known in the <code>mapDispatchToProps</code> function. This makes it possible to <em class="lang-highlight">propagate type errors through <code class="hljs arduino"><span class="hljs-built_in">connect</span></code></em>, which is not possible with the current type definition of <a href="https://github.com/reactjs/react-redux">react-redux</a>'s <code>connect</code>.</p>
+<p class="lang-highlight">To explain how <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> can be used to its full benefit, we must understand the type
+of the produced <code>store</code>. In general <code>store</code> will have the following type:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> Store&lt;STATE, DISPATCH&gt; = {
+    getState(): STATE;
+    subscribe(): <span class="hljs-built_in">void</span>;
+    dispatch: DISPATCH;
+};
+</code></pre>
+<p class="lang-highlight">where <code class="hljs ebnf"><span class="hljs-attribute">STATE</span></code> is a map from the reducer names (here: <code>todos</code>) and the state types and
+<code>DISPATCH</code> is a map from the reducer names (again <code>todos</code>) to functions which dispatch
+the respective actions.</p>
+<p class="lang-highlight">Now the <code class="hljs arduino"><span class="hljs-built_in">connect</span></code> function is set up so given a <code>mapStateToProps</code> which accepts a <code>STATE</code>
+and a <code>mapDispatchToProps</code> which accepts a <code>DISPATCH</code>, it produces a container which needs
+to have a <code>{ store: Store&lt;STATE, DISPATCH&gt;; }</code> as part of properties. This way the types
+from the store can be propagated all the way to the components and changing the type
+of an action-reducer triggers a type-error in all the right places.</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">interface</span> State {
+    todos: TodoItem;
+}
+
+<span class="hljs-keyword">interface</span> Dispatch {
+    todos: {
+        add(description: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+        clear(): <span class="hljs-built_in">void</span>;
+        toggle(index: <span class="hljs-built_in">number</span>): <span class="hljs-built_in">void</span>;
+    };
+}
+<span class="hljs-comment">// Let's say we have a `TodoListComponent` which wants the following</span>
+<span class="hljs-comment">// properties</span>
+<span class="hljs-keyword">interface</span> TodoListProps = {
+    todos: TodoItem;
+    add(description: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+    clear(): <span class="hljs-built_in">void</span>;
+    toggle(index: <span class="hljs-built_in">number</span>): <span class="hljs-built_in">void</span>;
+}
+
+<span class="hljs-keyword">class</span> TodoListComponent <span class="hljs-keyword">extends</span> React.Component&lt;TodoListProps&gt; {
+    <span class="hljs-comment">// ...</span>
+}
+
+<span class="hljs-keyword">const</span> mapStateToProps = <span class="hljs-function">(<span class="hljs-params">state: State</span>) =&gt;</span> state;
+<span class="hljs-keyword">const</span> mapDispatchToProps = <span class="hljs-function">(<span class="hljs-params">dispatch: Dispatch</span>) =&gt;</span> dispatch.todos;
+
+
+<span class="hljs-comment">// TodoListContainer is infered to have a type which requires a property</span>
+<span class="hljs-comment">// `{ store: Store&lt;State, Dispatch&gt; }`</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-keyword">const</span> TodoListContainer = connect(mapStateToProps, mapDispatchToProps)(TodoListComponent);
+</code></pre>
+<p class="lang-highlight"><code class="hljs arduino"><span class="hljs-built_in">connect</span></code> can also be used with <code>mapStateToProps</code> and <code>mapDispatchToProps</code> with
+a second argument, these second arguments become part of the required properties
+of the connected container.</p>
 <h2 id="how-does-it-all-work-">How does it all work?</h2>
 <p>In the <a href="./typeful-redux-internals">next post</a>, we'll explore in more depth how <a href="https://github.com/paulkoerbitz/typeful-redux">typeful-redux</a> is implemented as it uses some tricks to pick up the types from the reducer and transforms them to give the dispatch objec the right type.</p>
 
