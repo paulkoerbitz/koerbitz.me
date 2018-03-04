@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>typeful-redux - A look under the covers</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
+
+<h1 class="title">typeful-redux - A look under the covers</h1>
+<p class="date">published on March 4th, 2018</p>
+
+<p>In the <a href="/posts/announcing-typeful-redux.html">last post</a> I announced my library <a href="https://github.com/paulkoerbitz/typeful-redux">typeful-redux</a>, a fully
+type-safe, low boilerplate redux wrapper for TypeScript. The library
+achieves full type safety while allowing very concise application code
+by pulling some neat tricks with TypeScript's type system. In this post
+I want to take a closer look at these tricks.</p>
+<h2 id="the-goal">The Goal</h2>
+<p>Before looking at how <a href="https://github.com/paulkoerbitz/typeful-redux">typeful-redux</a> leverages TypeScript's type system,
+it is instructive to consider what the actual goal is. typeful-redux wants to</p>
+<ul>
+<li><p>give a fully type-safe redux wrapper, meaning that the type of the created
+store must be as informative as possible. That means in particular that the
+dispatch function must be fully typed so that all dispatches can be
+type-checked and we can't dispatch actions that do not have a reducer.</p>
+</li>
+<li><p>reduce the boilerplate required to configure actions and reducers.</p>
+</li>
+</ul>
+<p class="lang-highlight">The type of the store looks as follows. <code class="hljs ebnf"><span class="hljs-attribute">STATE</span></code> and <code>DISPATCH</code> are
+the generic type parameters that we want to fill out with the <em>right</em> types:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> Store&lt;STATE, DISPATCH&gt; {
+    getState(): STATE;
+    dispatch: DISPATCH;
+    <span class="hljs-comment">// I'll leave this out going forward because it is boring</span>
+    subscribe(<span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> <span class="hljs-built_in">void</span>): <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> <span class="hljs-built_in">void</span>;
+}
+</code></pre>
+<p class="lang-highlight">As an example, if we create a store with a single reducer that gets
+a <em>namespace</em> of <code class="hljs ebnf"><span class="hljs-attribute">todos</span></code> and, has state <code>TodoItem[]</code> and actions
+<code>add</code>, <code>clear</code> and <code>toggle</code>, the full store type will look as follows:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">interface</span> TodoItem {
+    task: <span class="hljs-built_in">string</span>;
+    completed: <span class="hljs-built_in">boolean</span>;
+}
+
+<span class="hljs-comment">// Create a new reducer with initial state [], then add three actions</span>
+<span class="hljs-keyword">const</span> TodoReducer = createReducer([] <span class="hljs-keyword">as</span> TodoItem[])
+    (<span class="hljs-string">'clear'</span>, <span class="hljs-function"><span class="hljs-params">s</span> =&gt;</span> [])
+    (<span class="hljs-string">'add'</span>, <span class="hljs-function">(<span class="hljs-params">s, newItem: TodoItem</span>) =&gt;</span> [...s, newItem])
+    (<span class="hljs-string">'toggle'</span>, <span class="hljs-function">(<span class="hljs-params">s: TodoItem[], index: <span class="hljs-built_in">number</span></span>) =&gt;</span> [
+        ...s.slice(<span class="hljs-number">0</span>, i),
+        { ...s[i], completed: !s[i].completed },
+        ...s.slice(i + <span class="hljs-number">1</span>)
+    ]);
+
+<span class="hljs-comment">// Create the store</span>
+<span class="hljs-keyword">const</span> store = <span class="hljs-keyword">new</span> StoreBuilder()
+    .addReducer(<span class="hljs-string">'todos'</span>, TodoReducer)
+    .addMiddleware(reduxLogger) <span class="hljs-comment">// as example</span>
+    .build();
+
+<span class="hljs-comment">// store has the following type:</span>
+<span class="hljs-keyword">type</span> StoreType = {
+    getState(): {
+        todos: TodoItem[];
+    };
+    dispatch: {
+        todos: {
+            add(taskName: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+            clear(): <span class="hljs-built_in">void</span>;
+            toggle(taskId: <span class="hljs-built_in">number</span>): <span class="hljs-built_in">void</span>;
+        }
+    }
+};
+</code></pre>
+<p class="lang-highlight">So in this case <code class="hljs ebnf"><span class="hljs-attribute">STATE</span></code> should be inferred to be <code>{ todos: TodoItem[]; }</code>
+and <code>DISPATCH</code> should be inferred to be</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">todos: {
+    add(taskName: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+    clear(): <span class="hljs-built_in">void</span>;
+    toggle(taskId: <span class="hljs-built_in">number</span>): <span class="hljs-built_in">void</span>;
+}
+</code></pre>
+<h2 id="giving-getstate-the-right-type" class="lang-highlight">Giving <code class="hljs stylus"><span class="hljs-function"><span class="hljs-title">getState</span><span class="hljs-params">()</span></span></code> the Right Type</h2>
+<p class="lang-highlight">Let's start with a look at how we can give <code class="hljs stylus"><span class="hljs-function"><span class="hljs-title">getState</span><span class="hljs-params">()</span></span></code> the right
+type as this is a bit easier but essentially leverages the same
+tricks as getting the <code>dispatch</code> object to look right. While pulling
+out the types from the library, I'll leave off parts which are not
+relevant for the current discussion to make following a bit easier.</p>
+<p class="lang-highlight">The first part is pretty simple: the <code class="hljs ebnf"><span class="hljs-attribute">createReuducer</span></code> function takes
+an initial state and returns a <code>Reducer</code> which has a <code>getInitial()</code>
+method that returns this state. So basically the state parameter <code>S</code>
+flows right through <code>createReducer</code>.</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> Reducer&lt;S, <span class="hljs-comment">/* ... */</span>&gt; = {
+    getInitial(): S;
+    <span class="hljs-comment">// ...</span>
+};
+
+<span class="hljs-keyword">const</span> createReducer = &lt;S&gt;(s: S): Reducer&lt;S&gt; =&gt; {
+    <span class="hljs-comment">// ...</span>
+};
+</code></pre>
+<p class="lang-highlight">Next comes the <code class="hljs ebnf"><span class="hljs-attribute">StoreBuilder</span></code> which takes a <code>Reducer</code> and a name
+storing it internally until its <code>build</code> method is invoked which
+creates the store.</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">class</span> StoreBuilder&lt;X = {}, <span class="hljs-comment">/* ... */</span>&gt; = {
+    addReducer&lt;R <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span>, S, <span class="hljs-comment">/* ... */</span>&gt;(
+        reducerName: R,
+        reducerBuilder: Reducer&lt;S, <span class="hljs-comment">/* ... */</span>&gt;
+    ): StoreBuilder&lt;X &amp; { [r <span class="hljs-keyword">in</span> R]: S }, <span class="hljs-comment">/* ... */</span>&gt;
+
+    build(): Store&lt;X, <span class="hljs-comment">/* ... */</span>&gt;;
+}
+</code></pre>
+<p class="lang-highlight">Here things become a little more interesting: <code class="hljs ebnf"><span class="hljs-attribute">StoreBuilder</span></code> has a
+type parameter <code>X</code> which at the end becomes the <code>STATE</code> type, which
+is type of the store state. We can see this because it is the first
+type parameter to <code>Store</code> which <code>build</code> returns.</p>
+<p class="lang-highlight">Now comes the first trick: When another reducer is added, <code class="hljs ebnf"><span class="hljs-attribute">addReducer</span></code> takes
+the <code>reducerName</code> (in the example above, this is <code>'todos'</code>) for which it
+infers the type <code>R</code> which is a subtype of <code>string</code>. Specifying the type
+parameter in this way, <code>R</code> will be infered to be the string itself. So
+if we call <code>.addReducer('todos', TodosReducer)</code>, then <code>R</code> is inferred to be
+the type <code>'todos'</code>. This will be useful in a minute.</p>
+<p class="lang-highlight">The second trick is to extract the type of the state from the <code class="hljs ebnf"><span class="hljs-attribute">Reducer</span></code>. This
+is realtively easy, <code>addReducer</code> has a second type parameter <code>S</code> which is
+the first type parameter to <code>Reducer</code>, this way <code>S</code> will be infered to the
+type of the <code>Reducer</code>'s state.</p>
+<p class="lang-highlight">The third trick now brings these things together by returning a <code class="hljs ebnf"><span class="hljs-attribute">StoreBuilder</span></code>
+with a new type. The type parameter <code>X</code> of <code>StoreBuilder</code> now becomes
+<code>X &amp; { [r in R]: S }</code>. As stated above <code>R</code> will have been inferred to the
+<code>reducerName</code> and <code>S</code> to the state type of the reducer. Thus <code>{ [r in 'todos']: S }</code>
+is basically <code>{ todos: S }</code> and intersecting the <em>state type so far</em> (<code>X</code>) with
+basically means <em class="lang-highlight">give <code class="hljs ebnf"><span class="hljs-attribute">X</span></code> also the property <code>'todos'</code> with type <code>S</code></em>.</p>
+<p class="lang-highlight">By combining these methods as described above we can extend the state parameter
+with each <code class="hljs ebnf"><span class="hljs-attribute">addReducer</span></code> call so that we can always give <code>getState()</code> the right
+return type.</p>
+<h2 id="building-a-fully-typed-dispatch-object">Building a Fully-Typed Dispatch Object</h2>
+<p class="lang-highlight">Hopefully the discussion for <code class="hljs stylus"><span class="hljs-function"><span class="hljs-title">getState</span><span class="hljs-params">()</span></span></code> was somewhat easy to follow. To give
+<code>dispatch</code> the right types we will use the exact same tricks but we need to
+go through one more level of indirection.</p>
+<p class="lang-highlight">Let's go back to <code class="hljs ebnf"><span class="hljs-attribute">Reducer</span></code> and <code>createReducer</code> where we have left of the most
+interesting parts. A more complete type of <code>Reducer</code> looks as follows (I still
+leave of some parts for clarity, but there are no type tricks involved there,
+they are just there for convenience, so we're not missing anything by not
+discussing them):</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> Reducer&lt;STATE, DISPATCH = {}&gt; = {
+    <span class="hljs-comment">// for adding setters, these are actions without a payload</span>
+    &lt;K <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span>&gt;(
+        name: K,
+        handler: <span class="hljs-function">(<span class="hljs-params">state: STATE</span>) =&gt;</span> STATE
+    ): Reducer&lt;STATE, DISPATCH &amp; Dispatch0&lt;K&gt;&gt;;
+
+    <span class="hljs-comment">// for adding handlers, these are actions with a payload</span>
+    &lt;K <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span>, PAYLOAD&gt;(
+        name: K,
+        handler: <span class="hljs-function">(<span class="hljs-params">state: STATE, payload: PAYLOAD</span>) =&gt;</span> STATE
+    ): Reducer&lt;STATE, DISPATCH &amp; Dispatch1&lt;K, PAYLOAD&gt;&gt;;
+
+    <span class="hljs-comment">// ...</span>
+};
+
+<span class="hljs-keyword">type</span> Dispatch0&lt;K <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span>&gt; = {
+    [k <span class="hljs-keyword">in</span> K]: { (): <span class="hljs-built_in">void</span>; }
+};
+
+<span class="hljs-keyword">type</span> Dispatch1&lt;K <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span>, P&gt; = {
+    [k <span class="hljs-keyword">in</span> K]: { (x: P): <span class="hljs-built_in">void</span>; }
+};
+</code></pre>
+<p class="lang-highlight">So we see that <code class="hljs ebnf"><span class="hljs-attribute">Reducer</span></code> has two generic type parameter:
+<code>STATE</code> is the type of the state as we have seen previously and <code>DISPATCH</code>
+is the final type of the dispatch functions that we are interested in (this is
+what <code>StoreBuilder</code> will use to assemble the type of the dispatch object).</p>
+<p class="lang-highlight">There are two different call signatures, the first one is for adding
+actions which don't need a payload (I call them <code class="hljs ebnf"><span class="hljs-attribute">setters</span></code> here) and the
+second one is for actions which do need a payload (called <code>handlers</code>).
+They serve essentially the same purpose, but for type inference reasons,
+it is necessary to have two different signatures.</p>
+<p class="lang-highlight">Let's focus on the second signature, as both work essentially the same
+way. Really what we are doing here is we're using the same trick as when
+building up the full store state type to build up the type of the dispatch
+functions on this reducer. As an example, let's say we call the <code class="hljs ebnf"><span class="hljs-attribute">Reducer</span></code>
+with the following parameters:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">const</span> TodoReducer = createReducer([] <span class="hljs-keyword">as</span> TodoItem[])
+    (<span class="hljs-string">'add'</span>, <span class="hljs-function">(<span class="hljs-params">s: TodoItem[], todoName: <span class="hljs-built_in">string</span></span>) =&gt;</span> <span class="hljs-comment">/* ... */</span>)
+</code></pre>
+<p class="lang-highlight">so <code class="hljs applescript"><span class="hljs-built_in">name</span></code> is <code>'add'</code>, <code>STATE</code> is <code>TodoItem[]</code> and <code>PAYLOAD</code> is <code>string</code>.
+As before, the type parameter <code>K</code> will be inferred to be just <code>'add'</code>. We
+then return a <code>Reducer&lt;STATE, DISPATCH &amp; Dispatch&lt;K, PAYLOAD&gt;&gt;</code>, substituting
+the parameters <code>STATE = TodoItem[]</code>, <code>DISPATCH = {}</code>, <code>K = 'add'</code> and <code>PAYLOAD = string</code> we get</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">Reducer&lt;STATE, DISPATCH &amp; Dispatch&lt;K, PAYLOAD&gt;&gt;
+= Reducer&lt;TodoItem[], {} &amp; Dispatch&lt;<span class="hljs-string">'add'</span>, <span class="hljs-built_in">string</span>&gt;&gt;
+= Reducer&lt;TodoItem[], {} &amp; { [k <span class="hljs-keyword">in</span> <span class="hljs-string">'add'</span>]: { (x: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> } }&gt;
+= Reducer&lt;TodoItem[], { [k <span class="hljs-keyword">in</span> <span class="hljs-string">'add'</span>]: { (x: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> } }&gt;
+= Reducer&lt;TodoItem[], { add: { (x: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> } }&gt;
+= Reducer&lt;TodoItem[], { add(x: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>; }&gt;
+</code></pre>
+<p class="lang-highlight">So now the <code class="hljs ebnf"><span class="hljs-attribute">DISPATCH</span></code> type parameter is <code>{ add(x: string): void; }</code>, thus
+a single function with name <code>add</code> that accepts a <code>string</code> and returns <code>void</code>.
+It might be instructive to run through these substitutions one more time
+with a second handler, but I'll leave this as an exercise to the reader.</p>
+<p class="lang-highlight">Let's instead look at how <code class="hljs ebnf"><span class="hljs-attribute">StoreBuilder</span></code> uses this information to build up
+the type of the full dispatch object. Going back to this definition,
+we'll see that <code>StoreBuilder</code> also has a second type parameter which
+is the type of the dispatch object.</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">class</span> StoreBuilder&lt;X = {}, Y = {}&gt; {
+    <span class="hljs-keyword">public</span> addReducer&lt;R <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span>, S, YY&gt;(
+        reducerName: R,
+        reducerBuilder: Reducer&lt;S, YY&gt;
+    ): StoreBuilder&lt;X &amp; { [r <span class="hljs-keyword">in</span> R]: S }, Y &amp; { [r <span class="hljs-keyword">in</span> R]: YY }&gt; {
+</code></pre>
+<p class="lang-highlight">Looking at the <code class="hljs ebnf"><span class="hljs-attribute">addReducer</span></code> method again, we see that <code>StoreBuilder</code>
+uses the exact same mechanism to extend the type of the store dispatch
+object as it uses for the type of the store state. Using the <code>Reducer</code>
+from above, let's look at how the types get inferred in this example</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-comment">// TodoReducer has type Reducer&lt;TodoItem[], { add(x: string): void; }&gt;</span>
+
+<span class="hljs-keyword">new</span> StoreBuilder()
+    .addReducer(<span class="hljs-string">'todos'</span>, TodoReducer)
+</code></pre>
+<p class="lang-highlight">Recall that <code class="hljs ebnf"><span class="hljs-attribute">R</span></code> is inferred to be <code>'todos'</code>, <code>S</code> is inferred as <code>TodoItem[]</code>
+and <code>YY</code> is inferred as <code>{ add(x: string): void; }</code>. The resulting
+<code>StoreBuilder</code> type will thus be</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">StoreBuilder&lt;{} &amp; { [r <span class="hljs-keyword">in</span> R]: S }, {} &amp; { [r <span class="hljs-keyword">in</span> R]: YY }&gt;
+= StoreBulider&lt;{ [r <span class="hljs-keyword">in</span> <span class="hljs-string">'todos'</span>]: TodoItem[] }, { [r <span class="hljs-keyword">in</span> <span class="hljs-string">'todos'</span>]: { add(x: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>; } }&gt;
+= StoreBulider&lt;{ todos: TodoItem[] }, { todos: { add(x: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>; } }&gt;
+</code></pre>
+<p class="lang-highlight">When invoking the <code class="hljs ebnf"><span class="hljs-attribute">build</span></code> method, we will get a store with the following type</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> StoreType = {
+    getState(): {
+        todos: TodoItem[];
+    };
+    dispatch: {
+        todos: {
+            add(x: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+        }
+    }
+};
+</code></pre>
+<p>Which is the goal that we started out with. I'm not really sure how to
+conclude this post, but I think it is pretty cool that by leveraging
+three simple tricks we can get a type inferred where it is at first
+surprising that you can actually do this.</p>
+
+
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
+</html>
