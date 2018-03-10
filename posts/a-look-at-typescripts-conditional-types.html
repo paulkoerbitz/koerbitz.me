@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>A Look at TypeScript&#x27;s Conditional Types</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
+
+<h1 class="title">A Look at TypeScript&#x27;s Conditional Types</h1>
+<p class="date">published on March 11th, 2018</p>
+
+<p><a href="https://github.com/Microsoft/TypeScript/milestone/61">TypeScript 2.8</a> introduces a fantastic new feature called
+<a href="https://github.com/Microsoft/TypeScript/pull/21316">conditional types</a> which is going to make TypeScript's type system
+even more powerful and enable a huge range of type orperators which
+were previously not possible. Let's take a look at how this exciting
+new feature works and what we can do with it.</p>
+<p class="lang-highlight">Conditional types essentially give you an <code class="hljs actionscript"><span class="hljs-keyword">if</span></code> statement along with
+the ability to <em>ask questions at the type level</em>. This enables some
+very powerful constructs which were not possible before. Conditional
+types look as follows:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">    T <span class="hljs-keyword">extends</span> U ? X : Y
+</code></pre>
+<p>In Anders Hejlsberg's words this <em>adds the ability to express non-uniform type
+mappings</em>. Before conditional types, there was basically no way to make
+an either-or decision in type operators, now there is.</p>
+<p class="lang-highlight">The <em>question</em> in the conditional type is the <code class="hljs actionscript"><span class="hljs-keyword">extends</span></code> check - if <code>T extends U</code>
+then the resulting type is <code>X</code>, otherwise it is <code>Y</code>. A type <code>extends</code> another
+type if it is assignable to it, or in some sense "at least as big as" the other type. If
+<code>T extends U</code> you can <em class="lang-highlight">do everything with <code class="hljs ebnf"><span class="hljs-attribute">T</span></code> that you can do with <code>U</code></em> or
+<em class="lang-highlight">use <code class="hljs ebnf"><span class="hljs-attribute">T</span></code> everywhere you can use <code>U</code></em>.</p>
+<p>Here is a very simple (and slightly silly) example for using conditional types:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> IsNumberType&lt;T&gt; = T <span class="hljs-keyword">extends</span> <span class="hljs-built_in">number</span> ? <span class="hljs-string">"yes"</span> : <span class="hljs-string">"no"</span>;
+
+<span class="hljs-keyword">type</span> Yes = IsNumberType&lt;<span class="hljs-number">3</span>&gt;; <span class="hljs-comment">// type "yes"</span>
+<span class="hljs-keyword">type</span> No = IsNumberType&lt;<span class="hljs-string">"foo"</span>&gt;; <span class="hljs-comment">// type "no"</span>
+</code></pre>
+<p class="lang-highlight">A more interesting and more useful example is to implement JavaScript's
+<code class="hljs actionscript"><span class="hljs-keyword">typeof</span></code> operator at TypeScript's type level:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> TypeName&lt;T&gt; =
+    T <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span> ? <span class="hljs-string">"string"</span> :
+    T <span class="hljs-keyword">extends</span> <span class="hljs-built_in">number</span> ? <span class="hljs-string">"number"</span> :
+    T <span class="hljs-keyword">extends</span> <span class="hljs-built_in">boolean</span> ? <span class="hljs-string">"boolean"</span> :
+    T <span class="hljs-keyword">extends</span> <span class="hljs-literal">undefined</span> ? <span class="hljs-string">"undefined"</span> :
+    T <span class="hljs-keyword">extends</span> <span class="hljs-built_in">Function</span> ? <span class="hljs-string">"function"</span> :
+    <span class="hljs-string">"object"</span>;
+
+<span class="hljs-keyword">type</span> T0 = TypeName&lt;<span class="hljs-built_in">string</span>&gt;;  <span class="hljs-comment">// "string"</span>
+<span class="hljs-keyword">type</span> T1 = TypeName&lt;<span class="hljs-string">"a"</span>&gt;;  <span class="hljs-comment">// "string"</span>
+<span class="hljs-keyword">type</span> T2 = TypeName&lt;<span class="hljs-literal">true</span>&gt;;  <span class="hljs-comment">// "boolean"</span>
+<span class="hljs-keyword">type</span> T3 = TypeName&lt;<span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> <span class="hljs-built_in">void</span>&gt;;  <span class="hljs-comment">// "function"</span>
+<span class="hljs-keyword">type</span> T4 = TypeName&lt;<span class="hljs-built_in">string</span>[]&gt;;  <span class="hljs-comment">// "object"</span>
+</code></pre>
+<h2 id="the-distributive-rule-of-conditional-and-union-types">The <em>Distributive Rule</em> of Conditional and Union Types</h2>
+<p>One interesting rule about conditional types is how they interact with
+union types. A conditional types <em>distributes over</em> a union type with
+the following distribution law:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">(A | B) <span class="hljs-keyword">extends</span> T ? X : U = (A <span class="hljs-keyword">extends</span> T ? X : U) | (B <span class="hljs-keyword">extends</span> T ? X : U)
+</code></pre>
+<p class="lang-highlight">Let's see how we can apply this law to the <code class="hljs ebnf"><span class="hljs-attribute">TypeName</span></code> operator defined
+above:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">TypeName&lt;<span class="hljs-built_in">string</span> | <span class="hljs-function">(<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>)&gt;
+= (<span class="hljs-params"><span class="hljs-built_in">string</span> | (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>)</span>) <span class="hljs-params">extends</span> <span class="hljs-params">string</span> ? "<span class="hljs-params">string</span>" :
+  (<span class="hljs-params"><span class="hljs-built_in">string</span> | (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>)</span>) <span class="hljs-params">extends</span> <span class="hljs-params">number</span> ? "<span class="hljs-params">number</span>" :
+  (<span class="hljs-params"><span class="hljs-built_in">string</span> | (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>)</span>) <span class="hljs-params">extends</span> <span class="hljs-params">boolean</span> ? "<span class="hljs-params">boolean</span>" :
+  (<span class="hljs-params"><span class="hljs-built_in">string</span> | (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>)</span>) <span class="hljs-params">extends</span> <span class="hljs-params">undefined</span> ? "<span class="hljs-params">undefined</span>" :
+  (<span class="hljs-params"><span class="hljs-built_in">string</span> | (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>)</span>) <span class="hljs-params">extends</span> <span class="hljs-params">Function</span> ? "<span class="hljs-params">function</span>" :
+  "<span class="hljs-params">object</span>";
+= (<span class="hljs-params"><span class="hljs-built_in">string</span> <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span> ? "<span class="hljs-built_in">string</span>" :
+   <span class="hljs-built_in">string</span> <span class="hljs-keyword">extends</span> <span class="hljs-built_in">number</span> ? "<span class="hljs-built_in">number</span>" :
+   <span class="hljs-built_in">string</span> <span class="hljs-keyword">extends</span> <span class="hljs-built_in">boolean</span> ? "<span class="hljs-built_in">boolean</span>" :
+   <span class="hljs-built_in">string</span> <span class="hljs-keyword">extends</span> <span class="hljs-literal">undefined</span> ? "<span class="hljs-literal">undefined</span>" :
+   <span class="hljs-built_in">string</span> <span class="hljs-keyword">extends</span> <span class="hljs-built_in">Function</span> ? "<span class="hljs-keyword">function</span>" :
+   "object"</span>)
+  |
+  (<span class="hljs-params">(<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>) <span class="hljs-keyword">extends</span> <span class="hljs-built_in">string</span> ? "<span class="hljs-built_in">string</span>" :
+   (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>) <span class="hljs-keyword">extends</span> <span class="hljs-built_in">number</span> ? "<span class="hljs-built_in">number</span>" :
+   (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>) <span class="hljs-keyword">extends</span> <span class="hljs-built_in">boolean</span> ? "<span class="hljs-built_in">boolean</span>" :
+   (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>) <span class="hljs-keyword">extends</span> <span class="hljs-literal">undefined</span> ? "<span class="hljs-literal">undefined</span>" :
+   (<span class="hljs-params">(<span class="hljs-params"></span>) =&gt; <span class="hljs-built_in">void</span></span>) <span class="hljs-keyword">extends</span> <span class="hljs-built_in">Function</span> ? "<span class="hljs-keyword">function</span>" :
+   "object"</span>)
+= "<span class="hljs-params">string</span>" | "<span class="hljs-params">function</span>"
+</span></code></pre>
+<p>So we have a substitution rule by which we can evaluate conditional types
+where the argument is a union type.</p>
+<h3 id="the-diff-type-operator" class="lang-highlight">The <code class="hljs ebnf"><span class="hljs-attribute">Diff</span></code> Type Operator</h3>
+<p class="lang-highlight">An interesting and useful application of this distribution rule is to
+<em>remove cases</em> from union types. For example, it is easy to write a
+<code class="hljs ebnf"><span class="hljs-attribute">Diff</span></code> type operator which relies on this rule:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> Diff&lt;T, U&gt; = T <span class="hljs-keyword">extends</span> U ? never : T;
+</code></pre>
+<p>This might seem confusing at first (it certainly did to me!), but makes
+sense when looking at an example:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">Diff&lt;<span class="hljs-string">"a"</span> | <span class="hljs-string">"b"</span> | <span class="hljs-string">"c"</span>, <span class="hljs-string">"a"</span> | <span class="hljs-string">"b"</span>&gt;
+= (<span class="hljs-string">"a"</span> | <span class="hljs-string">"b"</span> | <span class="hljs-string">"c"</span>) <span class="hljs-keyword">extends</span> (<span class="hljs-string">"a"</span> | <span class="hljs-string">"b"</span>) ? never : (<span class="hljs-string">"a"</span> | <span class="hljs-string">"b"</span> | <span class="hljs-string">"c"</span>)
+=   <span class="hljs-string">"a"</span> <span class="hljs-keyword">extends</span> (<span class="hljs-string">"a"</span> | <span class="hljs-string">"b"</span>) ? never : <span class="hljs-string">"a"</span>
+  | <span class="hljs-string">"b"</span> <span class="hljs-keyword">extends</span> (<span class="hljs-string">"a"</span> | <span class="hljs-string">"b"</span>) ? never : <span class="hljs-string">"b"</span>
+  | <span class="hljs-string">"c"</span> <span class="hljs-keyword">extends</span> (<span class="hljs-string">"a"</span> | <span class="hljs-string">"b"</span>) ? never : <span class="hljs-string">"c"</span>
+=   never
+  | never
+  | <span class="hljs-string">"c"</span>
+= <span class="hljs-string">"c"</span>
+</code></pre>
+<h3 id="the-nonnullable-type-operator" class="lang-highlight">The <code class="hljs ebnf"><span class="hljs-attribute">NonNullable</span></code> Type Operator</h3>
+<p class="lang-highlight">A useful application to this the <code class="hljs ebnf"><span class="hljs-attribute">NonNullable</span></code> type operator which
+removes the types <code>null</code> and <code>undefined</code> from a union type:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> NonNullable&lt;T&gt; = Diff&lt;T, <span class="hljs-literal">null</span> | <span class="hljs-literal">undefined</span>&gt;;
+
+<span class="hljs-keyword">type</span> Foo = NonNullable&lt;<span class="hljs-built_in">string</span> | <span class="hljs-literal">null</span> | <span class="hljs-literal">undefined</span>&gt;; <span class="hljs-comment">// Foo = string;</span>
+</code></pre>
+<p class="lang-highlight">It would seem like we could the inverse of the <code class="hljs ebnf"><span class="hljs-attribute">Partial</span></code> type operator
+with this technique - namely making all parameters on an object required.
+However, this is not the case:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> AlmostNonPartial&lt;T <span class="hljs-keyword">extends</span> object&gt; =
+    { [KEY <span class="hljs-keyword">in</span> keyof T]: NonNullable&lt;T[KEY]&gt;; };
+
+<span class="hljs-keyword">type</span> Bar = AlmostNonPartial&lt;{ a?: <span class="hljs-built_in">number</span>; b?: <span class="hljs-built_in">string</span>; }&gt;;
+<span class="hljs-comment">// o_O - a and b are still optional on Bar:</span>
+<span class="hljs-comment">// Bar = { a?: number | undefined; b?: string | undefined; }</span>
+</code></pre>
+<p>Fear not - rescue is in sight, TypeScript 2.8 also provides
+[better control over mapped type modifiers], with which
+we can write the NonPartial operator:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-comment">// notice the -? which removes the ? modifier</span>
+<span class="hljs-keyword">type</span> NonPartial&lt;T <span class="hljs-keyword">extends</span> object&gt; =
+    { [KEY <span class="hljs-keyword">in</span> keyof T]-?: T[KEY]; };
+
+<span class="hljs-keyword">type</span> Bar = NonPartial&lt;{ a?: <span class="hljs-built_in">number</span>; b?: <span class="hljs-built_in">string</span>; }&gt;;
+<span class="hljs-comment">// Bar now has the right type:</span>
+<span class="hljs-comment">// Bar = { a: number; b: string; }</span>
+</code></pre>
+<h2 id="leveraging-recursive-types-to-implement-deepreadonly-" class="lang-highlight">Leveraging Recursive Types to implement <code class="hljs ebnf"><span class="hljs-attribute">DeepReadonly</span></code></h2>
+<p class="lang-highlight">In TypeScript type mappings can be recursive under certain
+conditions. Using recursive type definitions and conditional
+types, we can implement the coveted <code class="hljs ebnf"><span class="hljs-attribute">DeepReadonly</span></code> type operator with
+conditional and recursive types:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> DeepReadonly&lt;T&gt; =
+    T <span class="hljs-keyword">extends</span> <span class="hljs-built_in">any</span>[] ? DeepReadonlyArray&lt;T[<span class="hljs-built_in">number</span>]&gt; :
+    T <span class="hljs-keyword">extends</span> object ? DeepReadonlyObject&lt;T&gt; :
+    T;
+
+<span class="hljs-keyword">interface</span> DeepReadonlyArray&lt;T&gt; <span class="hljs-keyword">extends</span> ReadonlyArray&lt;DeepReadonly&lt;T&gt;&gt; {}
+
+<span class="hljs-keyword">type</span> DeepReadonlyObject&lt;T&gt; = {
+    readonly [KEY <span class="hljs-keyword">in</span> keyof T&gt;]: DeepReadonly&lt;T[KEY]&gt;;
+};
+</code></pre>
+<p>So with conditional types, we can now write type operators we could not
+previously write and probably simplify a few other ones which were
+possible but difficult to write. What's more, in another PR, the
+ability to infer type parameters within conditional types was added to
+the upcomming 2.8 release. With this ability we can basically pattern
+match on types and extract for example the return type of a function
+or that of a function parameter. More on this next time.</p>
+
+
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+            </div>
+            <div class="footer">
+                <p>© Copyright 2013-2017 by Paul Körbitz.</p>
+                <p>
+                    Contact me via
+                    <a href="http://twitter.com/paulkoer">twitter</a> or
+                    <a href="http://github.com/paulkoerbitz">github</a>.
+                </p>
+                <p><a href="/impressum.html">Impressum</a></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-20755947-1']);
+         _gaq.push(['_setDomainName', 'paulkoerbitz.de']);
+         _gaq.push(['_setAllowLinker', true]);
+         _gaq.push(['_trackPageview']);
+         _gaq.push(['anonymizeIp']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
+</html>
