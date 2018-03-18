@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="description" content="">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <link rel="stylesheet" href="/css/atelier-cave-dark.css" type="text/css">
+        <link rel="stylesheet" href="/css/default.css" type="text/css">
+        <title>Inferring Types in Conditional Types</title>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <a href="/">Types and Tailcalls</a>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">blog</a></li>
+                    <!-- <li><a href="/til.html">til</a></li> -->
+                    <li><a href="/archive.html">archive</a></li>
+                    <li><a href="/about.html">about</a></li>
+                    <!-- <li><a href="/rss.xml">rss</a></li> -->
+                </ul>
+            </div>
+            <div class="body">
+
+<h1 class="title">Inferring Types in Conditional Types</h1>
+<p class="date">published on March 18th, 2018</p>
+
+<p class="lang-highlight">In addition to <a href="https://github.com/Microsoft/TypeScript/milestone/61">TypeScript 2.8</a>'s new feature called
+<a href="https://github.com/Microsoft/TypeScript/pull/21316">conditional types</a> which I coverd in the <a href="/posts/a-look-at-typescripts-conditional-types.html">last post</a>, TypeScript
+2.8 also adds a new keyword called <code class="hljs ebnf"><span class="hljs-attribute">infer</span></code>. It allows inferring and <em>extracting</em> a type inside of a conditional statement. This is really
+exciting as it allows us to pattern match on type parameters which was
+not possible in TypeScript up until now!</p>
+<p class="lang-highlight">To revisit, conditional types essentially give you an <code class="hljs actionscript"><span class="hljs-keyword">if</span></code> statement along with
+the ability to <em>ask questions at the type level</em>. This enables some
+very powerful constructs at the type level. Conditional
+types look as follows:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">T <span class="hljs-keyword">extends</span> U ? X : Y
+</code></pre>
+<p class="lang-highlight">Now we can use the <code class="hljs ebnf"><span class="hljs-attribute">infer</span></code> keyword in the <code>extends</code> clause. With it, we
+can infer a type and give it a name and we can use that name in the <code>then</code> clause (the part between <code>?</code> and <code>:</code>) of the conditional type. This allows
+us for example to extract the return type of a function (this previously
+required an ugly hack and couldn't be done with just a type operator in TypeScript):</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> ReturnType&lt;T&gt; = T <span class="hljs-keyword">extends</span> (...args: <span class="hljs-built_in">any</span>[]) =&gt; infer R ? R : never;
+</code></pre>
+<p class="lang-highlight">With the <code class="hljs actionscript"><span class="hljs-keyword">extends</span></code> clause, we check if <code>T</code> is a subtype of a function type
+returning <code>R</code> and if so, the resulting type becomes <code>R</code>, the return type
+of a function. It evaluates as follows:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> T0 = <span class="hljs-function">(<span class="hljs-params">x1: <span class="hljs-built_in">string</span>, x2: <span class="hljs-built_in">number</span></span>) =&gt;</span> <span class="hljs-built_in">string</span>[];
+
+<span class="hljs-comment">// pseudo code to show how the type operator evaluates</span>
+ReturnType&lt;T0&gt;
+    = ReturnType&lt;(&gt;
+    = <span class="hljs-function">(<span class="hljs-params">(<span class="hljs-params">x1: <span class="hljs-built_in">string</span>, x2: <span class="hljs-built_in">number</span></span>) =&gt; <span class="hljs-built_in">string</span>[]
+        <span class="hljs-keyword">extends</span> (<span class="hljs-params">...args: <span class="hljs-built_in">any</span>[]</span>) =&gt; infer R</span>)
+        ? <span class="hljs-params">R</span> : <span class="hljs-params">never</span>
+    = (<span class="hljs-params">(<span class="hljs-params">x1: <span class="hljs-built_in">string</span>, x2: <span class="hljs-built_in">number</span></span>) =&gt; <span class="hljs-built_in">string</span>[]
+        <span class="hljs-keyword">extends</span> (<span class="hljs-params">...args: <span class="hljs-built_in">any</span>[]</span>) =&gt; <span class="hljs-built_in">string</span>[]</span>)
+        ? <span class="hljs-params">string</span>[] : <span class="hljs-params">never</span>
+    = <span class="hljs-params">string</span>[];
+</span></code></pre>
+<p>In a similar vein, we can also extract the argument types
+of a function</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs">FirstArgType&lt;T&gt; =
+    T <span class="hljs-keyword">extends</span> (x: infer X, ...args: <span class="hljs-built_in">any</span>[]) =&gt; <span class="hljs-built_in">any</span> ? X : never;
+
+SecondArgType&lt;T&gt; =
+    T <span class="hljs-keyword">extends</span> (x: <span class="hljs-built_in">any</span>, y: infer Y, ...args: <span class="hljs-built_in">any</span>[]) =&gt; <span class="hljs-built_in">any</span> ? Y : never;
+
+<span class="hljs-comment">// and so on...</span>
+</code></pre>
+<h2 id="inferring-union-and-intersection-types">Inferring union and intersection types</h2>
+<p>It is possible to use the same type variable in multiple positions
+as well. Consider the following:</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> ParameterType&lt;T&gt; = T <span class="hljs-keyword">extends</span> { a: infer U, b: infer U } ? U : never;
+<span class="hljs-keyword">type</span> T1 = ParameterType&lt;{ a: <span class="hljs-built_in">number</span>, b: <span class="hljs-built_in">number</span> }&gt;; <span class="hljs-comment">// T1 = number</span>
+<span class="hljs-keyword">type</span> T2 = ParameterType&lt;{ a: <span class="hljs-built_in">string</span>, b: <span class="hljs-built_in">string</span> }&gt;; <span class="hljs-comment">// T2 = string</span>
+<span class="hljs-keyword">type</span> T3 = ParameterType&lt;{ a: <span class="hljs-built_in">number</span>, b: <span class="hljs-built_in">string</span> }&gt;; <span class="hljs-comment">// T3 = number | string</span>
+</code></pre>
+<p class="lang-highlight">At first it may seem that in the third example the condition should
+not hold and that thus <code class="hljs mipsasm"><span class="hljs-built_in">T3</span></code> should be <code>never</code>, however TypeScript
+can use a union type which allows both <code>number</code> and <code>string</code>. So
+it will generally do that for types which are covariant.</p>
+<p>Similarly, it will infer intersection types for type variables in
+contravariant positions (generally, these are argument types):</p>
+<pre class="lang-highlight"><code class="lang-TypeScript hljs"><span class="hljs-keyword">type</span> ArgumentType&lt;T&gt; = T <span class="hljs-keyword">extends</span> (x: infer U, y: infer U) =&gt; <span class="hljs-built_in">any</span> ? U : never;
+<span class="hljs-keyword">type</span> T4 = ArgumentType&lt;<span class="hljs-function">(<span class="hljs-params">x: <span class="hljs-built_in">number</span>, y: <span class="hljs-built_in">number</span></span>) =&gt;</span> <span class="hljs-built_in">any</span>&gt;; <span class="hljs-comment">// T4 = number</span>
+<span class="hljs-keyword">type</span> T5 = ArgumentType&lt;<span class="hljs-function">(<span class="hljs-params">x: <span class="hljs-built_in">string</span>, y: <span class="hljs-built_in">string</span></span>) =&gt;</span> <span class="hljs-built_in">any</span>&gt;; <span class="hljs-comment">// T5 = string</span>
+<span class="hljs-keyword">type</span> T6 = ArgumentType&lt;<span class="hljs-function">(<span class="hljs-params">x: <span class="hljs-built_in">number</span>, y: <span class="hljs-built_in">string</span></span>) =&gt;</span> <span class="hljs-built_in">any</span>&gt;; <span class="hljs-comment">// T6 = number &amp; string</span>
+</code></pre>
+<p class="lang-highlight">The <a href="https://github.com/Microsoft/TypeScript/pull/21496">merged pull request</a> by Anders Hejlsberg's introducing
+the <code class="hljs ebnf"><span class="hljs-attribute">infer</span></code> keyword has some additional details on how conditional
+types are evaluated, if you want to dig even deeper.</p>
+<p>I am very excited that we can now infer and extract types as this
+makes a lot of things much simpler in type level programming in
+TypeScript!</p>
+
+
+<hr />
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+ var disqus_shortname = 'paulkoerbitz';
+ (function() {
+     var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+     dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+</div>
+<div class="footer">
+    <p>© Copyright 2013-2018 by Paul Körbitz.</p>
+    <p>
+        Contact me via
+        <a href="http://twitter.com/paulkoer">twitter</a> or
+        <a href="http://github.com/paulkoerbitz">github</a>.
+    </p>
+    <p>
+        <a href="/impressum.html">Impressum</a>
+    </p>
+</div>
+</div>
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-20755947-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'UA-20755947-1');
+</script>
+</body>
+</html>
